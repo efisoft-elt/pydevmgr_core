@@ -1,0 +1,12 @@
+kind: Device
+type: Base
+interface_map:
+    i1: 
+        node_map:
+            n1: test_node.yml
+            n2: 
+                cfgfile: test_node.yml
+                value: 0
+
+node_map:
+    n3: test_node.yml
