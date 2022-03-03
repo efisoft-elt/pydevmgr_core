@@ -35,6 +35,7 @@ cfg_txt_er1 = """---
 temperature: 22
 """
 
+
 def test_main():
     config = BaseDevice.Config.parse_obj(yaml.load(cfg_txt, yaml.CLoader))
     assert config.node_map['temperature'].value == 22.0    

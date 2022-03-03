@@ -30,6 +30,7 @@ from PyQt5.QtWidgets import QLineEdit, QLabel, QCheckBox
 from .style import get_style, STYLE
 from .style import STYLE
 from typing import Tuple, Any
+import math
 
 FLOAT_FMT = "%.3f"
 FLOAT_DEFAULT = 0.0
@@ -295,8 +296,12 @@ class FloatVal_IO(BaseVal_IO):
                 output.setText(t)
                 switch_style(output, float_nan(input.text())==v)
                 
-            def get_input():              
-                return float(input.text())
+            def get_input():
+                try:
+                    return float(input.text())  
+                except ( TypeError, ValueError):
+                    return math.nan
+
         else:
             raise ValueError("Invalid input output combination")    
         super().__init__(set_input, set_output, get_input)    
@@ -313,8 +318,10 @@ class FloatVal_I(BaseVal_I):
             def set_input(v):                           
                 input.setText(fmt(v))            
             def get_input():
-                return float(input.text())                
-                    
+                try:
+                    return float(input.text())  
+                except ( TypeError, ValueError):
+                    return math.nan
                                     
         else:
             raise ValueError("Invalid input output combination")    

@@ -766,7 +766,6 @@ class Downloader:
         try:
             self._to_read.read(self._data)
         except Exception as e:
-            raise e
             if self._failure_callbacks:
                 self._did_failed = True
                 for func in self._failure_callbacks:                    

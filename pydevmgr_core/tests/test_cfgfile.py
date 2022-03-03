@@ -14,16 +14,20 @@ nodes = {
 
 
 def test_main():
-    i = BaseInterface( node_map = nodes)
-    assert i.test1.config.value == 9
-    assert i.test2.config.value == 0
-    assert i.test3.config.value == 9
+
+     i = BaseInterface( node_map = nodes)
+
+     assert i.test1.config.value == 9
+     assert i.test2.config.value == 0
+     assert i.test3.config.value == 9
     
-    d = load_and_build('test_device.yml')
-    d = BaseDevice.from_cfgfile('test_device.yml')
-    d.i1.n1.get() == 9
-    d.i1.n2.get() == 0
-    d.n3.get() == 9
+     io.load_config('test_device.yml')
+
+     d = open_object('test_device.yml')
+     d = BaseDevice.from_cfgfile('test_device.yml')
+     d.i1.n1.get() == 9
+     d.i1.n2.get() == 0
+     d.n3.get() == 9
   
 
 

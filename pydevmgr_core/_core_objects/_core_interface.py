@@ -1,5 +1,7 @@
 from ._core_base import (_BaseObject, _BaseProperty,  KINDS,
-                          ObjectIterator, ChildError, IOConfig, ksplit, BaseData)
+                          ObjectIterator, ChildError, IOConfig, ksplit, BaseData, 
+                        _get_class_dict
+                        )
                          
 from ._class_recorder import get_interface_class, get_class, record_class
 
@@ -29,7 +31,9 @@ class BaseInterfaceConfig(_BaseObject.Config):
     def _validate_rpc_map(cls, map, values):
         if values.get('map_built', False):
             return map
-        cls = get_class(values['kind'], values['type'])
+        cls = _get_class_dict(values)
+
+        # cls = get_class(values['kind'], values['type'])
         if map is None:
             map = cls.default_rpc_map() 
         cls.parse_rpc_map(map)
@@ -39,7 +43,9 @@ class BaseInterfaceConfig(_BaseObject.Config):
     def _validate_node_map(cls, map, values):
         if values.get('map_built', False):
             return map
-        cls = get_class(values['kind'], values['type']) 
+        cls = _get_class_dict(values)
+
+        # cls = get_class(values['kind'], values['type']) 
         if map is None:
             map = cls.default_node_map()       
         cls.parse_node_map(map)

@@ -7,12 +7,6 @@ from PyQt5 import uic, QtCore
 from pydantic import BaseModel
 #QCheckBox, QAction, QPushButton, QComboBox, QLayout,  QWidget, QFrame
 
-
-class DEFAULT:
-    link_failure = True
-    link_update = True 
-
-
 class Action:
     """ An action object must be created from a pool of actions of class :class:`Actions` 
     
@@ -170,15 +164,13 @@ class WidgetControl:
     Args:
     
       Basically they are the linker and all arguments necessary to re-establisher a connection between
-      the widget and Downloader and EltDevice
+      the widget and Downloader and Device
       
         - linker :class:`BaseUiLinker` 
         - downloader  :class:`Downloader`the downloader used by linker to connect widget and device output
         - obj :class:`_BaseObject` device/interface/manager.. used by the linker to connect widget and action methods    
         - data Optional[BaseData]: As created by the linker connection 
-        - link_failure (bool): default is True
-        - link_upload (bool): default is True  
-    
+   
     Examples:
     
     ::
@@ -197,18 +189,14 @@ class WidgetControl:
           linker, 
           downloader: Downloader, 
           device: _BaseObject, 
-          data: BaseData, 
-          link_failure: Optional[bool] = DEFAULT.link_failure,
-          link_update: Optional[bool]  = DEFAULT.link_update
+          data: BaseData 
         ) -> None:
         self.linker  = linker
         self.downloader = downloader
         self.device = device
         
         self.data   = data
-        self.link_failure = link_failure
-        self.link_update = link_update
-        
+         
     @property
     def widget(self):
         return self.linker.widget
@@ -216,7 +204,7 @@ class WidgetControl:
     def update(self):
         """ Force the widget update now
         
-        If self.link_update is false the update is not triggered by the downloader. One may want to 
+        If self.config.link_update is false the update is not triggered by the downloader. One may want to 
         have more control on when the widget is updated
         """
         self.linker.update(self.data)
@@ -237,10 +225,7 @@ class WidgetControl:
     def enable(self):
         """ re-establish a connection previously cut by disable and enable the widget """
         self.linker.disconnect()
-        self.linker.connect(self.downloader, self.device, self.data, 
-                           link_failure=self.link_failure, 
-                           link_update=self.link_update
-                           )
+        self.linker.connect(self.downloader, self.device, self.data)
         self.linker.widget.setEnabled(True)
         
     def kill(self):
@@ -270,10 +255,6 @@ class WidgetControl:
         else:
             layout.addWidget(widget)        
     
-
-
-
-
 class BaseUiLinker:
     """ UiLinker takes care of the link between a widget and a downloader and device 
     
@@ -295,9 +276,11 @@ class BaseUiLinker:
        motorCtrl = MotorCtrl().connect(downloader, motor)
            
     """        
-    Data = None
+    Data = BaseModel
     Widget = QWidget    
-    Config = BaseModel
+    class Config(BaseModel):
+        link_failure: bool = True
+        link_update: bool = True
     
     ## #############################################################
     #  
@@ -305,21 +288,30 @@ class BaseUiLinker:
     #
     ## #############################################################
     def __init__(self, widget=None, config=None, **kwargs):
+
+        self._config = self.parse_config(config, **kwargs)
+
         if widget is None:
-            widget = self.Widget()
+            widget = self.new_widget(self._config)
         
         self.widget = widget
-        self._config = self.parse_config(config, **kwargs)
-        
+                
         self.actions = Actions()
         self.inputs = Inputs()
         self.outputs = Outputs()
         self.io = InputOutputs()        
         self.init_vars()        
+    
     @property
     def config(self):
         return self._config
     
+    @classmethod
+    def new_widget(self, config):
+        """ Return a new widget for this linker """
+        return self.Widget()
+
+
     @classmethod
     def parse_config(cls, __config__=None, **kwargs):
         if __config__ is None:
@@ -338,9 +330,7 @@ class BaseUiLinker:
             downloader_or_connection: Union[Downloader,Downloader.Connection],
             dl: DataLink, 
             data :  BaseData,
-            link_failure: Optional[bool] = DEFAULT.link_failure, 
-            link_update: Optional[bool]  = DEFAULT.link_update
-          ) -> None:
+         ) -> None:
         """ Link the UI to a downloader 
         
         Each time the downloader will "download" the update will be executed with the 
@@ -350,11 +340,12 @@ class BaseUiLinker:
             - downloader (:class:`pydevmgr.Downloader`)
             - dl (:class:`pydevmgr.DataLink`)
             - data (:class:`BaseModel`) (shall be the one linked with the dl DataLink)
-            - link_failure (bool): if True, when download failed self.update_failure will be executed
-            - link_update (bbol): link the update method to the downloader .download() method  
         """
         self._disconnect_widget() # remove any connection 
-               
+        
+        link_failure = self.config.link_failure
+        link_update = self.config.link_update
+
         if isinstance(downloader_or_connection, Downloader):  
             connection  = downloader_or_connection.new_connection()
             new_connection = True 
@@ -401,9 +392,7 @@ class BaseUiLinker:
     def connect(self, 
            downloader: Downloader, 
            obj: _BaseObject,
-           data = None, 
-           link_failure: Optional[bool] = DEFAULT.link_failure , 
-           link_update: Optional[bool] = DEFAULT.link_update         
+           data = None,       
         ) -> WidgetControl:
         """ Connect the widget to a obj 
         
@@ -412,11 +401,7 @@ class BaseUiLinker:
             obj  (:class:`pydevmgr_core._BaseObject`): most probably a  :class:`pydevmgr_core.BaseDevice`
             data (optional, :class:`pydantic.BaseModel`): data structure to be linked. If not given
                   It is created from the class .Data attribute
-            link_failure (optional, bool): If True (default) the class update_failure subroutine is 
-                  called when the downloader failed to download
-            link_update (optional, bool): If True (default) the class update subroutine is called when 
-                  the downloader has downloaded new data
-        
+          
         Returns:
             ctrl: (:class:`WidgetControl`) This object allows to control the link between the widget, 
                 the downloader and device. The ctrl is usefull for a parent app whish needs to 
@@ -429,12 +414,12 @@ class BaseUiLinker:
         #self.setup_ui(obj, data)
         dl = DataLink(obj, data)
         self.setup_ui(obj, data)
-        self._link(downloader, dl, data, link_failure=link_failure,link_update=link_update)          
-        return WidgetControl(self, downloader, obj, data, link_failure=link_failure, link_update=link_update)
+        self._link(downloader, dl, data)          
+        return WidgetControl(self, downloader, obj, data)
         
     def disconnect(self) -> None:
         """ Free the uilink from downloader connection callbacks 
-        After executing unlink, the refresh is stopped and widget actions are removed 
+        After executing, the refresh is stopped and widget actions are removed 
         """
         self._disconnect_widget()        
         self.disconnect_events()
@@ -455,7 +440,7 @@ class BaseUiLinker:
         
     def __del__(self):
         try:
-            self.unlink()
+            self.disconnect()
         except Exception as e:
             pass        
 
@@ -487,6 +472,9 @@ class BaseUiLinker:
         """
         pass
 
+    def feedback(self, er, msg=''):
+        pass
+ 
 
 
 
@@ -494,7 +482,7 @@ class LayoutLinker:
     _wctrl_loockup = None
     Layout = QVBoxLayout
     _downloader = None
-    def __init__(self, layout: Optional = None):
+    def __init__(self, layout: Optional[str] = None):
         if layout is None:
             layout = self.Layout()
         
@@ -580,7 +568,6 @@ class WidgetFactory:
           downloader: Downloader, 
           device: _BaseObject, 
           data: BaseData = None, 
-          link_failure: bool = False, 
           widget: Optional[QWidget] =None
         )-> WidgetControl:
         if widget is None:
@@ -588,7 +575,7 @@ class WidgetFactory:
         if data is None:
             data = self.DataClass()
             
-        return self.Linker(widget).connect(downloader, device, data=data, link_failure=link_failure)
+        return self.Linker(widget).connect(downloader, device, data=data)
         
     def build(self,  widget: Optional[QWidget] =None) -> BaseUiLinker:
         if widget is None:
@@ -624,7 +611,8 @@ def get_widget_types(dev_type: str):
 def get_widget_factory(
        widget_type: str, 
        dev_type: Union[None, str], 
-       default: Optional[WidgetFactory] = None
+       default: Optional[WidgetFactory] = None, 
+       alt_dev_type: Optional[Iterable] = None
      ) -> WidgetFactory:
     """ Return a widget linker factory to build a widget for a given widget type and device type 
     
@@ -634,7 +622,7 @@ def get_widget_factory(
        - dev_type (str): The device type 
        - default (optional, WidgetFactory): If given and the Factory is not found it is returned else
                 an error is raised.
-    
+        - alt_dev_type (iterable, optional): Alternative type list if the widget is not found with dev_type 
     Example:
         
         > get_widget_factory('ctr', 'Motor').build().connect(downloader, motor1)
@@ -645,11 +633,22 @@ def get_widget_factory(
         return  _widget_factories[(widget_type, None)]
     except KeyError:
         pass
+
     try:
-        F = _widget_factories[(widget_type, dev_type)]
+        return  _widget_factories[(widget_type, dev_type)]
     except KeyError:
-        if default is None:
-            raise ValueError(f"Widget Factory with type {widget_type} and device type {dev_type} cannot be found")
-        return default         
-    return F
+        pass
+
+    if alt_dev_type:
+        for tpe in alt_dev_type:
+            try:
+                return  _widget_factories[(widget_type, tpe)]
+            except KeyError:
+                pass
+
+    
+    if default:
+        return default
+
+    raise ValueError(f"Widget Factory with type {widget_type} and device type {dev_type} cannot be found, set `alt_dev_type` or `default`")
 

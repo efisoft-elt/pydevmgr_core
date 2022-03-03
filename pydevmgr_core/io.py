@@ -106,6 +106,7 @@ def append_cfgpath( path: str, ioconfig: IOConfig = ioconfig):
     """
     envpath = os.environ.get(ioconfig.cfgpath, '').split(':')
     envpath.append(path)
-    os.environ[ioconfig.cfgpath] = ":".join(path)
+    os.environ[ioconfig.cfgpath] = ":".join(envpath)
+
 
 

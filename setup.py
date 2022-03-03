@@ -17,7 +17,7 @@ setup(
     #data_files=data_files,
     license='Creative Commons Attribution-Noncommercial-Share Alike license',
     long_description=open('README.md').read(),
-    install_requires=['pyyaml', 'jinja2', 'argparse', 'pydantic', 'typer', 'py_expression_eval'],
+    install_requires=['pyyaml',  'pydantic',  'py_expression_eval'],
     
     extras_require={
         "QT":  ["pyqt5"],
@@ -29,7 +29,7 @@ setup(
     include_package_data=True, 
     package_data= {
         'pydevmgr_core':    ["resources/*.yml"], 
-        'pydevmgr_qt': ["uis/*.ui"]
+        'pydevmgr_core_qt': ["uis/*.ui"]
     }, 
     entry_points = {
         'console_scripts': [],

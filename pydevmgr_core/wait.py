@@ -149,7 +149,7 @@ def wait(node_or_func_list, logic="all_true", period=0.1, timeout=60, lag=0.0, s
             the sleep time in second in between checks
         timeout (float, optional): timeout in second, a RuntimeError is raised if conditions
                          are still false after timeout
-        lag (float, optional): Add a flat time lag (in second) before starting to wait. 
+        lag (float, optional): Add a flat time lag (in second) before checking nodes. 
                     This could be used to make sure that the last operation has been digested by server. 
                          
                     Bellow the lag is used to make sure that when ``wait`` starts the motor is moving

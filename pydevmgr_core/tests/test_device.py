@@ -3,6 +3,7 @@ from pydevmgr_core import NodeAlias, NodeAlias1, record_class, get_class, BaseRp
 
 import yaml
 
+
 @record_class
 class Ctrl(BaseInterface):
     class Config(BaseInterface.Config):

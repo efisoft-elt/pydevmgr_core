@@ -26,7 +26,9 @@ class IOConfig(BaseModel):
 class BaseConfig(BaseModel):
     kind: KINDS = ""
     type: str = ""
-    version: str = "" # version of the configuration file 
+    version: str = "" # version of the configuration file
+    true_type: Optional[Type] = None
+    
     class Config: # this is the Config of BaseModel
         extra = Extra.forbid
         validate_assignment = True    
@@ -52,35 +54,141 @@ class BaseConfig(BaseModel):
         return cls.parse_obj(config_dict)
          
     
-    def cfgdict(self, exclude=set()):
+    def cfgdict(self, exclude: set =set()):
         """ Write the config to a dictionary as it is red from from_cfgdict """
+        exclude.add('true_type')
         d = self.dict(exclude_unset=True, exclude=exclude)
         return d
 
-def open_object(
-        kind, 
-        cfgfile, 
-        path: Optional[str] = None, 
-        prefix: str = '', 
-        key: Optional[str]= None, *args, **kwargs
-    ):     
-    if path is None:
-        # get the first key 
-        allconf = load_config(cfgfile)
-        path = next(iter(allconf))
-        allconf = allconf[path]            
-    else:
-        allconf = load_config(cfgfile)
+def _path_walk(d, path):
+    if isinstance(path, int):
+        # get the first key
+        
+        if hasattr(d, "keys"):
+            k = list(d.keys())[path]
+            return d[k]
+        else:
+            return d[path]
+   
+    if path:
         for p in (s for s in  path.split('.') if s):
-            allconf = allconf[p]
-    tpe = allconf['type']
+            d = d[p]
+    return d
+
+def _get_class_dict( d, default_type: Optional[Union[str, Type]] = None):
+
+    try:
+        kind = d['kind']
+    except KeyError:
+        raise ValueError('"kind" attribute missing')
     
-    Device = get_class(kind, tpe)
-    config = Device.Config.from_cfgdict(allconf)  
-    if key is None and path: 
+    tt = d.get('true_type', None)
+    if tt: 
+        return tt
+    
+    try:
+        st = d['type']
+    except KeyError:
+        raise ValueError('"type" attribute missing')    
+
+    try:
+        return get_class(kind, st)
+    except ValueError as e:
+        if default_type:
+            if isinstance(default_type, type):
+                return default_type
+            return get_class(kind, default_type)
+        raise e
+
+
+def _get_class_config( c, default_type: Optional[Union[str, Type]] = None):
+    if c.true_type:
+        return c.true_type
+    try:
+        return get_class(c.kind, c.type)
+    except ValueError as e:
+        if default_type:
+            if isinstance(default_type, type):
+                return default_type
+            return get_class(c.kind, default_type)
+        raise e
+  
+
+
+
+
+def open_class(
+        cfgfile: str, 
+        path: Optional[Union[str, int]] = None, 
+        default_type: Optional[str] = None,
+        **kwargs
+        ):
+    """ open a pydevmgr class and configuration object from a config file 
+
+    Args:
+        cfgfile: relative to on of the $CFPATH or absolute path to yaml config file 
+        kind (optional, str): object kind as enumerated in KINDS ('Manager', 'Device', 'Interface', 'Node', 'Rpc')
+            if None look inside the configuration file and raise error if not defined. 
+        
+        path (optional, str, int): an optional path to find the configuration inside the config file 
+             'a.b.c' will go to cfg['a']['b']['c']
+             If an integer N will get the Nth element of the cfgfile 
+
+        default_type (optional, str): A default type if no type is defined in the configuration file
+            If default_type is None and no type is found an error is raised 
+
+    Returns:
+        ObjClass :  An pydevmgr Object class (Manager, Device, Node, Rpc, Interface)
+        config : An instance of the config (BaseModel object) 
+    """
+    allconf = load_config(cfgfile)
+        
+    allconf = _path_walk(allconf, path)
+    
+    allconf.update( kwargs )
+    
+    try:
+        kind = allconf['kind']
+    except KeyError:
+        raise ValueError("Configuration has no 'kind' defined")
+
+    tpe = allconf.get('type', default_type)
+    if not tpe:
+        raise ValueError(f"Cannot resolve {kind} type")
+    Object = get_class(kind, tpe)
+    allconf['true_type'] = Object
+    # config = Object.parse_config(allconf) 
+    config = Object.Config.from_cfgdict(allconf)
+    return Object, config
+
+def open_object(
+        cfgfile,
+        key: Optional[str]= None, 
+        path: Optional[Union[str, int]] = None, 
+        prefix: str = '', 
+        default_type: Optional[str] = None, 
+        **kwargs
+    ):
+    """ open an object from a configuration file 
+    Args:
+        cfgfile: relative to on of the $CFPATH or absolute path to yaml config file 
+        kind (optional, str): object kind as enumerated in KINDS ('Manager', 'Device', 'Interface', 'Node', 'Rpc')
+            if None look inside the configuration file and raise error if not defined. 
+        
+        path (optional, str): an optional path to find the configuration inside the config file 
+             'a.b.c' will go to cfg['a']['b']['c']
+        default_type (optional, str): A default type if no type is defined in the configuration file
+            If default_type is None and no type is found an error is raised
+
+    Returns:
+        obj : instanciatedpydevmgr object (Manager, Device, Node, Rpc, Interface)
+
+    """
+    Object, config = open_class(cfgfile, path=path, default_type=default_type, **kwargs)
+    if key is None and isinstance(path, str): 
         _, name = ksplit(path)           
         key = kjoin(prefix, name)
-    return Device(key, *args, config=config, **kwargs)
+    return Object(key, config=config)
         
 class BaseData(BaseModel):
     # place holder for Data class 
@@ -105,12 +213,9 @@ def load_yaml_config(yaml_payload: str, path: Optional[Union[str, tuple]] = None
         config (BaseModel):  The parsed configuration 
     """
     payload = yaml.load(yaml_payload, Loader=ioconfig.YamlLoader)
-    if path is not None:
-        if isinstance(path , str):
-            path = [path]
-        for p in path:
-            payload = payload[p]
     
+    payload = _path_walk(payload, path)
+   
     return load_dict_config(payload)
     
 def load_dict_config(payload: dict)-> Tuple[Type,BaseConfig]:
@@ -122,8 +227,9 @@ def load_dict_config(payload: dict)-> Tuple[Type,BaseConfig]:
         type = payload['type']
     except KeyError:
         raise ValueError('"type" attribute missing')    
-    cls = get_class(kind, type)
-    return cls, cls.Config.parse_obj(payload)
+    
+    cls = _get_class_dict(payload)
+    return cls, cls.parse_config(payload)
 
 def build_yaml(yaml_payload, key: Optional[str]=None, *args, **kwargs):
     """ Build and return an object from its yaml configuration payload """
@@ -255,11 +361,17 @@ class _BaseObject:
     @classmethod
     def parse_config(cls, __config__=None, **kwargs):
         if __config__ is None:
+            kwargs['true_type'] = cls
             return cls.Config(**kwargs)
         if isinstance(__config__ , cls.Config):
             return __config__
         if isinstance(__config__, dict):
-            return cls.Config( **{**__config__, **kwargs} )
+            d = {**__config__, **kwargs} 
+            d['true_type'] = cls
+
+            # if hasattr(cls.Config, "from_cfgdict"):
+            #     return cls.Config.from_cfgdict(d)
+            return cls.Config( **d )
         raise ValueError(f"got an unexpected object for config : {type(__config__)}")
             
     @classmethod
@@ -299,43 +411,46 @@ class _BaseObject:
     @classmethod
     def from_cfgfile(cls, 
             cfgfile: str, 
-            path: Optional[str] = None, 
-            prefix: str = '', 
             key: Optional[str]= None, 
-            *args, **kwargs
+            path: Optional[Union[str,int]] = None, 
+            prefix: str = '', 
+            **kwargs
         ) -> '_BaseObject':
         """ Create the object from a configuration file 
         
         Args:
             cfgfile (str): Path to the config file, shall be relative to one of the $CFGPATH or absolute
                      path
+            key (str, Optional): key of the device, if not given this is built from the path suffix and
+                    the optional prefix
+           
             path (None, str, False)"" the hierarchique path where to find the config data inside the file 
                     for instance 'a.b.c' will loock at cfg['a']['b']['c'] from the loaded config file 
                     If "" the config file define the device configuration from its root 
                     If None the first item of the config file is taken 
             prefix (str, optional): add a prefix to the path name to build the device key. 
                     It is used only if key is None otherwhise ignored
-            key (str, Optional): key of the device, if not given this is built from the path suffix and
-                    the optional prefix
         """
         
-                        
-        if path is None:
-            # get the first key 
-            allconf = load_config(cfgfile)
-            path = next(iter(allconf))            
-        else:
-            allconf = load_config(cfgfile)
-            for p in (s for s in  path.split('.') if s):
-                allconf = allconf[p]
-                
-        config = cls.Config.from_cfgdict(allconf)            
-        if key is None and path: 
+        allconf = load_config(cfgfile)
+        allconf = _path_walk(allconf, path)
+        
+        allconf.update(**kwargs)
+               
+        if key is None and isinstance(path, str): 
             _, name = ksplit(path)           
             key = kjoin(prefix, name)
-                                        
-        return cls(key, *args, config=config, **kwargs)
+        
+        return cls.from_cfgdict(allconf, key)
     
+    @classmethod
+    def from_cfgdict(cls, cfgdict, key: Optional[str] = None, *args, **kwargs):
+        """ Open  """
+        tpe = cls.Config.__fields__['type'].default 
+        #config = cls.parse_config(cfgdict, type=tpe)
+        config = cls.Config.from_cfgdict(cfgdict)               
+        
+        return cls(key, *args, config=config, **kwargs)
         
     @property
     def key(self):

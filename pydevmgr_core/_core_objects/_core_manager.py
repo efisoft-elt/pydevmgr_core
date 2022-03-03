@@ -1,4 +1,4 @@
-from ._core_base import _BaseObject, _BaseProperty, ChildError, ksplit, BaseData, kjoin
+from ._core_base import _BaseObject, _BaseProperty, ChildError, ksplit, BaseData, kjoin, _get_class_dict, open_object
 from ._core_device import _DeviceListing, BaseDevice, parse_device_map
 from ._core_node import BaseNode, parse_node_map, _NodeListing
 from ._core_rpc import BaseRpc, parse_rpc_map, _RpcListing
@@ -40,7 +40,9 @@ class ManagerConfig(_BaseObject.Config):
     def _validate_device_map(cls, map, values):
         if values.get('map_built', False):
             return map
-        cls = get_class(values['kind'], values['type'])
+        cls = _get_class_dict(values)
+
+        # cls = get_class(values['kind'], values['type'])
         if map is None:
             map = cls.default_device_map()
         cls.parse_device_map(map)
@@ -50,7 +52,10 @@ class ManagerConfig(_BaseObject.Config):
     def _validate_rpc_map(cls, map, values):
         if values.get('map_built', False):
             return map
-        cls = get_class(values['kind'], values['type'])
+        cls = _get_class_dict(values)
+
+        # cls = get_class(values['kind'], values['type'])
+
         if map is None:
             map = cls.default_rpc_map()
         cls.parse_rpc_map(map)
@@ -60,7 +65,9 @@ class ManagerConfig(_BaseObject.Config):
     def _validate_node_map(cls, map, values):
         if values.get('map_built', False):
             return map
-        cls = get_class(values['kind'], values['type'])   
+        cls = _get_class_dict(values)
+
+        # cls = get_class(values['kind'], values['type'])   
         if map is None:
             map = cls.default_node_map()     
         cls.parse_node_map(map)
@@ -70,7 +77,11 @@ class ManagerConfig(_BaseObject.Config):
     def _validate_interface_map(cls, map, values):
         if values.get('map_built', False):
             return map        
-        cls = get_class(values['kind'], values['type'])
+        
+        cls = _get_class_dict(values)
+
+        # cls = get_class(values['kind'], values['type'])
+        
         if map is None:
             map = cls.default_interface_map()
         cls.parse_interface_map(map)
@@ -84,6 +95,33 @@ class ManagerConfig(_BaseObject.Config):
             if map not in exclude:
                 d[map] = {k:n.cfgdict() for k,n in getattr(self, map).items()}
         return d
+
+
+def open_manager(cfgfile, path=None, prefix="", key=None, default_type=None, **kwargs):
+    """ Open a manager from a configuration file 
+
+        
+        Args:
+            cfgfile: relative path to one of the $CFGPATH or absolute path to the yaml config file 
+            key: Key of the created Manager 
+            path (str, int, optional): 'a.b.c' will loock to cfg['a']['b']['c'] in the file. If int it will loock to the Nth
+                                        element in the file
+            prefix (str, optional): additional prefix added to the name or key
+
+        Output:
+            manager (BaseManager subclass) :tanciated Manager class     
+    """
+    kwargs.setdefault("kind", KINDS.MANAGER)
+    return open_object(
+                cfgfile, 
+                path=path, prefix=prefix, 
+                key=key, default_type=default_type, 
+                **kwargs
+            ) 
+
+
+
+
 
 @record_class        
 class BaseManager(_BaseObject, _DeviceListing, _NodeListing, _RpcListing, _InterfaceListing):

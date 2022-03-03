@@ -1,73 +1,160 @@
-from PyQt5.QtWidgets import QLayout, QBoxLayout, QGridLayout, QWidget
+from PyQt5.QtWidgets import QLayout, QBoxLayout, QHBoxLayout,  QGridLayout, QMainWindow, QVBoxLayout, QWidget, QMenu, QAction, qApp
 from PyQt5 import QtCore
+
+from .base import WidgetControl
 from .base import get_widget_factory, BaseUiLinker, WidgetFactory
 from typing import List, Tuple, Optional
-from pydevmgr_core import BaseDevice
+from pydevmgr_core import BaseDevice, DataLink
+from .base_view import DevicesWidgetLinker
 
-def insert_widget(
-     device: BaseDevice, 
-     layout: QLayout, 
-     widget_kind: str, *,
-     default_factory: Optional[WidgetFactory] = None,
-    
-     column: int = 0,
-     row: int = 0,
-     columnSpan: int = 1,
-     rowSpan: int = 1,
-     
-     stretch: int = 0,
-     alignment: int = 0        
-    ) -> BaseUiLinker:
-    """ Insert one device widget inside a QT Layout object 
-    
-    Args:
-        device (BaseDevice): list of devices 
-        layout: (QLayout)
-        widget_kind (str):  e.g. "line", "ctrl", "cfg" 
-        
-    
-    Returns:
-       linker (BaseUiLinker): A device linker object (not yet connected to device)
-       
-    """
-    factory = get_widget_factory(widget_kind, device.config.type, default=default_factory)       
-    linker = factory.build()
-    
-    widget = linker.widget 
-    if isinstance(layout, QBoxLayout): 
-        layout.addWidget(widget, stretch, QtCore.Qt.AlignmentFlag(alignment))
-    elif isinstance(layout, QGridLayout):
-        layout.addWidget(widget, row, column, rowSpan, columnSpan)
-    else:
-        layout.addWidget(widget)  
-    return linker 
 
-def insert_widgets(
-      devices: List[BaseDevice], 
-      layout: QLayout, 
-      widget_kind: str, *, 
-      direction: int = 0, # 0 for row 1 for column
-      column: int = 0,
-      row: int = 0,
-      **kwargs
-    ) -> List[Tuple[BaseDevice,BaseUiLinker]]:
-    """ Insert devices widgets inside a QT Layout object 
-    
-    Args:
-        device (list): list of devices 
-        layout: (QLayout)
-        widget_kind (str):  e.g. "line", "ctrl", "cfg" 
+
+class ConfigManager(DevicesWidgetLinker.Config):
+    pass
+
+
+class ManagerWidget(QMainWindow):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         
-    
-    Returns:
-       device_linker (list): A list of (device, linker) tuple
-       
-    """
-    
-    if direction:
-        return [(device,insert_widget(device, layout, widget_kind, column=column+i, row=row, **kwargs)) for i,device in enumerate(devices)]
-    else:
-        return [(device,insert_widget(device, layout, widget_kind, row=row+i, column=column, **kwargs)) for i,device in enumerate(devices)]
+        top = QWidget()
+        bottom = QWidget()
+        left = QWidget()
+        right = QWidget()
+        body = QWidget()
+         
+        
+        top_layout = QHBoxLayout()
+        bottom_layout = QHBoxLayout()
+        left_layout = QVBoxLayout()
+        right_layout = QVBoxLayout()
+        body_layout = QVBoxLayout()
+
+
+        top.setLayout(top_layout)
+        bottom.setLayout(bottom_layout)
+        left.setLayout(left_layout)
+        right.setLayout(right_layout)
+        body.setLayout(body_layout)
+
+        
+        main_layout = QGridLayout()
+        main = QWidget()
+        main.setLayout(main_layout)
+        
+        main_layout.addWidget( top, 0, 0, 1, 3 )
+        main_layout.addWidget( left, 1, 0 )
+        main_layout.addWidget( bottom, 2, 0, 1, 3 )
+        main_layout.addWidget( right, 1, 2)
+        main_layout.addWidget( body, 1, 1)
+
+
+        
+        devices =  DevicesWidgetLinker.Widget()
+        body_layout.addWidget(devices)
+        
+            
+
+        self.setCentralWidget(main)
+        
+        # main_layout = QVBoxLayout()
+        # self.setLayout(main_layout)
+        # main_layout.addWidget(self.body)
+        
+        menuBar = self.menuBar()
+        menuBar.setNativeMenuBar(False)
+        # Creating menus using a QMenu object
+        fileMenu = QMenu("&File", self)
+        menuBar.addMenu(fileMenu)
+        
+        self.resize(750, 1000)
+                
+        exitAct = QAction('&Exit', self)
+        exitAct.setShortcut('Ctrl+Q')
+        exitAct.setStatusTip('Exit application')
+        exitAct.triggered.connect(qApp.quit)
+        
+        fileMenu.addAction(exitAct)
+        
+        self.viewMenu = QMenu("&View", self)
+        menuBar.addMenu(self.viewMenu)
+        
+        self.menuBar = menuBar
         
         
+        self.top = top 
+        self.right = right
+        self.left = left 
+        self.bottom = bottom 
+        self.body = body 
+        self.main = main 
+        self.devices = devices
+
+        self.top_layout = top_layout 
+        self.right_layout = right_layout
+        self.left_layout = left_layout 
+        self.bottom_layout = bottom_layout 
+        self.body_layout = body_layout 
+        self.main_layout = main_layout 
+
+
+
+
+
+class ManagerLinker(BaseUiLinker):
+    Config = ConfigManager
+    Widget =  ManagerWidget
+    _widget_view_ctrl = None
+    _widget_view = None
+    
+    class Data(DevicesWidgetLinker.Data):
+        pass
+    
+   
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    
+    def connect(self, downloader, manager, data = None):
+        if data is None:
+            data = self.new_data()
+        
+        self.setup_ui(manager, data)
+        
+        self._multi_view_ctrl = WidgetControl(
+                self._multi_view, 
+                downloader, 
+                manager.devices(),
+                data
+            )
+        
+        self._multi_view._link(downloader)
+        self._link(downloader, DataLink(manager, data), data)
+        return self._multi_view_ctrl
+    
+    def view_changed(self, view_name):
+        if self._multi_view_ctrl:
+            self._multi_view_ctrl.data.current_view = view_name
+            self._multi_view_ctrl.disable()
+            self._multi_view_ctrl.enable()
+
+    
+    def setup_ui(self, manager, data):
+        
+        multi_view = DevicesWidgetLinker(widget=self.widget.devices, config=self.config)
+        
+        multi_view.setup_ui( manager.devices(), data)
+        
+        self._multi_view = multi_view
+                        
+        for view_name in self.config.views:
+            viewAct = QAction(view_name, self.widget)
+            self.widget.viewMenu.addAction(viewAct)
+
+            self.actions.add(self.view_changed, [view_name], feedback=self.feedback).connect_action(viewAct)
+                 
+
+    
+
+
 

@@ -1,4 +1,6 @@
-from ._core_base import (_BaseObject, _BaseProperty, ObjectIterator, ChildError, IOConfig, ksplit, BaseData)
+from ._core_base import (_BaseObject, _BaseProperty, ObjectIterator, ChildError,
+        IOConfig, ksplit, BaseData,
+        open_object, _get_class_dict)
 from ._class_recorder import get_device_class, KINDS, get_class, record_class
 from ._core_node import BaseNode, _NodeListing, parse_node_map
 from ._core_interface import BaseInterface, _InterfaceListing, parse_interface_map
@@ -7,7 +9,10 @@ from ._core_rpc import BaseRpc, _RpcListing, parse_rpc_map
 from pydantic  import BaseModel, validator
 from .. import io 
 
-from typing import List, Optional, Any, Dict, Union
+from typing import List, Optional, Any, Dict, Union, Type
+
+
+
 
 
 class BaseDeviceConfig(_BaseObject.Config):
@@ -25,7 +30,8 @@ class BaseDeviceConfig(_BaseObject.Config):
     def _validate_rpc_map(cls, map, values):
         if values.get('map_built', False):
             return map
-        cls = get_class(values['kind'], values['type'])
+        cls = _get_class_dict(values)
+        # cls = get_class(values['kind'], values['type'])
         if map is None:
             map = cls.default_rpc_map()
             
@@ -36,7 +42,8 @@ class BaseDeviceConfig(_BaseObject.Config):
     def _validate_node_map(cls, map, values):
         if values.get('map_built', False):
             return map
-        cls = get_class(values['kind'], values['type'])        
+        cls = _get_class_dict(values)
+        # cls = get_class(values['kind'], values['type'])        
         if map is None:
             map = cls.default_node_map()
         cls.parse_node_map(map)
@@ -46,7 +53,9 @@ class BaseDeviceConfig(_BaseObject.Config):
     def _validate_interface_map(cls, map, values):
         if values.get('map_built', False):
             return map        
-        cls = get_class(values['kind'], values['type'])
+        cls = _get_class_dict(values)
+    
+        # cls = get_class(values['kind'], values['type'])
         if map is None:
             map = cls.default_interface_map()
         cls.parse_interface_map(map)
@@ -70,13 +79,34 @@ class BaseDeviceConfig(BaseDeviceConfig):
     def _validate_device_map(cls, map, values):
         if values.get('map_built', False):
             return map
-        cls = get_class(values['kind'], values['type'])
+        cls = _get_class_dict(values)
+
+        # cls = get_class(values['kind'], values['type'])
         if map is None:
             map = cls.default_device_map()
         cls.parse_device_map(map)
         return map
     
     
+def open_device(cfgfile, path=None, prefix="", key=None, default_type=None, **kwargs):
+    """ Open a device from a configuration file 
+
+        
+        Args:
+            cfgfile: relative path to one of the $CFGPATH or absolute path to the yaml config file 
+            key: Key of the created Manager 
+            path (str, int, optional): 'a.b.c' will loock to cfg['a']['b']['c'] in the file. If int it will loock to the Nth
+                                        element in the file
+            prefix (str, optional): additional prefix added to the name or key
+
+        Output:
+            device (BaseDevice subclass) :tanciated Device class     
+    """
+    kwargs.setdefault("kind", KINDS.DEVICE)
+
+    return open_object(cfgfile, path=path, prefix=prefix, key=key, default_type=default_type, **kwargs) 
+
+
 
 
 def parse_device_map(parentClass, map):   

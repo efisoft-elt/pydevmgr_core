@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Union, List, Optional, Type
+from typing import Union, List, Optional, Type, Callable
 class KINDS(str, Enum):
     PARSER = "Parser"
     NODE = "Node"
@@ -24,12 +24,14 @@ class Managers:
 
 
 object_loockup = {}
-def get_class(kind: KINDS, type_: str) -> Type:
+def get_class(kind: KINDS, type_: str, default=None) -> Type:
     try:
         return object_loockup[(kind, type_)]
     except KeyError:
-        raise ValueError(f"Unknown {kind!r} of type {type_!r}")
-
+        if default is None:
+            raise ValueError(f"Unknown {kind!r} of type {type_!r}")
+        else:
+            return default
 def get_parser_class(type_: str)-> Type:
     return get_class(KINDS.PARSER, type_)
 
@@ -53,13 +55,13 @@ def record_class(
          overwrite: Optional[bool] = False, 
          type: Optional[str] =None, 
          kind: Optional[Union[KINDS,str]] =None
-     ) -> None:
+     ) -> Callable:
     """ record a new class by its kind and type 
     
     This can be used as decorator or function 
     """    
     if _cls_ is None:
-        def obj_decorator(cls):
+        def obj_decorator(cls) -> Type:
             return record_class(cls, overwrite=overwrite, type=type)
         return obj_decorator
     else:

@@ -33,7 +33,19 @@ from typing import Callable
 
 
 
-class Output:
+class WidgetLink:
+    def __init__(self, widget, config):
+        self._widget = widget
+        self._config = config
+    
+    def set(self, value):
+        raise NotImplementedError("set")
+    
+    @classmethod
+    def accept(cls, widget):
+        raise NotImplementedError("accept") 
+
+class Input:
     def __init__(self, widget, config):
         self._widget = widget
         self._config = config
@@ -57,15 +69,8 @@ def _found_handler(cls, widget):
     raise ValueError(f"Cannot found suitable output for class {cls.__name__} and widget {type(widget)}")
             
 
-    
-class OutputVal:
-    class Config(BaseModel):
-        pass
-        
-    def __init__(self, output_widget, config=None, **kwargs):        
-        self.config = self.parse_config(config, **kwargs)        
-        self.set = _found_handler(self.__class__, output_widget)(output_widget, self.config).set
-                
+
+class _BaseVal_:
     @classmethod
     def parse_config(cls, __config__=None, **kwargs):
         if __config__ is None:
@@ -77,31 +82,59 @@ class OutputVal:
         raise ValueError(f"got an unexpected object for config : {type(__config__)}")
 
 
+
+    
+class OutputVal(_BaseVal_):
+    class Config(BaseModel):
+        pass
+        
+    def __init__(self, output_widget, config=None, **kwargs):        
+        self.config = self.parse_config(config, **kwargs)        
+        self.set = _found_handler(self.__class__, output_widget)(output_widget, self.config).set
+                
+
+class InputVal(_BaseVal_):
+    class Config(BaseModel):
+        pass
+
+    def __init__(self, input_widget, config=None, **kwargs):
+        self.config = self.parse_config(config, **kwargs)
+        wh = _found_handler(self.__class__, input_widget)(input_widget, self.config)
+        self.set_input = wh.set
+        self.get = wh.get
+        
+
+class BoolCheck(WidgetLink):
+    @classmethod
+    def accept(cls, w):
+        return hasattr(w, "setChecked")
+    def set(self, b):
+        return self._widget.setChecked(b)
+    def get(self):
+        return self._widget.isChecked()
+    
+class BoolLabel(WidgetLink):
+    @classmethod
+    def accept(cls, w):
+        return hasattr(w, "setText") 
+    def set(self, b):
+        self._widget.setText( self._config.fmt(b) )     
+
+   
+
+
+
 class BoolVal_O(OutputVal):
     class Config(OutputVal.Config):
         fmt: Callable  = staticmethod(lambda v: "[X]" if v else "[ ]")
     
-    class BoolCheckOutput(Output):
-        @classmethod
-        def accept(cls, w):
-            return hasattr(w, "setChecked")
-        def set(self, b):
-            return self._widget.setChecked(b)         
-        
-    class BoolLabelOutput(Output):                
-        @classmethod
-        def accept(cls, w):
-            return hasattr(w, "setText") 
-        def set(self, b):
-            self._widget.setText( self._config.fmt(b) )     
-    
-        
-        # def __init__(self, w, c):
-        #     def set_output(b):
-        #         t = c.fmt(b)                
-        #         w.setText(t)
-        #     self.set  = set_output              
-    
-    
-    
-        
+    BoolCheck = BoolCheck
+    BoolLabel = BoolLabel
+
+
+
+class BoolVal_I(InputVal):
+    BoolCheck
+
+
+            
