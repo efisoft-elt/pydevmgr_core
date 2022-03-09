@@ -28,6 +28,7 @@ __all__ = [
 "AnyTrue", 
 "AnyFalse", 
 "InsideIntervalNode", 
+"InsideCircleNode", 
 "PosNameNode", 
 "FormulaNode", 
 "FormulaNode1", 

@@ -75,6 +75,19 @@ def _path_walk(d, path):
             d = d[p]
     return d
 
+def _path_name(d, path):
+    if isinstance(path, int):
+        if hasattr(d, "keys"):
+            k = list(d.keys())[path]
+            return k
+        else:
+            return None
+    if isinstance(path, str):
+        _, name = ksplit(path)
+        return name 
+    return None
+
+
 def _get_class_dict( d, default_type: Optional[Union[str, Type]] = None):
 
     try:
@@ -139,10 +152,12 @@ def open_class(
 
     Returns:
         ObjClass :  An pydevmgr Object class (Manager, Device, Node, Rpc, Interface)
-        config : An instance of the config (BaseModel object) 
+        config : An instance of the config (BaseModel object)
+        pname (str, None) : The name of the object extracted from the path 
     """
     allconf = load_config(cfgfile)
-        
+    
+    pname = _path_name(allconf, path)
     allconf = _path_walk(allconf, path)
     
     allconf.update( kwargs )
@@ -159,7 +174,7 @@ def open_class(
     allconf['true_type'] = Object
     # config = Object.parse_config(allconf) 
     config = Object.Config.from_cfgdict(allconf)
-    return Object, config
+    return Object, config, pname 
 
 def open_object(
         cfgfile,
@@ -184,10 +199,10 @@ def open_object(
         obj : instanciatedpydevmgr object (Manager, Device, Node, Rpc, Interface)
 
     """
-    Object, config = open_class(cfgfile, path=path, default_type=default_type, **kwargs)
-    if key is None and isinstance(path, str): 
-        _, name = ksplit(path)           
-        key = kjoin(prefix, name)
+    Object, config, pname = open_class(cfgfile, path=path, default_type=default_type, **kwargs)
+
+    if key is None and pname:
+        key = kjoin(prefix, pname)
     return Object(key, config=config)
         
 class BaseData(BaseModel):

@@ -2,8 +2,8 @@ from pydevmgr_core import *
 from pydantic import Field 
 
 class D(BaseDevice):
-    r = NoiseNode.prop('r', distribution="random", scale=0.8, mean=0.4)
-    
+    #r = NoiseNode.prop('r', distribution="random", scale=0.8, mean=0.4)
+    r = StaticNode('r', value=0.4)
     @NodeAlias1.prop('r2', node='r')
     def r2(self, value):
         return round(value, 2)

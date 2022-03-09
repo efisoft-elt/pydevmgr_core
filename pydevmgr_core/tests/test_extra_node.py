@@ -7,7 +7,13 @@ else:
     use_plot = False
 
 def test_main():
- 
+    
+    try:
+        import numpy
+    except ModuleNotFoundError:
+        print( "Warning numpy related node cannot be tested : numpy not installed" )
+        return 
+    
     s = StaticNode(value=16)
     v = NoiseAdderNode(node=s, scale=4)
 
