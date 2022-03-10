@@ -78,7 +78,7 @@ class Waiter:
             reader = DictReadCollector(data)
             for n in nodes:
                 reader.add(n)           
-                     
+        self.nodes = nodes               
         self.reader = reader    
         self.period  = period
         self.timeout = timeout
@@ -117,7 +117,7 @@ class Waiter:
             q = check_func(functions)
             if q:
                 reader.read(data_nodes)
-                return check_nodes(data_nodes.values())
+                return check_nodes( [data_nodes[n] for n in self.nodes] )
             return False
         
         # do the function first 
