@@ -420,7 +420,8 @@ class _BaseObject:
                 
                 MyDevice().ref_temperature.get()   
         """
-        config = cls.Config.parse_obj(kwargs)                
+        # config = cls.Config.parse_obj(kwargs)
+        config = cls.parse_config(kwargs)
         return cls.Property(cls, cls.new, name, config=config)
     
     @classmethod

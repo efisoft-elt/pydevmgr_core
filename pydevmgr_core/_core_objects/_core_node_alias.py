@@ -141,7 +141,8 @@ class NodeAlias(BaseNode):
     @classmethod
     def prop(cls, name: Optional[str] = None, nodes=None, **kwargs):
         nodes = [] if nodes is None else nodes
-        config = cls.Config.parse_obj(kwargs)           
+        #config = cls.Config.parse_obj(kwargs)  
+        config = cls.parse_config(kwargs)
         return cls.Property(cls, cls.new, name, nodes, config=config)
                 
     @classmethod
@@ -276,7 +277,8 @@ class NodeAlias1(BaseNode):
           node: Union[BaseNode,str] = None,  
           **kwargs
         ) -> NodeAliasProperty:
-        config = cls.Config.parse_obj(kwargs)          
+        # config = cls.Config.parse_obj(kwargs)
+        config = cls.parse_config(kwargs)
         return cls.Property(cls, cls.new, name, node, config=config)
     
     @classmethod
