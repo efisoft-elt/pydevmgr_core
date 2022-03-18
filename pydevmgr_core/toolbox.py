@@ -31,7 +31,8 @@ __all__ = [
 "InsideCircleNode", 
 "PosNameNode", 
 "FormulaNode", 
-"FormulaNode1", 
+"FormulaNode1",
+"PolynomNode1",
 "StatisticNode", 
 "CounterNode", 
 "FormatNode", 
@@ -440,6 +441,28 @@ class FormulaNode1(NodeAlias1):
                             
     def fget(self, value):          
         return self._parser.evaluate({self._varname:value})
+
+
+@record_class
+class PolynomNode1(NodeAlias1):
+    """ Apply a polynome 
+
+    Config:
+        polynom (list) : list of coefficients (lowest first) 
+    """
+    class Config(NodeAlias1.Config):
+        polynom: List[float] = [0.0,1.0]
+        
+    
+    def fget(self, value):
+        if not self.config.polynom:
+            return 0.0
+        x = self.config.polynom[0]
+        for i,c in enumerate(self.config.polynom[1:], start=1):
+            x += c*value**i
+        return x
+
+PolynomNode = PolynomNode1 
 
 
 

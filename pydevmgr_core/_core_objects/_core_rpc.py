@@ -7,6 +7,7 @@ from .. import io
 from typing import Dict, List, Callable, Union , Optional, Any, Type
 from pydantic import create_model, BaseModel
 from ._core_parser import parser, AnyParserConfig
+from ._core_obj_dict import ObjDict
 from inspect import signature , _empty
 
 import weakref
@@ -15,55 +16,18 @@ class BaseRpcConfig(_BaseObject.Config):
     kind: KINDS = KINDS.RPC.value
     type: str = ""
     
-    args_parser: Optional[List[Union[AnyParserConfig, List[Union[str, Callable]], str, Callable]]] = []
-    kwargs_parser: Optional[Dict[str,Union[AnyParserConfig, List[Union[str, Callable]], str, Callable]]] = {}
+    arg_parsers: Optional[List[Union[AnyParserConfig, List[Union[str, Callable]], str, Callable]]] = []
+    kwarg_parsers: Optional[Dict[str,Union[AnyParserConfig, List[Union[str, Callable]], str, Callable]]] = {}
+   
+    @classmethod
+    def validate_kind(cls, kind):
+        if kind:
+            if kind!=KINDS.RPC:
+                raise ValueError(f'expecting a Rpc kind, got a {kind!r}')
+        return kind    
     
-    
-    
-    #args_parser: Optional[List[Union[str, Callable, Iterable]]] = None    
-    #kwargs_parser: Optional[Dict[str,List[Union[str, Callable, Iterable]]]] = None
-    #args_parser_config: List = []
-    #kwargs_parser_config: Dict = {}
-    
-    class Config: # this is the Config of BaseModel
-        extra = 'forbid'
-        arbitrary_types_allowed = True
-    
-def parse_rpc_map(parentClass, map):        
-    for name, conf in map.items():
-        if isinstance(conf, BaseModel): continue
-        
-        if isinstance(conf, str):
-            conf = io.load_config(conf)
-        elif 'cfgfile' in conf:
-            tmp = IOConfig.parse_obj(conf)
-            conf = io.load_config(tmp.cfgfile)
-            conf.update(**tmp.dict(exclude=set(['cfgfile'])))
-        
-        try:
-            prop = getattr(parentClass, name)
-        except AttributeError:
-            type_ = conf.get('type', None)
-            if type_ is None:
-                cls = parentClass.Rpc
-            else:
-                cls = get_rpc_class(type_)
-            
-            map[name] = cls.Config.parse_obj(conf)
-        else:
-            # TODO treat the node ?????
-            map[name] = prop._cls.Config.parse_obj({**prop._config.dict(), **conf})
-    
-                                                
-    for subcls in parentClass.__mro__:
-        for name, obj in subcls.__dict__.items():
-            if isinstance(obj, _BaseProperty):
-                if issubclass(obj._cls, BaseRpc):
-                    if not name in map:
-                        map[name] = obj._config.copy(deep=True)
 
-    
-    
+
 class BaseCallCollector:
     """ The Read Collector shall collect all nodes having the same sid and read them in one call
     
@@ -98,14 +62,7 @@ class RpcProperty(_BaseProperty):
         self.fcall = func
         return self # must return self
     
-    def get_config(self, parent):
-        try:
-            sconf = parent.config.rpc_map[self._name]
-        except (KeyError, AttributeError):
-            return self._config.copy(deep=True)
-        else:
-            return sconf
-
+ 
     def _finalise(self, parent, rpc):
         if self.fcall:
             parent_wr = weakref.ref(parent)
@@ -119,16 +76,19 @@ class RpcProperty(_BaseProperty):
         return self
 
 
-
-
+class RpcDict(ObjDict):
+    class Config(ObjDict.Config):
+        kinds = set([KINDS.RPC])
+        default_kind = KINDS.RPC
 
 class BaseRpc(_BaseObject):
     
     Config = BaseRpcConfig
     Property = RpcProperty
+    Dict = RpcDict
     
-    _args_parser = None
-    _kwargs_parser = None
+    _arg_parsers = None
+    _kwarg_parsers = None
     def __init__(self, 
            key: Optional[str] = None, 
            config: Optional[Config] =None, 
@@ -136,18 +96,18 @@ class BaseRpc(_BaseObject):
         ) -> None:  
         super().__init__(key, config=config, **kwargs)
         
-        if self.config.args_parser:
-            _args_parser = []
-            for i,p in enumerate(self.config.args_parser):                
-                _args_parser.append(parser(p)) 
-                self.config.args_parser[i] = _args_parser[i].config
-            self._args_parser = _args_parser
-        if self.config.kwargs_parser:
-            _kwargs_parser = {}
-            for k,p in self.config.kwargs_parser.items():
-                _kwargs_parser[k] = parser(p)
-                self.config.kwargs_parser[k] = _kwargs_parser[k].config    
-            self._kwargs_parser  = _kwargs_parser
+        if self.config.arg_parsers:
+            _arg_parsers = []
+            for i,p in enumerate(self.config.arg_parsers):                
+                _arg_parsers.append(parser(p)) 
+                self.config.arg_parsers[i] = _arg_parsers[i].config
+            self._arg_parsers = _arg_parsers
+        if self.config.kwarg_parsers:
+            _kwarg_parsers = {}
+            for k,p in self.config.kwarg_parsers.items():
+                _kwarg_parsers[k] = parser(p)
+                self.config.kwarg_parsers[k] = _kwarg_parsers[k].config    
+            self._kwarg_parsers  = _kwarg_parsers
 
 
     @property
@@ -168,14 +128,14 @@ class BaseRpc(_BaseObject):
         return BaseCallCollector()
     
     def parse_args(self, args, kwargs):
-        """ Modify in place a list of args and kwargs thans to the defined args_parser and kwargs_parser """
-        if self._args_parser:
-            for i,(p,a) in enumerate(zip(self._args_parser, args)):
+        """ Modify in place a list of args and kwargs thans to the defined arg_parsers and kwarg_parsers """
+        if self._arg_parsers:
+            for i,(p,a) in enumerate(zip(self._arg_parsers, args)):
                 args[i] = p(a) 
-        if self._kwargs_parser:
+        if self._kwarg_parsers:
             for k,a in kwargs.items():
                 try:
-                    p = self._kwargs_parser[k]
+                    p = self._kwarg_parsers[k]
                 except KeyError:
                     pass
                 else:
@@ -236,121 +196,6 @@ class ComRpc(BaseRpc):
         d = super().new_args(parent, config)
         d.upadte(com=parent.com)
         return d        
-        
-class _RpcListing:
-    # This class shall be include in all parents with rpc as child  
-    
-    def _config_rpc_keys(self):
-        return self.config.rpc_map.keys()
-    
-    def _config_rpc_constructor(self, name):
-        try:
-            rpcconf = self.config.rpc_map[name]
-        except KeyError:
-            raise ChildError(f"Unknown rpc {name}")
-        return get_rpc_class(rpcconf.type).new    
-    
-    def _build_rpc(self, name):
-        constructor = self._config_rpc_constructor(name)
-        rpc = constructor(self, name, config=self.config.rpc_map[name])
-        self.__dict__[name] = rpc 
-        return rpc
-    
-    parse_rpc_map = classmethod(parse_rpc_map)     
-    @classmethod
-    def default_rpc_map(cls):
-        return {}
-    
-    
-    @property
-    def rpcs(self) -> List[BaseRpc]:
-        return ObjectIterator(self, self._build_rpc, self._config_rpc_keys())
-    
-    def get_rpc(self, name: str):
-        try:
-            #cached rpc
-            rpc = self.__dict__[name]
-        except KeyError:
-            try:
-                # static rpc, as property 
-                rpc = object.__getattribute__(self, name)
-            except AttributeError:
-                rpc = self._build_rpc(name)                
-            else:
-                if not isinstance(rpc, BaseRpc):
-                    raise ValueError(f"Unknown rpc {name}")          
-        else:
-            if not isinstance(rpc, BaseRpc):
-                raise ValueError(f"Unknown rpc {name}")
-        return rpc
-    
-    def add_rpc(self, name, rpc: Union[BaseRpc, BaseRpc.Config, dict]):
-        """ Add a rpc
-        
-        This will also change the manager config.rpc_map 
-        
-        Args:
-            name (str): The name (attribute) of the rpc
-                
-                ::
-                
-                    parent.add_rpc('move', move_rpc)
-                    parent.move is move_rpc
-            
-            rpc (Node, Config , dict): A rpc object or a config to build the new rpc
-        
-        """    
-        if isinstance(rpc, dict):
-            type_ = rpc.get('type',None)
-            if type_ is None:
-                cls = self.Node
-            else:
-                cls = get_rpc_class(type_)
-            if name is None:
-                raise ValueError("name is missing")                                
-            rpc = cls.new(self, name, **rpc)
-        elif isinstance(rpc, BaseModel):
-            if name is None:
-                raise ValueError("name is missing") 
-            rpc = cls.new(self, name, config=rpc)
-            
-        
-        if name is None:
-            _, name = ksplit(rpc.key)
-        
-        if name in self.config.rpc_map and self.config.rpc_map[name] != rpc.config:
-            raise ValueError("Interface already exists inside the parent")
-        elif name in self.__dict__:
-            raise ValueError(f"attribute {name} is already taken")
-        
-        self.config.rpc_map[name] = rpc.config
-        setattr(self, name, rpc)              
-
-    def remove_rpc(self, name):
-        """ Remove a rpc 
-        
-        This will remove also the configuration inside the config.rpc_map 
-        An ValueError is raised if the rpc is not in the parent or if it has been defined 
-        statisticaly on the class.
-        
-        Args:
-            name (str) : the reference (the attribute) of the rpc
-        """
-        
-        try:
-            getattr(self.__class__, name)
-        except AttributeError:
-            if not name in self.config.rpc_map:
-                raise ValueError("Unknown rpc {name!r}")
-            
-            del self.config.rpc_map[name]
-            try:
-                del self.__dict__[name]
-            except KeyError:
-                pass    
-        else:
-            raise ValueError("rpc {name!r} was defined inside the class")    
-        
     
         
 
@@ -397,7 +242,7 @@ def to_rpc_class(_func_: Callable = None, *, type: Optional[str] = None) -> Type
         >>>     print( key, "is called with value", value,  end=end)
       
         >>> Echo.Config()    
-        EchoConfig(kind=<KINDS.RPC: 'Rpc'>, type='Echo', args_parser=None, kwargs_parser=None, args_parser_config=[], kwargs_parser_config={}, com=None, end='\n')
+        EchoConfig(kind=<KINDS.RPC: 'Rpc'>, type='Echo', arg_parsers=None, kwarg_parsers=None, arg_parsers_config=[], kwarg_parsers_config={}, com=None, end='\n')
         
         >>> echo = Echo('echo!!', end="||\n")
         >>> echo.call(100)

@@ -9,6 +9,8 @@ from .datamodel import (DataLink, BaseData, NodeVar, NodeVar_R, NodeVar_W,
 from ._misc.math_parser import DataEval, ExpEval
 from .toolbox import *
 
+from .device_model import create_device, DeviceModel
+
 try:
     import numpy
 except ModuleNotFoundError:

@@ -4,6 +4,8 @@ from ._core_base import (_BaseObject, _BaseProperty, kjoin,
                           ChildError, ksplit, BaseData
                         )
 from ._core_parser import parser, BaseParser, _BuiltParser, AnyParserConfig, create_parser_class
+from ._core_obj_dict import ObjDict
+
 from .. import io 
 
 import weakref
@@ -11,6 +13,8 @@ from inspect import signature , _empty
 
 from pydantic import create_model, Extra, BaseModel, validator
 from typing import Dict, Any, Optional, Union, Callable, Iterable, List, Dict, Tuple
+
+
 
         
 class BaseNodeConfig(_BaseObject.Config):
@@ -27,43 +31,14 @@ class BaseNodeConfig(_BaseObject.Config):
     def _parser_validator(cls, parsers):
         if parsers is not None:
             return parser(parsers).config
-            
-        
+    
+    @classmethod
+    def validate_kind(cls, kind):
+        if kind:
+            if kind!=KINDS.NODE:
+                raise ValueError(f'expecting a Node kind, got a {kind!r}')
+        return kind    
 
-def parse_node_map(parentClass, map):        
-    for name, conf in map.items():
-        if isinstance(conf, BaseModel): continue
-        
-        
-        if isinstance(conf, str):
-            conf = io.load_config(conf)
-        elif 'cfgfile' in conf:
-            tmp = IOConfig.parse_obj(conf)
-            conf = io.load_config(tmp.cfgfile)
-            conf.update(**tmp.dict(exclude=set(['cfgfile'])))
-            
-        try:
-            prop = getattr(parentClass, name)
-        except AttributeError:
-            type_ = conf.get('type', None)
-            if type_ is None:
-                cls = parentClass.Node
-            else:
-                cls = get_node_class(type_)
-            
-            map[name] = cls.Config.parse_obj(conf)
-        else:
-            # TODO treat the node ?????
-            
-            map[name] = prop._cls.Config.parse_obj({**prop._config.dict(), **conf})
-                                                
-    for subcls in parentClass.__mro__:
-        for name, obj in subcls.__dict__.items():
-            if isinstance(obj, _BaseProperty):
-                if issubclass(obj._cls, BaseNode):
-                    if not name in map:
-                        map[name] = obj._config.copy(deep=True)
-            
         
 class BaseReadCollector:
     """ Object used to collect nodes values from the same server in one roundtrip 
@@ -161,15 +136,7 @@ class NodeProperty(_BaseProperty):
         """ decoraotr to define the fset function """
         self.fset = func    
         return self # must return self
-    
-
-    def get_config(self, parent):
-        try:
-            sconf = parent.config.node_map[self._name]
-        except (KeyError, AttributeError):
-            return self._config.copy(deep=True)
-        else:
-            return sconf
+     
     
     def _finalise(self, parent, node):
         # overwrite the fget, fset function to the node if defined 
@@ -192,7 +159,11 @@ class NodeProperty(_BaseProperty):
         self.fget = func
         return self
 
-            
+class NodeDict(ObjDict):
+    class Config(ObjDict.Config):
+        kinds = set([KINDS.NODE])
+        default_kind = KINDS.NODE
+
 class BaseNode(_BaseObject):
     """ This a base class defining the base methods for a node 
     
@@ -210,6 +181,9 @@ class BaseNode(_BaseObject):
     """
     Config = BaseNodeConfig
     Property = NodeProperty
+
+    Dict = NodeDict
+
     class Data(BaseData):
         value: Any = None    
     _parser = None
@@ -476,124 +450,6 @@ class NodesWriter:
             collection.write()
 
 
-        
-class _NodeListing:
-    # provide a standard capability to have node has children with some method
-    # in this context self is the parent 
-    
-    def _config_node_keys(self):        
-        return self.config.node_map.keys()
-    
-    def _config_node_constructor(self, name):        
-        try:
-            nodeconf = self.config.node_map[name]
-        except KeyError:
-            raise ChildError(f"Unknown node {name}")
-        return get_node_class(nodeconf.type).new    
-    
-    def _build_node(self, name):
-        constructor = self._config_node_constructor(name)
-        node = constructor(self, name, config=self.config.node_map[name])
-        self.__dict__[name] = node 
-        return node
-    
-    parse_node_map = classmethod(parse_node_map)
-    
-    @classmethod
-    def default_node_map(cls):
-        return {}
-            
-    @property
-    def nodes(self) -> List[BaseNode]:
-        return ObjectIterator(self, self._build_node, self._config_node_keys())
-
-    def get_node(self, name: str):
-        try:
-            #cached node
-            node = self.__dict__[name]
-        except KeyError:
-            try:
-                # static node, as property 
-                node = object.__getattribute__(self, name)
-            except AttributeError:
-                node = self._build_node(name)
-            else:
-                if not isinstance(node, BaseNode):
-                    raise ValueError(f"Unknown node {name}")
-        else:
-            if not isinstance(node, BaseNode):
-                raise ValueError(f"Unknown node {name}")            
-        return node
-        
-    def add_node(self, name, node: Union[BaseNode, BaseNode.Config, dict]):
-        """ Add a node
-        
-        This will also change the manager config.node_map 
-        
-        Args:
-            name (str): The name (attribute) of the node
-                
-                ::
-                
-                    parent.add_node('position', pos_node)
-                    parent.position is pos_node
-            
-            node (Node, Config , dict): A node object or a config to build the new node
-        
-        """    
-        if isinstance(node, dict):
-            type_ = node.get('type',None)
-            if type_ is None:
-                cls = self.Node
-            else:
-                cls = get_node_class(type_)
-            if name is None:
-                raise ValueError("name is missing")                                
-            node = cls.new(self, name, **node)
-        elif isinstance(node, BaseModel):
-            if name is None:
-                raise ValueError("name is missing") 
-            node = cls.new(self, name, config=node)
-            
-        
-        if name is None:
-            _, name = ksplit(node.key)
-        
-        if name in self.config.node_map and self.config.node_map[name] != node.config:
-            raise ValueError("Interface already exists inside the parent")
-        elif name in self.__dict__:
-            raise ValueError(f"attribute {name} is already taken")
-        
-        self.config.node_map[name] = node.config
-        setattr(self, name, node)              
-
-    def remove_node(self, name):
-        """ Remove a node 
-        
-        This will remove also the configuration inside the config.node_map 
-        An ValueError is raised if the node is not in the parent or if it has been defined 
-        statisticaly on the class.
-        
-        Args:
-            name (str) : the reference (the attribute) of the node
-        """
-        
-        try:
-            getattr(self.__class__, name)
-        except AttributeError:
-            if not name in self.config.node_map:
-                raise ValueError("Unknown node {name!r}")
-            
-            del self.config.node_map[name]
-            try:
-                del self.__dict__[name]
-            except KeyError:
-                pass    
-        else:
-            raise ValueError("node {name!r} was defined inside the class")    
-        
-
-
 def new_node(type_, *args, **kwargs):
     """ Create a new node for a given type 
     
@@ -607,7 +463,7 @@ def new_node(type_, *args, **kwargs):
     
     """
     cls = get_node_class(type_)
-    return cls(key, *args, **kwargs) 
+    return cls(*args, **kwargs) 
         
         
 def to_node_class(_func_: Callable =None, *, type: Optional[str] = None):

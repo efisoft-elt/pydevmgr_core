@@ -42,10 +42,10 @@ def test_main():
     n.config.parser.max = 12 
     assert  n._parser.config.max  == 12
 
-    r = BaseRpc(args_parser=["Clipped"], kwargs_parser={'toto':[float,"Clipped"] })
-    assert r._args_parser[0].config is r.config.args_parser[0]
-    r.config.args_parser[0].max = 10
-    assert r._kwargs_parser['toto'].config is r.config.kwargs_parser['toto']
+    r = BaseRpc(arg_parsers=["Clipped"], kwarg_parsers={'toto':[float,"Clipped"] })
+    assert r._arg_parsers[0].config is r.config.arg_parsers[0]
+    r.config.arg_parsers[0].max = 10
+    assert r._kwarg_parsers['toto'].config is r.config.kwarg_parsers['toto']
 
 if __name__ == "__main__":
     test_main()

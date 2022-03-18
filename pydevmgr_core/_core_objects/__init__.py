@@ -16,11 +16,14 @@ from ._core_node_alias import (NodeAlias, NodeAlias1, nodealiasproperty, nodeali
 from ._extra_nodes import StaticNode, LocalNode
 
 from ._core_rpc import RpcError, BaseRpc, RpcProperty, rpcproperty, to_rpc_class
-from ._core_interface import buildproperty, BaseInterface, InterfaceProperty  
+from ._core_interface import BaseInterface, InterfaceProperty  
 
 from ._core_device import BaseDevice, DeviceProperty, open_device
 from ._core_manager import BaseManager, ManagerProperty, open_manager
 from ._core_com import BaseCom
 from ._core_model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
+
+from ._core_pydantic import Defaults, GenDevice, GenManager, GenInterface, GenNode
+
 
 from ._core_parser import *

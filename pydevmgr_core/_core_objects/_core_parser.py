@@ -39,6 +39,10 @@ class BaseParser:
     """ Callable Parser class """      
     Config = ParserElementConfig
     
+    def __init_subclass__(cls, **kwargs) -> None:
+        if kwargs:
+            cls.Config = create_model(  cls.__name__+"Config",  __base__=cls.Config, **kwargs)
+   
     def __init__(self, 
            config: Optional[ParserElementConfig] = None, 
            **kwargs

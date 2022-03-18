@@ -1,20 +1,27 @@
-from typing import Any,  Tuple, Optional, List, Dict, Union, Type
-from pydantic import BaseModel, Extra
-from ._class_recorder import get_class
+from typing import Any,  Tuple, Optional, List, Dict, Union, Type, Generic, TypeVar
+from pydantic import BaseModel, Extra, ValidationError, validator, create_model
+from ._class_recorder import get_class, KINDS
 from ._core_model_var import StaticVar
+
+from ._core_pydantic import _default_walk_set
 from enum import Enum 
 import yaml
 from ..io import ioconfig, load_yaml, load_config
+import logging 
+import weakref
+
+log = logging.getLogger('pydevmgr')
+
+class CONFIG_MODE(str, Enum):
+    OVERWRITE = "OVERWRITE"
+    DEFAULT = "DEFAULT"
 
 
-class KINDS(str, Enum):
-    PARSER = "Parser"
-    NODE = "Node"
-    RPC = "Rpc"
-    DEVICE = "Device"
-    INTERFACE = "Interface"
-    MANAGER = "Manager"
-    
+AUTO_BUILD_DEFAULT = False
+CONFIG_MODE_DEFAULT = CONFIG_MODE.DEFAULT
+
+
+ObjVar = TypeVar('ObjVar')
 
 
 class IOConfig(BaseModel):
@@ -23,17 +30,93 @@ class IOConfig(BaseModel):
     class Config:
         extra = Extra.allow
     
-class BaseConfig(BaseModel):
+class BaseConfig(BaseModel, Generic[ObjVar]):
     kind: KINDS = ""
     type: str = ""
     version: str = "" # version of the configuration file
-    true_type: Optional[Type] = None
     
+    
+
     class Config: # this is the Config of BaseModel
         extra = Extra.forbid
         validate_assignment = True    
         use_enum_values = True 
     
+    def _parent_class_ref(cls):
+        return None
+    
+
+    def _get_parent_class(self):
+        p = self._parent_class_ref()
+        if p is not None:
+            return p
+        return get_class(self.kind, self.type)
+
+    @validator('kind')
+    def _kind_validator(cls, kind):
+        return cls.validate_kind(kind)
+
+
+    @classmethod
+    def validate_kind(cls, kind):
+        if kind:
+            return KINDS(kind)
+    
+    @classmethod
+    def validate_type(cls, type_):
+        return type_
+    
+    # @classmethod
+    # def validate(cls, v, field):
+    #     if field.sub_fields:
+    #         if len(field.sub_fields)!=1:
+    #             raise ValidationError(['to many field GenDevice require and accept only one argument'], cls)
+        
+
+    #         val_f = field.sub_fields[0]
+    #         errors = []
+        
+    #         valid_value, error = val_f.validate(v, {}, loc='value')
+
+    #         if error:
+    #             errors.append(error)
+    #         if errors:
+    #             raise ValidationError(errors, cls)
+    #     else:
+    #         valid_value = v
+        
+        
+    #     if isinstance(valid_value, dict):
+    #         haskind, hastype = False, False
+    #         if 'kind' in valid_value:
+    #             valid_value['kind'] = cls.validate_kind( valid_value['kind'])
+    #             haskind = True
+    #         if 'type' in valid_value:
+    #             hastype = True
+    #             valid_value['type'] = cls.validate_type( valid_value['type'])
+
+    #         if isinstance( field.default, BaseConfig ):
+    #             c_kind = valid_value.get('kind', field.default.kind)
+    #             c_type = valid_value.get('kind', field.default.type)
+
+
+    #             if (c_kind!= field.default.kind) or\
+    #                (c_type!= field.default.type):
+    #                     Obj = get_class(c_kind, c_type)
+    #                     cls = Obj.Config
+
+
+    #     return cls.parse_obj(valid_value)
+        #return valid_value   
+
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    
+
+
     @classmethod
     def from_cfgfile(cls, cfgfile, path: str = ''):
         """ Create the config object from a yaml config file 
@@ -56,9 +139,27 @@ class BaseConfig(BaseModel):
     
     def cfgdict(self, exclude: set =set()):
         """ Write the config to a dictionary as it is red from from_cfgdict """
-        exclude.add('true_type')
+        # exclude.add()
         d = self.dict(exclude_unset=True, exclude=exclude)
         return d
+
+
+class ChildrenCapabilityConfig(BaseModel): 
+    auto_build: bool = AUTO_BUILD_DEFAULT
+    
+    @classmethod
+    def _build_unknown(cls, values):
+        """ Every dict with kind and type member will be transformed to its right class 
+
+        This will only be used if extra="allow"
+        """
+        for k,v in values.items():
+            if k in cls.__fields__: # field exist in the class and will be treated after
+                continue
+            if isinstance(v, dict) and "kind" in v and "type" in v:
+                ObjClass = get_class(v["kind"], v["type"])
+                values[k] = ObjClass.Config.parse_obj(v)
+        return values
 
 def _path_walk(d, path):
     if isinstance(path, int):
@@ -95,9 +196,6 @@ def _get_class_dict( d, default_type: Optional[Union[str, Type]] = None):
     except KeyError:
         raise ValueError('"kind" attribute missing')
     
-    tt = d.get('true_type', None)
-    if tt: 
-        return tt
     
     try:
         st = d['type']
@@ -115,8 +213,6 @@ def _get_class_dict( d, default_type: Optional[Union[str, Type]] = None):
 
 
 def _get_class_config( c, default_type: Optional[Union[str, Type]] = None):
-    if c.true_type:
-        return c.true_type
     try:
         return get_class(c.kind, c.type)
     except ValueError as e:
@@ -171,7 +267,6 @@ def open_class(
     if not tpe:
         raise ValueError(f"Cannot resolve {kind} type")
     Object = get_class(kind, tpe)
-    allconf['true_type'] = Object
     # config = Object.parse_config(allconf) 
     config = Object.Config.from_cfgdict(allconf)
     return Object, config, pname 
@@ -288,6 +383,17 @@ def new_key(config):
     return f'{k}{c:03d}'
 
 
+def auto_build( obj, attr ):
+    c = getattr( obj.config, attr  )
+    if not isinstance(c, BaseConfig):
+        raise AttributeError(attr)
+    NewClass = c._get_parent_class()
+    new = NewClass.new( obj, attr, config=c )
+    obj.__dict__[attr] = new
+    return new 
+    
+
+
 class _BaseProperty:    
     """ A Property is basically calling a constructor with dynamical and static arguments 
     
@@ -301,13 +407,15 @@ class _BaseProperty:
     optional keyword arguments  
     
     """    
-    def __init__(self, cls, constructor, name, *args, config=None,  **kwargs):
+    def __init__(self, cls, constructor, name, *args, config=None, config_path=None, config_mode=CONFIG_MODE_DEFAULT, **kwargs):
         
         self._cls = cls 
         self._constructor = constructor
         self._name = name         
         
-        self._config = config        
+        self._config = config 
+        self._config_path = config_path
+        self._config_mode = config_mode 
         self._args = args
         self._kwargs = kwargs
         
@@ -318,30 +426,63 @@ class _BaseProperty:
     def _finalise(self, parent, obj):
         pass
     
+    
+    def __set_name__(self, owner, name):
+        if self._name is None:
+            self._name = name 
+
+
     def __get__(self, parent, clp=None):
         if parent is None:
             return self 
         # try to retrieve the node directly from the parent __dict__ where it should 
         # be cached. If no boj cached create one and save it/ 
-        # if _name is the same than the attribute name in class, this should be called only ones                
-        try:
-            obj = parent.__dict__[self]
-        except KeyError:
-            name, obj = self.new(parent)     
-            # store in parent with the name 
-            parent.__dict__[self] = obj        
+        # if _name is the same than the attribute name in class, this should be called only ones
+        if self._name is None:
+            try:
+                obj = parent.__dict__[self]
+            except KeyError:
+                name, obj = self.new(parent)     
+                # store in parent with self
+                parent.__dict__[self] = obj   
+        else:
+            try:
+                obj = parent.__dict__[self._name]
+            except KeyError:
+                name, obj = self.new(parent)     
+                # store in parent with the name 
+                parent.__dict__[self._name] = obj   
+
         return obj
                 
     def get_config(self, parent):
         """ return configuration from parent object """
-        # this has to be implemented for each kinds 
-        return self._config.copy(deep=True)
+        # this has to be implemented for each kinds
+        if self._config_path:
+            config = getattr( parent.config, self._config_path )
+        elif self._name:
+            try:
+                config = getattr(parent.config, self._name)
+            except AttributeError:
+                config = self._config
+        
+        if config is not self._config:
+            if not isinstance( config, type(self._config) ):
+                log.warning( f"The configuration Class missmatch in property {self._name!r} " )
+
+            if self._config_mode == CONFIG_MODE.DEFAULT:
+                _default_walk_set(self._config, config)
+            else:
+                for k,v in self._config.dict( exclude_unset=True ).items():
+                    log.warning( f"config var {k} overwriten by property" )
+                    setattr(config, k, v)
+        return config    
+            
                 
     def new(self, parent):     
         config = self.get_config(parent)
         if self._name is None:
-            name = new_key(config)
-            
+            name = new_key(config) 
             #name = config.kind+str(id(config))
         else:
             name = self._name                            
@@ -355,7 +496,15 @@ class _BaseObject:
     Config = BaseConfig
     Property = _BaseProperty    
     _config = None
+    
+
+    def __init_subclass__(cls, **kwargs) -> None:
+         # if kwargs:
+        cls.Config = create_model(  cls.__name__+".Config",  __base__=cls.Config, **kwargs)
+        cls.Config._parent_class_ref = weakref.ref(cls)
             
+
+
     def __init__(self, 
           key: Optional[str] = None,  
           config: Optional[Config] = None, *,          
@@ -376,13 +525,11 @@ class _BaseObject:
     @classmethod
     def parse_config(cls, __config__=None, **kwargs):
         if __config__ is None:
-            kwargs['true_type'] = cls
             return cls.Config(**kwargs)
         if isinstance(__config__ , cls.Config):
             return __config__
         if isinstance(__config__, dict):
             d = {**__config__, **kwargs} 
-            d['true_type'] = cls
 
             # if hasattr(cls.Config, "from_cfgdict"):
             #     return cls.Config.from_cfgdict(d)
@@ -408,7 +555,7 @@ class _BaseObject:
         return cls(kjoin(parent.key, name), config=config, **cls.new_args(parent, config))
     
     @classmethod
-    def prop(cls, name: Optional[str] = None, **kwargs):
+    def prop(cls, name: Optional[str] = None, config_path=None, config_mode=CONFIG_MODE_DEFAULT, **kwargs):
         """ Return an object  property  to be defined in a class 
         
         Exemple:
@@ -422,7 +569,7 @@ class _BaseObject:
         """
         # config = cls.Config.parse_obj(kwargs)
         config = cls.parse_config(kwargs)
-        return cls.Property(cls, cls.new, name, config=config)
+        return cls.Property(cls, cls.new, name, config=config, config_path=config_path, config_mode=config_mode)
     
     @classmethod
     def from_cfgfile(cls, 
@@ -497,7 +644,9 @@ class _BaseObject:
                     if issubclass(v._cls, SubCls):
                         d[k] = v._cls
         return d
-                    
+    
+
+
     def _cash_all(self):
         """ cash all child _BaseProperty to real Objects """
         if not self.__all_cashed__:
@@ -513,6 +662,93 @@ class _BaseObject:
             if isinstance(v, (_BaseObject)):
                 self.__dict__.pop(k)
         self.__all_cashed__ = False
+
+
+class ChildrenCapability:
+    _all_cashed = False
+    def find(self, cls: Type[_BaseObject], depth: int = 0):
+        """ iterator on  children matching the given  class 
+        
+        ...note::
+            
+            The side effect of find is that all children will be built 
+
+        Exemple::
+            
+            from pydevmgr_core import BaseNode
+            list(   device.find( BaseNode, -1 ) ) # will return all nodes found in device and sub-devices, interface,
+            etc...
+        
+        """
+        if not self._all_cashed:
+            self.build_all()
+            self._all_cashed = True
+        
+        
+        for obj in self.__dict__.values():
+            if isinstance(obj, cls):
+                yield obj
+            if depth!=0 and isinstance(obj, ChildrenCapability):
+                for sub in obj.find(cls, depth-1):
+                    yield sub
+            
+    
+            
+    def build_all(self, depth:int =0):
+        """ Build all possible children objects 
+        
+        Every single children will be built inside the object and will be cashed inside the obj.__dict__
+        
+        """
+        for sub in self.__class__.__mro__:
+                for k,v in sub.__dict__.items():
+                    if isinstance(v, (_BaseProperty, _BaseObjDictProperty)):
+                        obj = getattr(self, k)
+                        if depth!=0 and isinstance(obj, ChildrenCapability):
+                            obj.build_all(depth-1)
+
+     
+        if self.config.auto_build:
+            for k,c in self.config:
+                if isinstance( c, BaseConfig ):
+                    obj = getattr( self, k)
+                    if depth!=0 and isinstance(obj, ChildrenCapability):
+                            obj.build_all(depth-1)
+
+
+    
+    
+
+    def __getattr__(self, attr):   
+        try:
+            return object.__getattribute__(self, attr)
+        except AttributeError as e:
+            if self._config.auto_build:
+                return auto_build(self, attr)
+            else:
+                raise e
+
+class _BaseObjDict(dict, ChildrenCapability):
+    
+    def find(self, cls, depth: int = 0):
+        for obj in self.values():
+            if isinstance(obj, cls):
+                yield obj
+                
+            if depth!=0 and isinstance(obj, ChildrenCapability):
+                for sub in obj.find(cls, depth-1):
+                    yield sub
+    
+    def build_all(self, depth=1):
+        if depth==0: return 
+        for obj in self.values():
+            if isinstance(obj, ChildrenCapability):
+                obj.build_all(depth-1)
+
+        
+
+class _BaseObjDictProperty:
+    pass
 
 
 

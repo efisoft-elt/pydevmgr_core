@@ -1,3 +1,6 @@
+# 0.3.4 
+- Add the PolynomNode1 
+
 # 0.3.3 
 - the prop method nows built Config from cls.parse_config. So no record_class is needed for intermediate interfaces
 - wait is fixed. It now wait on input nodes only. Before it was waiting on all downloaded nodes which cause problem for
