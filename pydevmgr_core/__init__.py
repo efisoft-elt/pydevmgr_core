@@ -1,6 +1,6 @@
 from ._core_objects import *
 from ._core_objects import _BaseObject
-from .download import Prefixed, Downloader, download, DataView
+from .download import  Downloader, download, DataView
 from .upload import upload, Uploader
 from .wait import wait, Waiter
 from .datamodel import (DataLink, BaseData, NodeVar, NodeVar_R, NodeVar_W,
@@ -9,7 +9,6 @@ from .datamodel import (DataLink, BaseData, NodeVar, NodeVar_R, NodeVar_W,
 from ._misc.math_parser import DataEval, ExpEval
 from .toolbox import *
 
-from .device_model import create_device, DeviceModel
 
 try:
     import numpy

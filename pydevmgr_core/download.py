@@ -1,4 +1,4 @@
-from ._core_objects import NodesReader, BaseNode, kjoin
+from ._core_objects import NodesReader, BaseNode, kjoin, _BaseObject
 
 import time
 from collections import  OrderedDict
@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterable, Union, Optional, Callable
 class DataView:
     def __init__(self, 
             data: Dict[BaseNode,Any], 
-            prefix: Optional[str] = None
+            prefix: Optional[Union[str, _BaseObject]] = None
           ) -> None:
         self._data = data
         if prefix is None:
@@ -86,133 +86,6 @@ class DataView:
         for k, n in list(self._key2data.items()):            
             self._data.pop(n)
 
-            
-class Prefixed:
-    """ this is a view of a dictionary wit prefixed keys 
-    
-    d = {"motor1.pos_actual" : 1.5, 
-         "motor1.pos_error" : 0.002,
-         
-         "motor2.pos_actual" : 2.3, 
-         "motor2.pos_error" : 0.001}
-         
-    > dp = Prefixed(d, "motor1") # prefix without the dot
-    > dp['pos_actual']
-    1.5 
-    
-    This can be handy when one have to parse for instance a specific dictionary to a generic "motor" 
-    function which should work with any motors.
-    
-    .. note::
-       
-       doing dp['pos_actual'] is quite fast has only a prefix is added on the key
-            however an iteration on Prefixed dictionary can be long if the root dictionary 
-            is large as all keys of the root dictionary have to be checked for prefix.
-            It is expected that these Prefixed dictionary will be used mostly as set/get item
-    
-    .. seealso::  
-    
-        :func:`pydevmgr.download`
-        :class:`pydevmgr.Downloader`             
-    """
-    _prefix = ""
-    _data = None
-    
-    def __init__(self, 
-          data: Dict[str,Any], 
-          prefix: str
-        ) -> None:
-        self._prefix = prefix
-        self._data = data
-    
-    def __getitem__(self, item):
-        return self._data[kjoin(self._prefix, item)]
-    
-    def __setitem__(self, item, value):
-        self._data[kjoin(self._prefix, item)] = value
-    
-    def __delitem__(self, item):
-        del self._data[kjoin(self._prefix, item)]
-    
-    def __getattr__(self, attr):
-        return self._data[kjoin(self._prefix, attr)]
-    
-    def __has__(self, item):
-        return kjoin(self._prefix, item) in self._data 
-    
-    def update(self, __d__={}, **kwargs) -> None:
-        for k,v in dict(__d__, **kwargs).iteritems():
-            self._data[kjoin(self._prefix, k)] = v
-    
-    def pop(self, item) -> Any:
-        """ Pop an item from the root data ! """
-        return self._data.pop(kjoin(self._prefix, item))
-    
-    def popitem(self, item) -> Any:
-        """ Pop an item from the root data ! """
-        return self._data.popitem(kjoin(self._prefix, item))
-    
-    def keys(self) -> Iterable:
-        """ D.keys() ->iterable on D's root keys with matching prefix
-        
-        Shall be avoided to use in a :class:`Prefixed` object
-        """
-        if not self._prefix : 
-            for k in self._data.keys():
-                yield k 
-            return 
-        
-        pref = self._prefix+"."
-        lp = len(pref)
-        for k in self._data.keys():
-            if isinstance(k, str) and k.startswith(pref):
-                yield k[lp:]
-    
-    def items(self) -> Iterable:
-        """D.items() -> iterable on D's root items with matching prefix
-        
-        Shall be avoided to use in a :class:`Prefixed` object
-        """
-        if not self._prefix : 
-            for k,v in self._data.items():
-                yield k , v    
-            return 
-            
-        pref = self._prefix+"."
-        lp = len(pref)
-        for k, v in self._data.items():
-            if isinstance(k, str) and k.startswith(pref):
-                yield k[lp:], v
-    
-    def values(self) -> Iterable:
-        """D.values() -> iterable on D's root  values with matching prefix
-        
-        Shall be avoided to use in a :class:`Prefixed` object
-        """
-        if not self._prefix : 
-            for v in self._data.values():
-                yield v    
-            return 
-                
-        pref = self._prefix+"."
-        for k, v in self._data.items():
-            if isinstance(k, str) and k.startswith(pref):
-                yield v
-    
-    def clear(self) -> None:
-        """ D.clear() -> None.  Remove all items from D root with matching prefix
-        
-        Shall be avoided to use in a :class:`Prefixed` object
-        """
-        if not self._prefix:
-            self._data.clear()
-            return 
-        
-        pref = self._prefix+"."
-        for k, v in list(self._data.items()):
-            if isinstance(k, str) and k.startswith(pref):
-                self._data.pop(k)
-    
 
 def _setitem(d,k,v):
     d[k] = v
