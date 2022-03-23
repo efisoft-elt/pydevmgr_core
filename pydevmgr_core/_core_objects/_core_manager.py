@@ -10,7 +10,13 @@ from ._class_recorder import KINDS, get_class, record_class
 from ._core_pydantic import _default_walk_set
 
 from ._core_obj_dict import ObjDict
+from pydantic import create_model 
 
+
+                      
+class ManagerConfig(_BaseObject.Config, ChildrenCapabilityConfig):
+    kind: KINDS = KINDS.MANAGER.value
+    type: str = "Base"
 
 class ManagerProperty(_BaseProperty):    
     fbuild = None    
@@ -27,13 +33,7 @@ class ManagerProperty(_BaseProperty):
     def _finalise(self, parent, device):
         # overwrite the fget, fset function to the node if defined         
         if self.fbuild:
-            self.fbuild(parent, device)  
-                      
-class ManagerConfig(_BaseObject.Config, ChildrenCapabilityConfig):
-    kind: KINDS = KINDS.MANAGER.value
-    type: str = "Base"
-
-
+            self.fbuild(parent, device)
 
 def open_manager(cfgfile, path=None, prefix="", key=None, default_type=None, **kwargs):
     """ Open a manager from a configuration file 
@@ -75,12 +75,13 @@ class BaseManager(_BaseObject, ChildrenCapability):
     Rpc = BaseRpc
     Dict = ManagerDict
     
-    def __init__(self, *args, devices=None, **kwargs):
+    
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if devices:
-            for name, d in BaseDevice.Dict(devices, __parent__=self).items():
-                self.__dict__[name] = d
-            
+        if self._localdata is None:
+            self._localdata = {}
+    
+
     @property
     def devices(self):
         return self.find( BaseDevice )

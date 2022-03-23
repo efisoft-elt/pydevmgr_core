@@ -92,7 +92,6 @@ class Defaults(Generic[RecVar]):
             return v
         if len(field.sub_fields)!=1:
             raise ValidationError(['to many field Defaults require and accept only one argument'], cls)
-        
             
         
         val_f = field.sub_fields[0]

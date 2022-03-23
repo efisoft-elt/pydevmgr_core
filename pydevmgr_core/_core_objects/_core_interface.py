@@ -13,7 +13,6 @@ from ._core_obj_dict import ObjDict
 
 from .. import io
 from typing import Optional, Iterable, Union, List, Dict, Callable
-from pydantic import root_validator
 #  ___ _   _ _____ _____ ____  _____ _    ____ _____ 
 # |_ _| \ | |_   _| ____|  _ \|  ___/ \  / ___| ____|
 #  | ||  \| | | | |  _| | |_) | |_ / _ \| |   |  _|  
@@ -27,9 +26,6 @@ class BaseInterfaceConfig(_BaseObject.Config, ChildrenCapabilityConfig):
     kind: KINDS = KINDS.INTERFACE.value
     type: str = "Base"     
     
-    @root_validator
-    def _root(cls, values):
-        return cls._build_unknown(values)
         
 class InterfaceProperty(_BaseProperty):    
     fbuild = None

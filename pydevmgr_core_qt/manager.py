@@ -124,7 +124,7 @@ class ManagerLinker(BaseUiLinker):
         self._multi_view_ctrl = WidgetControl(
                 self._multi_view, 
                 downloader, 
-                manager.devices(),
+                self.list_devices(manager), 
                 data
             )
         
@@ -137,13 +137,16 @@ class ManagerLinker(BaseUiLinker):
             self._multi_view_ctrl.data.current_view = view_name
             self._multi_view_ctrl.disable()
             self._multi_view_ctrl.enable()
+    
+    def list_devices(self, manager):
+        return list(manager.find( BaseDevice ))
 
     
     def setup_ui(self, manager, data):
         
         multi_view = DevicesWidgetLinker(widget=self.widget.devices, config=self.config)
         
-        multi_view.setup_ui( manager.devices(), data)
+        multi_view.setup_ui(self.list_devices(manager), data)
         
         self._multi_view = multi_view
                         

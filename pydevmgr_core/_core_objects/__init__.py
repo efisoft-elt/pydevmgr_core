@@ -3,7 +3,7 @@ from ._class_recorder import (get_class, get_rpc_class, get_node_class, get_inte
                               list_class, Nodes, Rpcs, Devices, Managers, Parsers, Interfaces 
                               )
 from ._core_base import (kjoin, ksplit, reconfig, build_yaml, load_and_build, BaseData,
-                        open_object, _BaseObject)
+                        open_object, _BaseObject, path_walk_item , path_walk_attr)
 from ._core_node import (BaseNode,
                          nodeproperty,  node, 
                           NodesReader, NodesWriter, 

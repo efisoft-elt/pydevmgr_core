@@ -1,5 +1,7 @@
 from typing import Any,  Tuple, Optional, List, Dict, Union, Type, Generic, TypeVar
 from pydantic import BaseModel, Extra, ValidationError, validator, create_model
+from pydantic.class_validators import root_validator
+
 from ._class_recorder import get_class, KINDS
 from ._core_model_var import StaticVar
 
@@ -17,7 +19,7 @@ class CONFIG_MODE(str, Enum):
     DEFAULT = "DEFAULT"
 
 
-AUTO_BUILD_DEFAULT = False
+AUTO_BUILD_DEFAULT = True
 CONFIG_MODE_DEFAULT = CONFIG_MODE.DEFAULT
 
 
@@ -39,7 +41,7 @@ class BaseConfig(BaseModel, Generic[ObjVar]):
 
     class Config: # this is the Config of BaseModel
         extra = Extra.forbid
-        validate_assignment = True    
+        validate_assignment = True   
         use_enum_values = True 
     
     def _parent_class_ref(cls):
@@ -127,41 +129,39 @@ class BaseConfig(BaseModel, Generic[ObjVar]):
                  contains the root. For instance 'a.b.c' will look at configuration in cfg['a']['b']['c']
         """
         config = load_config(cfgfile)
-        for p in (s for s in  path.split('.') if s):
-            config = config[p]
-        return cls.from_cfgdict(config)                    
+        if path is not None:
+            config = path_walk_item(config, path)
+        return cls.parse_obj(config)                    
     
-    @classmethod 
-    def from_cfgdict(cls, config_dict):
-        """ Create the config object from python dictionary """
-        return cls.parse_obj(config_dict)
-         
     
-    def cfgdict(self, exclude: set =set()):
-        """ Write the config to a dictionary as it is red from from_cfgdict """
-        # exclude.add()
-        d = self.dict(exclude_unset=True, exclude=exclude)
-        return d
-
 
 class ChildrenCapabilityConfig(BaseModel): 
     auto_build: bool = AUTO_BUILD_DEFAULT
     
-    @classmethod
-    def _build_unknown(cls, values):
+    
+    
+
+    @root_validator(pre=False)
+    def _root_post_validator(cls, values):
         """ Every dict with kind and type member will be transformed to its right class 
 
         This will only be used if extra="allow"
         """
         for k,v in values.items():
-            if k in cls.__fields__: # field exist in the class and will be treated after
+            if k in cls.__fields__: # field exist in the class and will be treated independently 
                 continue
-            if isinstance(v, dict) and "kind" in v and "type" in v:
-                ObjClass = get_class(v["kind"], v["type"])
-                values[k] = ObjClass.Config.parse_obj(v)
+            values[k] = cls.validate_extra(k, v, values)
         return values
+    
+    @classmethod
+    def validate_extra(cls, name, extra, values):
+        if isinstance(extra, dict) and "kind" in extra and "type" in extra:
+            ObjClass = get_class(extra["kind"], extra["type"])
+            return ObjClass.Config.parse_obj(extra)
+        return extra
 
-def _path_walk(d, path):
+
+def path_walk_item(d, path):
     if isinstance(path, int):
         # get the first key
         
@@ -175,6 +175,13 @@ def _path_walk(d, path):
         for p in (s for s in  path.split('.') if s):
             d = d[p]
     return d
+
+
+def path_walk_attr(obj, path):
+    for p in (s for s in path.split('.') if s):
+        obj = getattr(obj, p)
+    return obj
+
 
 def _path_name(d, path):
     if isinstance(path, int):
@@ -254,7 +261,7 @@ def open_class(
     allconf = load_config(cfgfile)
     
     pname = _path_name(allconf, path)
-    allconf = _path_walk(allconf, path)
+    allconf = path_walk_item(allconf, path)
     
     allconf.update( kwargs )
     
@@ -267,8 +274,7 @@ def open_class(
     if not tpe:
         raise ValueError(f"Cannot resolve {kind} type")
     Object = get_class(kind, tpe)
-    # config = Object.parse_config(allconf) 
-    config = Object.Config.from_cfgdict(allconf)
+    config = Object.Config.parse_obj(allconf)
     return Object, config, pname 
 
 def open_object(
@@ -324,7 +330,7 @@ def load_yaml_config(yaml_payload: str, path: Optional[Union[str, tuple]] = None
     """
     payload = yaml.load(yaml_payload, Loader=ioconfig.YamlLoader)
     
-    payload = _path_walk(payload, path)
+    payload = path_walk_item(payload, path)
    
     return load_dict_config(payload)
     
@@ -384,9 +390,13 @@ def new_key(config):
 
 
 def auto_build( obj, attr ):
-    c = getattr( obj.config, attr  )
+
+    try:
+        c = getattr( obj.config, attr  )
+    except AttributeError:
+        raise AttributeError(f"{attr!r} attribute is not a valid pydevmgr object. Nothing in .config matching")
     if not isinstance(c, BaseConfig):
-        raise AttributeError(attr)
+        raise AttributeError(f"found {attr!r} in config but does not seems to be a pydevmgr config object")
     NewClass = c._get_parent_class()
     new = NewClass.new( obj, attr, config=c )
     obj.__dict__[attr] = new
@@ -530,9 +540,6 @@ class _BaseObject:
             return __config__
         if isinstance(__config__, dict):
             d = {**__config__, **kwargs} 
-
-            # if hasattr(cls.Config, "from_cfgdict"):
-            #     return cls.Config.from_cfgdict(d)
             return cls.Config( **d )
         raise ValueError(f"got an unexpected object for config : {type(__config__)}")
             
@@ -548,7 +555,7 @@ class _BaseObject:
         parent must have the .key attribute 
         """        
         # here shall be implemented something to deal with config, it might be that config it comming
-        # from the parent.config like node_map, etc ...
+        # from the parent.config 
         config = cls.parse_config(config, **kwargs)
         if name is None:
             name = new_key(config)                                
@@ -596,25 +603,17 @@ class _BaseObject:
         """
         
         allconf = load_config(cfgfile)
-        allconf = _path_walk(allconf, path)
+        allconf = path_walk_item(allconf, path)
         
         allconf.update(**kwargs)
                
         if key is None and isinstance(path, str): 
             _, name = ksplit(path)           
             key = kjoin(prefix, name)
-        
-        return cls.from_cfgdict(allconf, key)
-    
-    @classmethod
-    def from_cfgdict(cls, cfgdict, key: Optional[str] = None, *args, **kwargs):
-        """ Open  """
-        tpe = cls.Config.__fields__['type'].default 
-        #config = cls.parse_config(cfgdict, type=tpe)
-        config = cls.Config.from_cfgdict(cfgdict)               
-        
-        return cls(key, *args, config=config, **kwargs)
-        
+
+        config = cls.Config.from_cfgfile( cfgfile, path )
+        return cls(key = key, config=config, **kwargs)
+            
     @property
     def key(self):
         """ key """
@@ -666,6 +665,7 @@ class _BaseObject:
 
 class ChildrenCapability:
     _all_cashed = False
+    _auto_build_object = AUTO_BUILD_DEFAULT
     def find(self, cls: Type[_BaseObject], depth: int = 0):
         """ iterator on  children matching the given  class 
         
@@ -708,26 +708,67 @@ class ChildrenCapability:
                             obj.build_all(depth-1)
 
      
-        if self.config.auto_build:
+        if self._auto_build_object:
             for k,c in self.config:
                 if isinstance( c, BaseConfig ):
                     obj = getattr( self, k)
                     if depth!=0 and isinstance(obj, ChildrenCapability):
                             obj.build_all(depth-1)
 
-
-    
+    def clear_all(self):
+        """ Remove all instances of children object they a re rebuilt on demand """
+        for k,v in list(self.__dict__.items()):
+            if isinstance( v, _BaseObject ):
+                del self.__dict__[k]
+        
+             
     
 
     def __getattr__(self, attr):   
         try:
             return object.__getattribute__(self, attr)
         except AttributeError as e:
-            if self._config.auto_build:
+            if self._auto_build_object:
                 return auto_build(self, attr)
             else:
                 raise e
 
+    def children(self, cls: Optional[_BaseObject] = _BaseObject):
+        """ iter on children attribute name 
+
+        Args:
+            cls: the class which shall match the object. By default it will be all pydevmgr objects
+            (:class:`pydevmgr_core._BaseObject`)
+
+        Exemple::
+                
+            >>> l = [getattr(manager, name) for name in  manager.children( BaseDevice )]
+            # is equivalent to 
+            >>> l = list (manager.find( BaseDevice, 0 ))
+
+            
+        """
+        if not self._all_cashed:
+            self.build_all()
+            self._all_cashed = True
+        for name, obj in self.__dict__.items():
+            if isinstance(obj, cls):
+                yield name  
+    
+    
+    def create_data_class( self, children,  Base = None ):
+               
+        data_obj = {}
+        for name in children:
+            obj = getattr(self, name)
+            data_obj[name] = (obj.Data, obj.Data())
+         
+        return create_model( "Data_Of_"+self.key, __base__=self.Data, **data_obj  )
+
+
+
+
+    
 class _BaseObjDict(dict, ChildrenCapability):
     
     def find(self, cls, depth: int = 0):

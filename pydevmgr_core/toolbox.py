@@ -26,7 +26,8 @@ __all__ = [
 "AllTrue", 
 "AllFalse", 
 "AnyTrue", 
-"AnyFalse", 
+"AnyFalse",
+"NegNode", 
 "InsideIntervalNode", 
 "InsideCircleNode", 
 "PosNameNode", 
@@ -279,6 +280,13 @@ class AnyFalse(NodeAlias):
     def fget(*nodes):
         return not all(nodes)
 
+@record_class
+class NegNode(NodeAlias1):
+    """ Return the negative of the aliased node """
+    class Config(NodeAlias1.Config):
+        type = "NegNode"
+    def fget(self, value):
+        return not value 
 
 @record_class
 class CounterNode(BaseNode):

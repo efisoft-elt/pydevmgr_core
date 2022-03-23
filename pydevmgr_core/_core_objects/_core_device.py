@@ -13,7 +13,6 @@ from ._core_rpc import BaseRpc
 
 from ._core_obj_dict import ObjDict
 
-from pydantic  import BaseModel
 from .. import io 
 
 from typing import List, Optional, Any, Dict, Union, Type
@@ -30,14 +29,10 @@ class BaseDeviceConfig(_BaseObject.Config, ChildrenCapabilityConfig):
     
     def cfgdict(self, exclude=set()):
         all_exclude = {*{}, *exclude}
-        d = super().cfgdict(exclude=all_exclude)
-           
+        d = super().cfgdict(exclude=all_exclude)       
         return d
     
-    class Config:
-        validate_assignment = True
-
-
+  
     
 def open_device(cfgfile, path=None, prefix="", key=None, default_type=None, **kwargs):
     """ Open a device from a configuration file 
