@@ -57,8 +57,8 @@ class PydevmgrLoader(yaml.CLoader):
     --- 
     name: test 
     config: !include
-    include_files: [path/to/config1.yml, path/to/config2.yml]
-    overwriten_key: 34.5 
+     include_files: [path/to/config1.yml, path/to/config2.yml]
+     overwriten_key: 34.5 
     
     """
     find_config = staticmethod(find_config)

@@ -36,6 +36,7 @@ class BaseConfig(BaseModel, Generic[ObjVar]):
     kind: KINDS = ""
     type: str = ""
     version: str = "" # version of the configuration file
+
     
     class Config: # this is the Config of BaseModel
         extra = Extra.forbid
