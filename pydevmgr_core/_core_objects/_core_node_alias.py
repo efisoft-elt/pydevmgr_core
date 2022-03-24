@@ -1,7 +1,7 @@
 from ._core_node import BaseNode, NodesReader, NodesWriter
-from ._core_base import kjoin, _BaseObject, new_key
+from ._core_base import kjoin, _BaseObject, new_key, path 
 from typing import Union, List, Optional, Any, Dict, Callable
-from pydantic import create_model
+from pydantic import create_model, validator
 from inspect import signature , _empty
 
 
@@ -9,10 +9,11 @@ class NodeAliasConfig(BaseNode.Config):
     type: str = "Alias"
     nodes: Optional[Union[List[Union[str, tuple]], str]] = None
     
-
+ 
 class NodeAlias1Config(BaseNode.Config):
     type: str = "Alias1"
     node: Optional[Union[str,tuple]] = None
+    
 
 
 class NodeAliasProperty(BaseNode.Property):
@@ -168,7 +169,7 @@ class NodeAlias(BaseNode):
         elif hasattr(nodes, "__call__"):
             nodes = nodes(parent)
                                 
-        parsed_nodes, node_names = zip(*(cls._parse_node(parent, n) for n in nodes))
+        parsed_nodes, node_names = zip(*(cls._parse_node(parent, n) for n in path(nodes)))
         
         return cls(kjoin(parent.key, name), parsed_nodes, config=config, localdata=parent.localdata, node_names=node_names)
     
@@ -294,7 +295,7 @@ class NodeAlias1(BaseNode):
             node = config.node 
         if node is None:
             raise ValueError("node origin pointer is not defined")                             
-        parsed_node, node_name = NodeAlias._parse_node(parent, node)
+        parsed_node, node_name = NodeAlias._parse_node(parent, path(node))    
         
         return cls(kjoin(parent.key, name), parsed_node, config=config, localdata=parent.localdata, node_name=node_name)
     

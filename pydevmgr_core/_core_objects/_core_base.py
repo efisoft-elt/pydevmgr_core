@@ -1,5 +1,5 @@
 from typing import Any,  Tuple, Optional, List, Dict, Union, Type, Generic, TypeVar
-from pydantic import BaseModel, Extra, ValidationError, validator, create_model
+from pydantic import BaseModel, Extra, ValidationError, validator, create_model, root_validator
 from pydantic.class_validators import root_validator
 
 from ._class_recorder import get_class, KINDS
@@ -37,13 +37,16 @@ class BaseConfig(BaseModel, Generic[ObjVar]):
     type: str = ""
     version: str = "" # version of the configuration file
     
-    
-
     class Config: # this is the Config of BaseModel
         extra = Extra.forbid
         validate_assignment = True   
         use_enum_values = True 
     
+
+    
+
+
+
     def _parent_class_ref(cls):
         return None
     
@@ -371,6 +374,22 @@ def ksplit(key: str) -> Tuple[str,str]:
     """
     s, _, p = key[::-1].partition(".")
     return p[::-1], s[::-1]
+
+def path( keys: Union[str, list])-> Union[str, List[Union[str, tuple]]]:
+    if isinstance(keys, str):
+        l = keys.split(".")
+        if len(l)<2:
+            return keys
+        return tuple(l)
+    elif isinstance(keys, tuple):
+        return keys
+    elif hasattr( keys, '__iter__' ):
+        return [path(k) for k in keys]
+    return keys 
+    #raise ValueError(f'expecting a string or an iterable on string got a {type(keys)}')
+
+    
+
 
 def reconfig(ConfigClass: Type, config: BaseConfig, kwargs: dict) -> BaseConfig:    
     if config is None:

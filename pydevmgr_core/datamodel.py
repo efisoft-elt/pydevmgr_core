@@ -2,7 +2,7 @@ from pydantic import BaseModel, ValidationError, Field
 from pydantic.fields import ModelField
 from .download import download, BaseDataLink, reset
 from .upload import upload
-from ._core_objects import BaseNode, NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar, BaseData
+from ._core_objects import BaseNode, NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar, BaseData, path as to_path
 
 from typing import TypeVar, Generic, Any, Iterable, Dict, List, Type
 
@@ -49,7 +49,7 @@ def _extract_node(obj, name, field):
     if C.NODE in field.field_info.extra:
         
         node = field.field_info.extra[C.NODE]
-        
+        node = to_path(node)    
         if field.field_info.extra.get(C.ATTR, None) is not None:
             raise MatchError(f'node={C.NODE!r} and attr={C.ATTR!r} cannot be both set, choose one.')
         
@@ -101,6 +101,7 @@ def _extract_node(obj, name, field):
             raise MatchError(f'path={C.PATH!r} and item={C.ITEM!r} cannot be both set, choose one.')
              
         path = field.field_info.extra[C.PATH]
+        path = to_path(path)    
         if path:
             
             if isinstance(path, str):
