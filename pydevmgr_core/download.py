@@ -299,14 +299,9 @@ class Downloader:
             callback: Optional[Callable] = None,
             trigger: Optional[Callable] = None
         ) -> None:
-        
         if data is None:
-            if isinstance(nodes_or_datalink, dict):
-                data = nodes_or_datalink
-                # clear everything which is not a node 
-                nodes_or_datalink = [n for n in nodes_or_datalink if isinstance(n, BaseNode)]
-            else:
-                data = {}        
+            data = {}
+               
         self._data = data 
         
         if nodes_or_datalink is None:
@@ -315,10 +310,28 @@ class Downloader:
         elif isinstance(nodes_or_datalink, BaseDataLink):
             nodes = set()
             datalinks = set([nodes_or_datalink])
-        else:
-            nodes = set(nodes_or_datalink)
-            datalinks = set()
         
+        elif isinstance( nodes_or_datalink, dict):
+            nodes = set()
+            datalinks = set()
+            for k,v in nodes_or_datalink.items():
+                if isinstance( v, BaseDataLink ):
+                    datalinks.add(v)
+                else:
+                    nodes.add(v)
+        
+        else:
+            nodes = set()
+            datalinks = set()
+            for v in nodes_or_datalink:
+                if isinstance( v, BaseDataLink ):
+                    datalinks.add(v)
+                else:
+                    nodes.add(v)
+            
+
+
+
         #nodes = set() if nodes is None else set(nodes)
         if callback is None:
             callbacks = set()
