@@ -115,7 +115,6 @@ class BaseDevice(_BaseObject, ChildrenCapability):
         if self._localdata is None:
             self._localdata = {}
         self._com = self.new_com(self._config, com)
-    
 
 
     @classmethod

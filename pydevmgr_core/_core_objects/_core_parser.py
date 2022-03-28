@@ -377,7 +377,7 @@ class Enumerated(BaseParser):
         enumname: str = "" # name of the Enum class if enumarator is a dictionary 
         enumerator: Type = _BaseEnum 
         
-        @validator("enumerator", pre=True)
+        @validator("enumerator", pre=True, check_fields=False)
         def _enum_validator(cls, value, values):
             if isinstance( value, list):
                 value = dict(value)

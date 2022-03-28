@@ -32,7 +32,7 @@ class IOConfig(BaseModel):
     class Config:
         extra = Extra.allow
     
-class BaseConfig(BaseModel, Generic[ObjVar]):
+class BaseConfig(BaseModel):
     kind: KINDS = ""
     type: str = ""
     version: str = "" # version of the configuration file
@@ -134,9 +134,9 @@ class BaseConfig(BaseModel, Generic[ObjVar]):
         #return valid_value   
 
 
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
+    # @classmethod
+    # def __get_validators__(cls):
+    #     yield cls.validate
 
     
 
