@@ -1,3 +1,6 @@
+# 0.4.2
+- The default fget and fset of NodeAlias1 is returning the value, as it should be !
+
 # 0.4.1
 - added the path function 
 - NodeAlias and DataLink are now using the path function natively  

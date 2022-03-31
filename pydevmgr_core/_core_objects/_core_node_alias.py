@@ -223,17 +223,11 @@ class NodeAlias(BaseNode):
                 data[n] = v        
     
     def fget(self, *args) -> Any:
-        """ This is the function we need to implement to get real data 
-        
-        The number of argument must match the number of nodes
-        """
+        """ Process all input value (taken from Nodes) and return a computed value """
         raise NotImplementedError('fget')
     
-    def fset(self, value) -> None:
-        """ This is the function we need to implement to set real data
-         
-        The number of returned value must match the number of nodes 
-        """
+    def fset(self, value) -> Any:
+        """ Process one argument and return new values for the aliased Nodes """
         raise NotImplementedError('fset')    
 
 
@@ -321,18 +315,12 @@ class NodeAlias1(BaseNode):
             data[self._node] = value
     
     def fget(self,value) -> Any:
-        """ This is the function we need to implement to get real data 
-        
-        One argument for NodeAlias1
-        """
-        raise NotImplementedError('fget')
+        """ Process the input retrieved value and return a new computed on """
+        return value
     
-    def fset(self, value) -> None:
-        """ This is the function we need to implement to set real data
-         
-        Must return one single value for NodeAlias1
-        """
-        raise NotImplementedError('fset')    
+    def fset(self, value) -> Any:
+        """ Process the value intended to be set """
+        return value
 
 
 def nodealiasproperty(name, nodes, *args, **kwargs):

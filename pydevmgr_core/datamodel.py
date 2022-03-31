@@ -150,7 +150,7 @@ class DataLink(BaseDataLink):
     
     Args:
         input (Any):  Any object with attributes, expecting that the input contains some 
-                      :class:`BaseNode` attributes in tis hierarchy
+                      :class:`BaseNode` attributes in its hierarchy
                          
         model (:class:`pydantic.BaseModel`): a data model. Is expecting that the data model structure 
             contains :class:`NodeVar` type hint signature.
@@ -174,26 +174,26 @@ class DataLink(BaseDataLink):
                 
                 
                 # also the input object attribute pointing to a node can be changed 
-                # with the node_name keyword in Field
-                pos: NodeVar[float] = Field(0.0, node_name='pos_actual')
-                vel: NodeVar[float] = Field(0.0, node_name='vel_actual')
+                # with the no de keyword in Field (from pydantic import Field)
+                pos: NodeVar[float] = Field(0.0, node='pos_actual')
+                vel: NodeVar[float] = Field(0.0, node='vel_actual')
                  
                 
             class MotorData(BaseModel):    
                 num  : int =1 # other data which are not node related                
                 
-                # .stat shall be noth present inside the MotorData and the linked Object 
+                # Add the stat Data Model 
                 stat : MotorStatData = MotorStatData()
                 
                 # This node is standalone, not linked to input object, 
                 # it must be specified in Field with the node keyword 
-                utc:         NodeVar[str]   = Field('', node=LocalUtcNode('utc'))
+                utc:         NodeVar[str]   = Field('1950-01-01T00:00:00.00000', node=LocalUtcNode('utc'))
                 
                 
             >>> data = MotorData()
             >>> data.stat.pos
             0.0
-            >>> link = DataLink( tins.motor1, data )
+            >>> link = DataLink( motor1, data )
             >>> link.download() # download node values inside data from tins.motor1
             >>> data.stat.pos
             4.566   
@@ -320,7 +320,7 @@ class DataLink(BaseDataLink):
     def download_from_nodes(self, nodevals: Dict[BaseNode,Any]) -> None:
         """ Update the data from a dictionary of node/value pair 
         
-        If a node in the dictionary is currently not in the data model it is ignored silently 
+        If a node in the dictionary is currently not part of the data model link it is ignored silently 
         """
         for node, val in nodevals.items():
             try:
@@ -359,7 +359,7 @@ class DataLink(BaseDataLink):
                 todata[node] = val  
                         
     def upload(self) -> None:
-        """ upload data value (the one linkerd to a node) to the server """
+        """ upload data value (the one linked to a node) to the server """
         todata = {}
         self._upload_to(todata)
         upload(todata) 
