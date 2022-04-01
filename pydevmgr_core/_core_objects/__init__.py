@@ -23,7 +23,7 @@ from ._core_manager import BaseManager, ManagerProperty, open_manager
 from ._core_com import BaseCom
 from ._core_model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
 
-from ._core_pydantic import Defaults, GenDevice, GenManager, GenInterface, GenNode
+from ._core_pydantic import Defaults, GenDevice, GenManager, GenInterface, GenNode, GenConf
 
 
 from ._core_parser import *

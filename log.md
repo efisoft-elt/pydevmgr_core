@@ -1,3 +1,8 @@
+# 0.4.3 
+- Add GenConf typing to allow loading string as content of a config file 
+- io.load_config can now handle  '/file/path.yml[a.b.c]'
+- Add conparser  to build parser in pydantic model 
+
 # 0.4.2
 - The default fget and fset of NodeAlias1 is returning the value, as it should be !
 

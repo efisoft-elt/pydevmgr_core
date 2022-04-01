@@ -53,15 +53,9 @@ class BaseConfig(BaseModel):
         # This is important to pop the cfgfile, so this will not be executed every time there is 
         # an attribute assignment 
         cfgfile = values.pop('cfgfile', None) 
-        cfgfile_path = values.pop('cfgfile_path', None)
 
         if cfgfile:
-            print("I sshould be called ones")
             cfg = load_config(cfgfile)
-            if cfgfile_path:
-                if isinstance(cfgfile_path, list):
-                    cfgfile_path = tuple(cfgfile_path)
-                cfg = path_walk_item(cfg, path(cfgfile_path))
             for k, v in cfg.items():
                 values.setdefault(k,v)
         return values

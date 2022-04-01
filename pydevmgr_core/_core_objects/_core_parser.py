@@ -1,5 +1,7 @@
-from typing import Any, Optional, Type, Callable, Union, Iterable, List
-from pydantic import BaseModel , create_model, Extra, validator
+from typing import Any, Optional, Type, Callable, Union, Iterable, List, Generic, TypeVar
+from pydantic import BaseModel , create_model, Extra, validator, ValidationError
+
+from pydantic.fields import ModelField
 from inspect import signature , _ParameterKind, _empty, isbuiltin
 from ._class_recorder import get_parser_class, KINDS, record_class
 from ._core_base import reconfig
@@ -7,6 +9,7 @@ from .._misc.math_parser import ExpEval
 import math
 from enum import Enum 
 
+from ..io import load_config
 parser_loockup = {}
 
 class _Empty_:
@@ -305,6 +308,63 @@ def parser(parsers, config=None, **kwargs):
     return Parser(config=config, **kwargs)        
 
 
+ParserVar = TypeVar('ParserVar')
+class _BaseParserTyping(Generic[ParserVar]):
+    _parser = None
+    @classmethod
+    def __get_validators__(cls):
+        # one or more validators may be yielded which will be called in the
+        # order to validate the input, each validator will receive as an input
+        # the value returned from the previous validator
+        yield cls.validate
+
+    @classmethod
+    def __modify_schema__(cls, field_schema):
+        # __modify_schema__ should mutate the dict it receives in place,
+        # the returned value will be ignored
+        #field_schema.update()
+        pass
+
+    @classmethod
+    def validate(cls, v, field: ModelField):
+        
+        errors = []
+
+        if field.sub_fields:
+            if len(field.sub_fields)>1:
+                raise ValidationError(['to many field Defaults require and accept only one argument'], cls)
+            val_f = field.sub_fields[0]
+                       
+            valid_value, error = val_f.validate(v, {}, loc='value')
+            
+            if error:    
+                errors.append(error)
+        else:
+            val_f = v
+
+        if errors:
+            raise ValidationError(errors, cls)
+
+        if cls._parser:
+            valid_value = cls._parser(val_f)
+
+            # try:
+            #     valid_value = cls._parser(val_f)
+            # except ValueError as er:
+            #     errors.append(er)
+        else:
+            valid_value = val_f
+            
+        
+        return valid_value
+    
+    def __repr__(self):
+        return f'{self.__class__.__name__}({super().__repr__()})'
+
+def conparser(parsers, **kwargs):
+     p = parser( parsers, **kwargs)
+     return type( p.__class__.__name__+"Type", (_BaseParserTyping, ), {"_parser": p})
+
 
 
 def _make_global_parsers():
@@ -478,4 +538,28 @@ class Formula(BaseParser):
         
 
         # return ExpEval(config.formula).eval({config.varname:value})            
+
+class _BaseModelConfigParse(BaseModel):
+    class Config:
+        extra = "allow"
+@record_class
+class ConfigParse(BaseParser):
+    class Config(BaseParser.Config):
+        type: str = "ConfigParse"
+        model: Optional[Type] = _BaseModelConfigParse
         
+    @staticmethod
+    def parse(value, config):
+        if isinstance( value, str):
+            value = load_config( value )
+        if not isinstance( value, (BaseModel, dict) ):
+            raise ValueError("input shall be a file path, a BaseModel or dictionary ")
+        if config.model:
+            if value is None:
+                return config.model()
+            return config.model.parse_obj(value)
+        if value is None:
+            return {}
+        return value
+
+

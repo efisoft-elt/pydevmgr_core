@@ -1,6 +1,6 @@
 import yaml
 import os
-
+import re
 from pydantic import BaseModel
 from typing import Tuple, Optional, List, Dict, Optional, Callable, Any
 from ._yaml_loader import PydevmgrLoader
@@ -16,6 +16,18 @@ pkg_res = PkgResource('pydevmgr_core', 'resources')
 
 
 
+
+_re_path_pattern = re.compile( '^([^\\[]+)\\[([^\\]]*)\\]$' )
+def parse_file(file_name: str):
+    """ split a file name into real file and path tuple"""
+    g = _re_path_pattern.search(file_name)
+    if not g:
+        return file_name, None
+    else:
+        file, path = g[1], g[2]
+        return file.strip(' '), tuple( p for p in path.strip(' ').split('.') if p)
+
+
 def load_config(file_name: str, ioconfig: IOConfig = ioconfig) -> Dict:
     """ Load a configuration file into a dictionary
     
@@ -25,6 +37,15 @@ def load_config(file_name: str, ioconfig: IOConfig = ioconfig) -> Dict:
     Alternatively the path can be an absolute '/' path 
 
     For now only yaml configuration files are supported 
+    
+    At the end of the file name can be a path to a target value inside the configuration. Path are string separated by
+    '.'
+    
+        e.g.
+        
+        ::
+            
+            assert load_config( 'myconfig.yml[a.b.c]' ) == load_config('myconfig.yml')['a']['b']['c']
 
     Args:
         file_name (str): config file name. Should be inside one of the path defined by the $CFGPATH 
@@ -34,16 +55,30 @@ def load_config(file_name: str, ioconfig: IOConfig = ioconfig) -> Dict:
     Returns:
         cfg (dict): config dictionary
     """
-    return read_config(find_config(file_name, ioconfig = ioconfig), ioconfig = ioconfig)
+    file_name, path = parse_file( file_name)
+    return read_config(find_config(file_name, ioconfig = ioconfig), ioconfig = ioconfig, path=path)
 
-def read_config(file: str, ioconfig: IOConfig =ioconfig) -> Dict:    
+
+def read_config(file: str, ioconfig: IOConfig =ioconfig, path=None) -> Dict:    
     """ Read the given configuration (yaml) file 
     
     Args:
         file (str): real file path, shall be a yaml file. 
     """
-    with open(file) as f:
-        return yaml.load(f.read(), Loader=ioconfig.YamlLoader)
+    if not path:
+        with open(file) as f:
+            return yaml.load(f.read(), Loader=ioconfig.YamlLoader)
+    else:
+        with open(file) as f:
+            d = yaml.load(f.read(), Loader=ioconfig.YamlLoader)
+            for p in path:
+                if p:
+                    try:
+                        d = d[p]
+                    except KeyError:
+                        raise ValueError(f"Cannot resolve path {path!r} inside {file!r}")
+            return d
+
 
 def load_yaml(input: str, ioconfig: IOConfig =ioconfig) -> Any:
     return yaml.load(input, Loader=ioconfig.YamlLoader)
