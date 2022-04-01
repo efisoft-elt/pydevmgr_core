@@ -362,6 +362,27 @@ class _BaseParserTyping(Generic[ParserVar]):
         return f'{self.__class__.__name__}({super().__repr__()})'
 
 def conparser(parsers, **kwargs):
+     """ Build a typing anotation parser for pydantic Models 
+        
+     Example: 
+
+     ::
+        
+        from pydantic import BaseModel
+        from pydevmgr_core import conparser
+
+        class Conf(BaseModel):
+            x: conparser( [float, "Bounded"], min=0, max=10) = 5.0
+        
+        
+
+        # ValidationError
+        >>> Conf(x=11.0)
+        ValidationError: 1 validation error for Conf
+        x
+          11.0 is higher than 10.0 (type=value_error)
+        
+     """
      p = parser( parsers, **kwargs)
      return type( p.__class__.__name__+"Type", (_BaseParserTyping, ), {"_parser": p})
 
