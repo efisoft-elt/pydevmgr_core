@@ -1,4 +1,4 @@
-from ._core_objects import  BaseNode, NodeAlias, NodeAlias1, record_class
+from ._core_objects import  BaseNode, NodeAlias, NodeAlias1, record_class, parser
 
 from collections import deque
 import time
@@ -595,16 +595,6 @@ class MaxNode(_Stat):
             self._max = value
         return self._max
 
-
-
-        
-
-
-
-
-
-
-
         
 @record_class
 class FormatNode(NodeAlias):
@@ -614,9 +604,5 @@ class FormatNode(NodeAlias):
     
     def fget(self, *values):
         return self.config.format.format(*values)
-
-            
-            
-            
         
         

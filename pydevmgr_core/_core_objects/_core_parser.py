@@ -76,8 +76,7 @@ class _BuiltParser:
     def __call__(self, value):
         return self.parse(value, self.config)        
 
-
-
+    
 def to_parser_class(_func_: Callable =None, *, type: Optional[str] = None) -> Type[BaseParser]:
     if _func_ is None:
         def parser_func_decorator(func):
@@ -154,7 +153,7 @@ def create_parser_class(
     The Config class of the new parser class is a combination of all Configs
     
     Args:
-        parser: A list of type :class:`BaseParser` or :class:`_BuiltParser` or callable or str  
+        parser: A list of type :class:`BaseParser` or :class:`_BuiltParser` or callable or str (recorded parser name) 
     
     Return:
         Cls (Type[_BuiltParser]): A new parser class 
@@ -278,7 +277,6 @@ def parser(parsers, config=None, **kwargs):
         >>> [p(10), p(20), p(30), p(40), p(50), p(60)]
         [30.0, 50.0, 70.0, 90.0, 100.0, 100.0]
         
-    ::
     
         
     .. seealso::
@@ -554,7 +552,9 @@ class Formula(BaseParser):
     @staticmethod
     def parse(value, config):
         # Cash the Eval expression inside the condig.__dict__
-        exp = config.__dict__.setdefault( "__:"+config.formula, ExpEval(config.formula ))
+        
+        # exp = config.__dict__.setdefault( "__:"+config.formula, ExpEval(config.formula ))
+        exp = ExpEval(config.formula )
         return exp.eval( {config.varname:value} ) 
         
 
