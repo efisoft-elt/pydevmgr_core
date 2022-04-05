@@ -1,6 +1,6 @@
 from ._class_recorder import get_rpc_class, KINDS
-from ._core_base import (_BaseObject, _BaseProperty, 
-                        ObjectIterator, ChildError, IOConfig, ksplit)
+from ._core_base import (_BaseObject, _BaseProperty)
+                           
 from ._core_com import BaseCom
 
 from .. import io

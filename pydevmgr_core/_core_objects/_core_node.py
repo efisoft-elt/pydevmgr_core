@@ -1,7 +1,6 @@
 from ._class_recorder import get_node_class, KINDS
 from ._core_base import (_BaseObject, _BaseProperty, kjoin, 
-                          ObjectIterator, IOConfig, 
-                          ChildError, ksplit, BaseData
+                           ksplit, BaseData
                         )
 from ._core_parser import parser, BaseParser, _BuiltParser, AnyParserConfig, create_parser_class
 from ._core_obj_dict import ObjDict

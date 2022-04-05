@@ -253,7 +253,7 @@ def parser(parsers, config=None, **kwargs):
                 or dict or string. 
                 Definne the parser class used
        config: optional, configuration of the parser 
-       \*\*kwargs:  Additional key/value configuration pairs 
+       * * kwargs:  Additional key/value configuration pairs 
        
     Exemple::
     
@@ -280,6 +280,7 @@ def parser(parsers, config=None, **kwargs):
     
         
     .. seealso::
+    
         :func:`create_parser_class`
         
     """ 

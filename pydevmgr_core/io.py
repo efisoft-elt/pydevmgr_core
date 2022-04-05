@@ -4,7 +4,6 @@ import re
 from pydantic import BaseModel
 from typing import Tuple, Optional, List, Dict, Optional, Callable, Any
 from ._yaml_loader import PydevmgrLoader
-from ._pkg_resource import PkgResource 
 
 class IOConfig(BaseModel):
     cfgpath : str = 'CFGPATH'
@@ -12,7 +11,6 @@ class IOConfig(BaseModel):
     YamlLoader = PydevmgrLoader
     
 ioconfig = IOConfig()
-pkg_res = PkgResource('pydevmgr_core', 'resources')    
 
 
 
@@ -105,12 +103,19 @@ PydevmgrLoader.find_config = staticmethod(find_config)
 def explore_config(filter: Optional[Callable] =None, ioconfig: IOConfig = ioconfig):
     """ Iterator on all config files found inside directories of the $CFGPATH environment variable 
     
-    The iterator returns 
+    The iterator returns pairs of (relateve_path, root_directory)   
 
     Args:
         filter (None, callable, optional): if given it will receive the content for each file
                to filter
-        ioconfig (optional): a :class:`IOConfig`               
+        ioconfig (optional): a :class:`IOConfig`
+
+    Example:
+
+    ::
+
+        >>> list(explore_config(  lambda d: d['kind']=='Device' ))
+
     """
         
     path_list = os.environ.get(ioconfig.cfgpath, '.').split(':')

@@ -1,21 +1,15 @@
-from ._core_base import (_BaseObject, _BaseProperty, ObjectIterator, ChildError,
-        IOConfig, ksplit, BaseData,
-        open_object, 
-        
-        ChildrenCapability, ChildrenCapabilityConfig
-
-        )
-from ._class_recorder import get_device_class, KINDS, get_class, record_class
+from ._core_base import (_BaseObject, _BaseProperty, BaseData, open_object, 
+                        ChildrenCapability, ChildrenCapabilityConfig
+                        )
+from ._class_recorder import  KINDS,  record_class
 from ._core_node import BaseNode 
 from ._core_interface import BaseInterface
-from ._core_com import BaseCom
 from ._core_rpc import BaseRpc
 
 from ._core_obj_dict import ObjDict
 
-from .. import io 
 
-from typing import List, Optional, Any, Dict, Union, Type
+from typing import  Optional, Any 
 
 
 
@@ -24,7 +18,6 @@ from typing import List, Optional, Any, Dict, Union, Type
 class BaseDeviceConfig(_BaseObject.Config, ChildrenCapabilityConfig):
     kind: KINDS = KINDS.DEVICE.value
     type: str = "Base"
-    com: Optional[BaseCom.Config] = None
     
     
     def cfgdict(self, exclude=set()):
@@ -103,19 +96,16 @@ class BaseDevice(_BaseObject, ChildrenCapability):
     Rpc = BaseRpc    
     Dict = DeviceDict 
     
-    _com = None                
     def __init__(self, 
            key: Optional[str] = None, 
            config: Optional[Config] = None,
-           com: Optional[Any] = None,             
            **kwargs
         ) -> None:        
         
         super().__init__(key, config=config, **kwargs)  
         if self._localdata is None:
             self._localdata = {}
-        self._com = self.new_com(self._config, com)
-
+    
 
     @classmethod
     def parse_config(cls, config, **kwargs):
@@ -138,16 +128,11 @@ class BaseDevice(_BaseObject, ChildrenCapability):
         return com 
     
         
-
-        
     def clear(self):
         """ clear all cashed intermediate objects """
         self._clear_all()  
             
-    @property
-    def com(self):
-        return self._com
-        
+            
     def connect(self):
         """ Connect device to client """
         raise NotImplementedError('connect method not implemented') 

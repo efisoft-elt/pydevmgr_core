@@ -1,5 +1,5 @@
-from typing import Any,  Tuple, Optional, List, Dict, Union, Type, Generic, TypeVar
-from pydantic import BaseModel, Extra, ValidationError, validator, create_model, root_validator
+from typing import Any, Tuple, Optional, List,  Union, Type, TypeVar
+from pydantic import BaseModel, Extra,  validator, create_model, root_validator, ValidationError
 from pydantic.class_validators import root_validator
 
 from ._class_recorder import get_class, KINDS
@@ -8,7 +8,7 @@ from ._core_model_var import StaticVar
 from ._core_pydantic import _default_walk_set
 from enum import Enum 
 import yaml
-from ..io import ioconfig, load_yaml, load_config
+from ..io import ioconfig, load_config
 import logging 
 import weakref
 
@@ -25,17 +25,10 @@ CONFIG_MODE_DEFAULT = CONFIG_MODE.DEFAULT
 
 ObjVar = TypeVar('ObjVar')
 
-
-class IOConfig(BaseModel):
-    """ model for cfgfile definition """    
-    cfgfile: str = ""
-    class Config:
-        extra = Extra.allow
     
 class BaseConfig(BaseModel):
     kind: KINDS = ""
     type: str = ""
-    version: str = "" # version of the configuration file
 
     
     class Config: # this is the Config of BaseModel
@@ -84,56 +77,6 @@ class BaseConfig(BaseModel):
     def validate_type(cls, type_):
         return type_
     
-    # @classmethod
-    # def validate(cls, v, field):
-    #     if field.sub_fields:
-    #         if len(field.sub_fields)!=1:
-    #             raise ValidationError(['to many field GenDevice require and accept only one argument'], cls)
-        
-
-    #         val_f = field.sub_fields[0]
-    #         errors = []
-        
-    #         valid_value, error = val_f.validate(v, {}, loc='value')
-
-    #         if error:
-    #             errors.append(error)
-    #         if errors:
-    #             raise ValidationError(errors, cls)
-    #     else:
-    #         valid_value = v
-        
-        
-    #     if isinstance(valid_value, dict):
-    #         haskind, hastype = False, False
-    #         if 'kind' in valid_value:
-    #             valid_value['kind'] = cls.validate_kind( valid_value['kind'])
-    #             haskind = True
-    #         if 'type' in valid_value:
-    #             hastype = True
-    #             valid_value['type'] = cls.validate_type( valid_value['type'])
-
-    #         if isinstance( field.default, BaseConfig ):
-    #             c_kind = valid_value.get('kind', field.default.kind)
-    #             c_type = valid_value.get('kind', field.default.type)
-
-
-    #             if (c_kind!= field.default.kind) or\
-    #                (c_type!= field.default.type):
-    #                     Obj = get_class(c_kind, c_type)
-    #                     cls = Obj.Config
-
-
-    #     return cls.parse_obj(valid_value)
-        #return valid_value   
-
-
-    # @classmethod
-    # def __get_validators__(cls):
-    #     yield cls.validate
-
-    
-
 
     @classmethod
     def from_cfgfile(cls, cfgfile, path: str = ''):
@@ -152,10 +95,7 @@ class BaseConfig(BaseModel):
     
 
 class ChildrenCapabilityConfig(BaseModel): 
-    auto_build: bool = AUTO_BUILD_DEFAULT
-    
-    
-    
+    auto_build: bool = AUTO_BUILD_DEFAULT 
 
     @root_validator(pre=False)
     def _root_post_validator(cls, values):
@@ -163,10 +103,16 @@ class ChildrenCapabilityConfig(BaseModel):
 
         This will only be used if extra="allow"
         """
+        errors = []
         for k,v in values.items():
             if k in cls.__fields__: # field exist in the class and will be treated independently 
                 continue
-            values[k] = cls.validate_extra(k, v, values)
+            try:
+                values[k] = cls.validate_extra(k, v, values)
+            except ValueError as e:
+                errors.append(e)
+        if errors:
+            raise ValueError( "\n\n  ".join(str(e) for e in errors))
         return values
     
     @classmethod
@@ -174,6 +120,11 @@ class ChildrenCapabilityConfig(BaseModel):
         if isinstance(extra, dict) and "kind" in extra and "type" in extra:
             ObjClass = get_class(extra["kind"], extra["type"])
             return ObjClass.Config.parse_obj(extra)
+        
+        if getattr( cls.Config, "extra_obj_only", False):
+            if isinstance( extra, _BaseObject.Config):
+                return extra
+            raise ValueError(f"""Extra {name!r} of type {type(extra)} not allowed""") 
         return extra
 
 
@@ -326,9 +277,6 @@ class BaseData(BaseModel):
     # place holder for Data class 
     key: StaticVar[str] = ""
 
-class ChildError(ValueError):
-    """ Error raise when a parent try to reach a child object (interface, node, rpc, ...) and cannot find it"""
-    pass
 
 def load_yaml_config(yaml_payload: str, path: Optional[Union[str, tuple]] = None) -> Tuple[Type,BaseConfig]:
     """ Load a yaml configuration and pare it in the right configuration object 
@@ -824,77 +772,3 @@ class _BaseObjDictProperty:
     pass
 
 
-
-class ObjectIterator:
-    _iterator = None
-    def __init__(self, obj, constructor, names):
-        self._obj = obj
-        self._constructor = constructor
-        self._names = names 
-    
-    def __iter__(self):
-        self._iterator = iter(self._names)
-        return self
-    
-    def __next__(self):
-        name = next(self._iterator)
-        try:
-            return object.__getattribute__(self._obj, name)
-        except AttributeError:
-            return self._constructor(name)
-        
-    def __getitem__(self, name):
-        
-        try:
-            return object.__getattribute__(self._obj, name)
-        except AttributeError:
-            return self._constructor(name)
-    
-    def __call__(self) -> List:
-        return list(self)
-    
-    def names(self) -> List:
-        return list(self._names)
-       
-       
-class _Old_ObjectIterator_To_delete:
-    _iterator = None
-    def __init__(self, map: dict, classes: Union[Type,Tuple[Type]]):
-        self._map = map
-        self._classes = classes 
-    
-    def __iter__(self):
-        self._iterator = iter(self._map.items())
-        return self
-    
-    def __next__(self):
-        k,v = next(self._iterator)
-        if isinstance(v, self._classes):
-            return v
-        return self.__next__()
-    
-    def __getitem__(self, item):
-        v = self._map[item]
-        if isinstance(v, self._classes):
-            return v 
-        raise KeyError(item)
-    
-    def __call__(self) -> List:
-        return list(self)
-    
-    def names(self) -> List:
-        return [k for k,v in self._map.items() if isinstance(v, self._classes)]
-       
-def _collect_config_properties(cls, prop_kind):
-    for sub in cls.__mro__:
-        for k,v in sub.__dict__.items():
-            if isinstance(v, (_BaseProperty)):
-                if v._config.kind is prop_kind:
-                    yield k, v._config
-
-
-
-
-
-                       
-        
