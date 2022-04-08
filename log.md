@@ -1,3 +1,6 @@
+# 0.4.4
+- cleanup, removing of unused functions and classes 
+
 # 0.4.3 
 - Add GenConf typing to allow loading string as content of a config file 
 - io.load_config can now handle  '/file/path.yml[a.b.c]'

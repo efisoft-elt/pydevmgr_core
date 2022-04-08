@@ -219,7 +219,7 @@ class _BaseModelGenConf(BaseModel):
 class GenConf(Generic[GenConfVar]):
     """ Parse a Model. If the input is a string it is interpreted as a path to a config file 
 
-    Te model is loaded from the config file which must have an absolute path or a path relative 
+    The model is loaded from the config file which must have an absolute path or a path relative 
     to one of the path defined in the $CFGPATH env varaible 
     
     A Node input will be interpreted as an empty dictionary (Model built without arguments). It will 
