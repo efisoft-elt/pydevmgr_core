@@ -13,8 +13,7 @@ pydevmgr_core module is the core library for pydevmgr it contains two modules :
 interface, nodes, and communication protocol. It does not do much by itself. 
 
 The idea is to build a base framework to handle communication with distributed
-devices. for this, it uses for this several objects ans some key functions. Let
-us start with the main objects definition and usage.
+devices. Let us start with the main objects definition and usage.
 
 Objects
 -------
@@ -24,8 +23,8 @@ Parser
 
 The class  :class:`pydevmgr_core.BaseParser`: defines an callable object used to
 parse data. This parser is for instance used in a node to make sure that a user
-value is correct and is eventually changed to be acceptable by the client
-communication. 
+value is correct and is eventually changed to be acceptable by the client/server 
+communication.  
 
 The :class:`pydevmgr_core.BaseParser`: base parser class has a configuration (a
 `Pydantic`_  ``BaseModel`` as for all config objects in pydevmgr) to specify
@@ -47,8 +46,8 @@ some parsing parameters. Example on the :class:`pydevmgr_core.Clipped` parser :
 
 
 One can combine Parser together for a chain of parsing, the only restriction is
-that their is only one name space for config parameter. So a two parameters with
-the same name will enter in collision.
+that their is only one name space for config parameter. So two parameters with
+the same name will enter in confict.
 
 ::
     
@@ -117,12 +116,13 @@ the :class:`pydevmgr_core.BaseNode` which cannot do much by itself but is the
 base brick for Node implementation. See for instance the `pydevmgr_ua:UaNode` to
 retrieve a node value from an OPC-UA server. 
 
-Each Node type has its own __init__ signature, however the get and set method are
-garanty to have always the same signature: 
+Each Node type has its own __init__ signature, mostlikely one will want to add to the __init__ a 
+socket, a serial, or any open communication object use to retrieve the value. 
+However the get and set methods are garanty to have always the same signature: 
 
 ::
     
-    # get the value where ever it is (e.g. an OPC-UA server)
+    # get the value (where ever it is, e.g. an OPC-UA server)
     value = my_node.get()
 
     # get the value from a data dictionary. Where data must have the node as key
@@ -141,7 +141,7 @@ garanty to have always the same signature:
 
 Node are mostly used by a parent object like a :class:`pydevmgr_core.BaseDevice` or
 :class:`pydevmgr_core.BaseInterface`. The `classmethod` :meth:`pydevmgr_core.BaseNode.new` is used to build the node
-within the context of its parent. In other word ne first time one is doing::
+within the context of its parent. In other word when doing this for the first ::
 
     my_device.my_node 
 
@@ -149,12 +149,12 @@ The::
 
     MyNode.new( name, my_device )   
 
-Is called and the node instance cashed inside ``my_device``. 
+Is called and the node instance is cashed inside ``my_device``. 
 
 
 
 For this documentation, let us build a simple dummy Node that read/write global variables. For a more complete
-development tutorial see code of ``pydevmgr_ua`` or  :ref:`Tuto` 
+development tutorial see code of ``pydevmgr_ua``
 
 ::
 

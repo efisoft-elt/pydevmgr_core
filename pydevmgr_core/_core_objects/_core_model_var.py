@@ -2,9 +2,9 @@ from pydantic import BaseModel, ValidationError, Field
 from pydantic.fields import ModelField
 from typing import TypeVar, Generic, Any, Iterable, Dict, List, Type
 
-Val = TypeVar('ValType')
+ValType = TypeVar('ValType')
 
-class NodeVar(Generic[Val]):
+class NodeVar(Generic[ValType]):
     """
     A Field as NodeVar. Does not do validation by itself but it is used
     as an iddentifier of a node value
@@ -56,7 +56,7 @@ class NodeVar_R(NodeVar):
     """ Read Only version of :class:`NodeVar` """
     pass
 
-class StaticVar(Generic[Val]):
+class StaticVar(Generic[ValType]):
     """
     A Field as StaticVar. Does not do validation by itself but it is used
     as an iddentifier of a static attribute of the input object of DataLink

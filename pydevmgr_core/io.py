@@ -16,13 +16,14 @@ ioconfig = IOConfig()
 
 
 _re_path_pattern = re.compile( '^([^\\[]+)\\[([^\\]]*)\\]$' )
-def parse_file(file_name: str):
+def parse_file_name(file_name: str):
     """ split a file name into real file and path tuple"""
     g = _re_path_pattern.search(file_name)
     if not g:
         return file_name, None
     else:
         file, path = g[1], g[2]
+         
         return file.strip(' '), tuple( p for p in path.strip(' ').split('.') if p)
 
 
@@ -53,7 +54,7 @@ def load_config(file_name: str, ioconfig: IOConfig = ioconfig) -> Dict:
     Returns:
         cfg (dict): config dictionary
     """
-    file_name, path = parse_file( file_name)
+    file_name, path = parse_file_name( file_name)
     return read_config(find_config(file_name, ioconfig = ioconfig), ioconfig = ioconfig, path=path)
 
 

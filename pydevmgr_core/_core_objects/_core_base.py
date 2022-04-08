@@ -1,14 +1,14 @@
-from typing import Any, Tuple, Optional, List,  Union, Type, TypeVar
+from typing import Any, Tuple, Optional, List,  Union, Type, TypeVar, Iterator
 from pydantic import BaseModel, Extra,  validator, create_model, root_validator, ValidationError
 from pydantic.class_validators import root_validator
 
 from ._class_recorder import get_class, KINDS
-from ._core_model_var import StaticVar
+from ._core_model_var import StaticVar, NodeVar
 
 from ._core_pydantic import _default_walk_set
 from enum import Enum 
 import yaml
-from ..io import ioconfig, load_config
+from ..io import ioconfig, load_config, parse_file_name
 import logging 
 import weakref
 
@@ -577,7 +577,11 @@ class _BaseObject:
             path (None, str, False)"" the hierarchique path where to find the config data inside the file 
                     for instance 'a.b.c' will loock at cfg['a']['b']['c'] from the loaded config file 
                     If "" the config file define the device configuration from its root 
-                    If None the first item of the config file is taken 
+                    If None the first item of the config file is taken. 
+                    Note that the path can be defined directly inside the cfgfile file name
+                    in the form ``path/to/myconfig.yml[a.b.c]`` see :func:`load_config`
+
+                                
             prefix (str, optional): add a prefix to the path name to build the device key. 
                     It is used only if key is None otherwhise ignored
         """
@@ -587,9 +591,16 @@ class _BaseObject:
         
         allconf.update(**kwargs)
                
-        if key is None and isinstance(path, str): 
-            _, name = ksplit(path)           
-            key = kjoin(prefix, name)
+        if key is None:
+            if path and isinstance(path, str): 
+                _, name = ksplit(path)           
+                key = kjoin(prefix, name)
+            else:
+                # try with the path defined in file name 
+                _, p = parse_file_name(cfgfile)
+                if p:
+                    key = p[-1]
+                
 
         config = cls.Config.from_cfgfile( cfgfile, path )
         return cls(key = key, config=config, **kwargs)
@@ -646,7 +657,8 @@ class _BaseObject:
 class ChildrenCapability:
     _all_cashed = False
     _auto_build_object = AUTO_BUILD_DEFAULT
-    def find(self, cls: Type[_BaseObject], depth: int = 0):
+
+    def find(self, cls: Type[_BaseObject], depth: int = 0) -> Iterator:
         """ iterator on  children matching the given  class 
         
         ...note::
@@ -674,7 +686,7 @@ class ChildrenCapability:
             
     
             
-    def build_all(self, depth:int =0):
+    def build_all(self, depth:int =0) -> None:
         """ Build all possible children objects 
         
         Every single children will be built inside the object and will be cashed inside the obj.__dict__
@@ -695,7 +707,7 @@ class ChildrenCapability:
                     if depth!=0 and isinstance(obj, ChildrenCapability):
                             obj.build_all(depth-1)
 
-    def clear_all(self):
+    def clear_all(self) -> None:
         """ Remove all instances of children object they a re rebuilt on demand """
         for k,v in list(self.__dict__.items()):
             if isinstance( v, _BaseObject ):
@@ -713,14 +725,14 @@ class ChildrenCapability:
             else:
                 raise e
 
-    def children(self, cls: Optional[_BaseObject] = _BaseObject):
+    def children(self, cls: Optional[_BaseObject] = _BaseObject) -> Iterator:
         """ iter on children attribute name 
 
         Args:
             cls: the class which shall match the object. By default it will be all pydevmgr objects
             (:class:`pydevmgr_core._BaseObject`)
 
-        Exemple::
+        Example::
                 
             >>> l = [getattr(manager, name) for name in  manager.children( BaseDevice )]
             # is equivalent to 
@@ -736,14 +748,24 @@ class ChildrenCapability:
                 yield name  
     
     
-    def create_data_class( self, children,  Base = None ):
-               
+    def create_data_class( self, children: Iterator[str],  Base = None ) -> Type[BaseData]:
+        """ Create a new data class for the object according to a child name list 
+
+        This is a quick and durty way to create a data class dynamicaly. To be used mostly 
+        in a manager or device with dynamic children. 
+        Manager, Device, Interface child will be build from their defined Data class 
+        Nodes will be of ``Any`` type and filled with ``None`` as default. 
+        
+        """       
         data_obj = {}
         for name in children:
             obj = getattr(self, name)
-            data_obj[name] = (obj.Data, obj.Data())
-         
-        return create_model( "Data_Of_"+self.key, __base__=self.Data, **data_obj  )
+            if hasattr( obj, "get"):
+                data_obj[name] = (NodeVar[Any], None)
+            else:
+                data_obj[name] = (obj.Data, obj.Data())
+        Base  = self.Data if Base is None else Base 
+        return create_model( "Data_Of_"+self.key, __base__= Base, **data_obj  )
 
 
 

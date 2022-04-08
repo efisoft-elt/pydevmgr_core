@@ -282,7 +282,7 @@ class AnyFalse(NodeAlias):
 
 @record_class
 class NegNode(NodeAlias1):
-    """ Return the negative of the aliased node """
+    """ Return the boolean oposite of the aliased node """
     class Config(NodeAlias1.Config):
         type = "NegNode"
     def fget(self, value):
