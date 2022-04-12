@@ -7,9 +7,7 @@ from ._core_rpc import BaseRpc
 from ._core_interface import BaseInterface  
 from ._class_recorder import KINDS, get_class, record_class
 
-from ._core_pydantic import _default_walk_set
 
-from ._core_obj_dict import ObjDict
 from pydantic import create_model 
 
 
@@ -59,11 +57,6 @@ def open_manager(cfgfile, path=None, prefix="", key=None, default_type=None, **k
 
 
 
-class ManagerDict(ObjDict):
-   class Config(ObjDict.Config):
-        kinds = set([KINDS.MANAGER])
-        default_kind = KINDS.MANAGER
-
 @record_class        
 class BaseManager(_BaseObject, ChildrenCapability):
     Property  = ManagerProperty
@@ -73,9 +66,7 @@ class BaseManager(_BaseObject, ChildrenCapability):
     Interface = BaseInterface
     Node = BaseNode
     Rpc = BaseRpc
-    Dict = ManagerDict
-    
-    
+     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self._localdata is None:
@@ -110,9 +101,4 @@ class BaseManager(_BaseObject, ChildrenCapability):
             config = None
            
         return super().parse_config(config, **kwargs)
-        
-    def clear(self):
-        """ clear all cashed intermediate objects """
-        self._clear_all()
-    
         

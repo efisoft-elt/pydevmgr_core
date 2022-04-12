@@ -7,7 +7,6 @@ from .. import io
 from typing import Dict, List, Callable, Union , Optional, Any, Type
 from pydantic import create_model, BaseModel
 from ._core_parser import parser, AnyParserConfig
-from ._core_obj_dict import ObjDict
 from inspect import signature , _empty
 
 import weakref
@@ -76,16 +75,11 @@ class RpcProperty(_BaseProperty):
         return self
 
 
-class RpcDict(ObjDict):
-    class Config(ObjDict.Config):
-        kinds = set([KINDS.RPC])
-        default_kind = KINDS.RPC
 
 class BaseRpc(_BaseObject):
     
     Config = BaseRpcConfig
     Property = RpcProperty
-    Dict = RpcDict
     
     _arg_parsers = None
     _kwarg_parsers = None

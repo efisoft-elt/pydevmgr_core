@@ -1,6 +1,8 @@
+from os import defpath
 from typing import Any, Tuple, Optional, List,  Union, Type, TypeVar, Iterator
 from pydantic import BaseModel, Extra,  validator, create_model, root_validator, ValidationError
 from pydantic.class_validators import root_validator
+from pydantic.errors import NoneIsAllowedError
 
 from ._class_recorder import get_class, KINDS
 from ._core_model_var import StaticVar, NodeVar
@@ -8,7 +10,8 @@ from ._core_model_var import StaticVar, NodeVar
 from ._core_pydantic import _default_walk_set
 from enum import Enum 
 import yaml
-from ..io import ioconfig, load_config, parse_file_name
+from ..io import ioconfig, load_config, parse_file_name, PydevmgrLoader
+import io as _io
 import logging 
 import weakref
 
@@ -19,7 +22,6 @@ class CONFIG_MODE(str, Enum):
     DEFAULT = "DEFAULT"
 
 
-AUTO_BUILD_DEFAULT = True
 CONFIG_MODE_DEFAULT = CONFIG_MODE.DEFAULT
 
 
@@ -54,10 +56,12 @@ class BaseConfig(BaseModel):
         return values
 
     def _parent_class_ref(cls):
+        # this is overwriten in __init_subclass__ of _BaseObject by a weak reference of the parent class
         return None
     
 
     def _get_parent_class(self):
+        """ Return the parent pydevmgr Object (Manager, Device, Interface, Node or Rpc ) for this configuration """
         p = self._parent_class_ref()
         if p is not None:
             return p
@@ -95,7 +99,6 @@ class BaseConfig(BaseModel):
     
 
 class ChildrenCapabilityConfig(BaseModel): 
-    auto_build: bool = AUTO_BUILD_DEFAULT 
 
     @root_validator(pre=False)
     def _root_post_validator(cls, values):
@@ -282,7 +285,7 @@ def load_yaml_config(yaml_payload: str, path: Optional[Union[str, tuple]] = None
     """ Load a yaml configuration and pare it in the right configuration object 
     
     The Config class used is localised thanks to the `kind` and `type` string argument inside the yaml
-    If the class is not recognised an Exception is raised.
+    If the class is not recognised an ValueError Exception is raised.
     
     Args:
         yaml_payload (str):  The yaml string payload 
@@ -369,21 +372,6 @@ def new_key(config):
     return f'{k}{c:03d}'
 
 
-def auto_build( obj, attr ):
-
-    try:
-        c = getattr( obj.config, attr  )
-    except AttributeError:
-        raise AttributeError(f"{attr!r} attribute is not a valid pydevmgr object. Nothing in .config matching")
-    if not isinstance(c, BaseConfig):
-        raise AttributeError(f"found {attr!r} in config but does not seems to be a pydevmgr config object")
-    NewClass = c._get_parent_class()
-    new = NewClass.new( obj, attr, config=c )
-    obj.__dict__[attr] = new
-    return new 
-    
-
-
 class _BaseProperty:    
     """ A Property is basically calling a constructor with dynamical and static arguments 
     
@@ -393,7 +381,7 @@ class _BaseProperty:
     The constructor is called with the following signature
         constructor( parent , name, *args, config=config, **kwargs)
     
-    So it must have at least twho positional arguments a config keyword argument and 
+    So it must have at least two positional arguments a config keyword argument and 
     optional keyword arguments  
     
     """    
@@ -623,40 +611,10 @@ class _BaseObject:
     @property
     def name(self):
         return ksplit(self._key)[1]    
-    
-    @classmethod
-    def _builtin_objects(cls, SubCls=None):
-        SubCls = SubCls or _BaseObject
-        d = {}
-        for sub in cls.__mro__:
-            for k,v in sub.__dict__.items():
-                if isinstance(v, (_BaseProperty)):
-                    if issubclass(v._cls, SubCls):
-                        d[k] = v._cls
-        return d
-    
-
-
-    def _cash_all(self):
-        """ cash all child _BaseProperty to real Objects """
-        if not self.__all_cashed__:
-            for sub in self.__class__.__mro__:
-                for k,v in sub.__dict__.items():
-                    if isinstance(v, (_BaseProperty)):
-                        getattr(self, k)
-            self.__all_cashed__ = True
-    
-    def _clear_all(self):
-        """ clear all cashed intermediate objects """
-        for k,v in list(self.__dict__.items()):
-            if isinstance(v, (_BaseObject)):
-                self.__dict__.pop(k)
-        self.__all_cashed__ = False
 
 
 class ChildrenCapability:
     _all_cashed = False
-    _auto_build_object = AUTO_BUILD_DEFAULT
 
     def find(self, cls: Type[_BaseObject], depth: int = 0) -> Iterator:
         """ iterator on  children matching the given  class 
@@ -698,32 +656,44 @@ class ChildrenCapability:
                         obj = getattr(self, k)
                         if depth!=0 and isinstance(obj, ChildrenCapability):
                             obj.build_all(depth-1)
+        
+        for k,c in self.config:
+            if isinstance( c, BaseConfig ):
+                obj = getattr( self, k)
+                if depth!=0 and isinstance(obj, ChildrenCapability):
+                        obj.build_all(depth-1)
 
-     
-        if self._auto_build_object:
-            for k,c in self.config:
-                if isinstance( c, BaseConfig ):
-                    obj = getattr( self, k)
-                    if depth!=0 and isinstance(obj, ChildrenCapability):
-                            obj.build_all(depth-1)
+    def clear_all(self, cls=None) -> None:
+        """ Remove all instances of cashed children objects 
 
-    def clear_all(self) -> None:
-        """ Remove all instances of children object they a re rebuilt on demand """
+        Args:
+            cls (Type): A pydevmgr Class, default is the _BaseObject 
+            
+        """
+        if cls is None:
+            cls = _BaseObject
+            
         for k,v in list(self.__dict__.items()):
             if isinstance( v, _BaseObject ):
                 del self.__dict__[k]
-        
-             
-    
+         
 
     def __getattr__(self, attr):   
         try:
             return object.__getattribute__(self, attr)
-        except AttributeError as e:
-            if self._auto_build_object:
-                return auto_build(self, attr)
-            else:
-                raise e
+        except AttributeError:
+            try:
+                config = getattr( self.config, attr  )
+            except AttributeError:
+                raise AttributeError(f"{attr!r} attribute is not a valid pydevmgr selfect. Nothing in .config matching")
+            if not isinstance(config, BaseConfig):
+                raise AttributeError(f"found {attr!r} in config but does not seems to be a pydevmgr config selfect")
+            NewClass = config._get_parent_class()
+            new = NewClass.new(self, attr, config=config )
+            self.__dict__[attr] = new
+            return new 
+
+
 
     def children(self, cls: Optional[_BaseObject] = _BaseObject) -> Iterator:
         """ iter on children attribute name 
@@ -769,7 +739,157 @@ class ChildrenCapability:
 
 
 
+class ObjectFactory:
+    """ Generic pydevmgr Object Factory 
 
+    Build a valid pydevmgr object (Manager, Device, Interface, Node, Rpc) within the context of a prent object 
+    and from three different input types :  
+        - string :  relative path to config file
+        - file stream : file with the yaml configuration in it 
+        - dictionary 
+        - Config (pydantic BaseModel),
+        - a pydevmgr class 
+        - or an pydevmgr instanciated object
+        
+    """
+    def __init__(self, BaseClass=_BaseObject, defaults=None, match_type_function=None):
+        self._BaseClass = BaseClass
+        if defaults is None:
+            defaults = {}
+        self._defaults = defaults
+        self._base_kind = BaseClass.Config.__fields__['kind'].default
+        if match_type_function:
+            self._match_type = match_type_function
+    
+    def _match_type(self, type_):
+        return True
+
+    
+    def _build_from_string(self, parent, name, file_name):
+        return self._build_from_dictionary( parent, name,load_config(file_name))
+    
+    def _build_from_io(self, parent, name, file):
+        return self._build_from_dictionary( parent, name, yaml.load( file, Loader=PydevmgrLoader))
+    
+    def _build_from_dictionary(self, parent, name, dictionary):
+        if self._defaults:
+            dictionary = dictionary.copy() # copy to avoid side effect on original dict 
+            for k,v in self._defaults.items():
+                dictionary.setdefault(k,v)
+        
+        kind = dictionary.get('kind', self._base_kind)
+        if not kind:
+            raise ValueError("Cannot figures out the dictionaryect 'kind'")
+        try:
+            type_ = dictionary['type']
+        except KeyError:
+            raise ValueError("Cannot figures our the dictionaryect 'type'")
+        
+        if not self._match_type(type_):
+            raise ValueError(f"type {type_!r} is not a valid type for this {kind} factory")
+        NewClass = get_class(kind, type_)
+        if not issubclass(NewClass, self._BaseClass):
+            raise ValueError(f"Input kind={kind}, type={type_} result to an invalid Class for this Factory")
+        config = NewClass.Config.parse_obj(dictionary)
+        return NewClass.new(parent, name, config=config)
+    
+    def _build_from_config(self, parent, name, config):
+        for k,v in self._defaults.items():
+            if k not in config.__fields_set__:
+               setattr(config, k, v)
+        
+        NewClass = config._get_parent_class()
+        if not issubclass(NewClass, self._BaseClass):
+            raise ValueError(f"Input config result to an invalid Class for this Factory")
+        return NewClass.new(parent, name, config=config)
+
+    def build(self, parent, name,  obj):
+        if isinstance(obj, str):
+            return self._build_from_string(parent, name, obj)
+        if isinstance(obj, (_io.TextIOBase, _io.BufferedIOBase, _io.RawIOBase, _io.IOBase)):
+            return self._build_from_io(parent, name, obj)
+        if isinstance(obj, dict): # this is a configuration payload
+            return self._build_from_dictionary(parent, name, obj)
+        if isinstance(obj, BaseModel):
+            return self._build_from_config(parent, name, obj)
+        if isinstance(obj, type) and issubclass(obj, _BaseObject):
+            return obj.new(parent, name, config=obj.Config(**self._defaults))
+        if isinstance(obj, _BaseObject):
+            return obj 
+        raise ValueError(f"Input is not a valid object for this Factory")
+
+
+class ConfigFactory:
+    """ A Generic Factory of config object accepting several inputs 
+        
+        - string :  relative path to config file
+        - file stream : file with the yaml configuration in it 
+        - dictionary 
+        - Config (pydantic BaseModel),   
+    """
+    def __init__(self, BaseConfigClass = _BaseObject.Config, defaults=None, match_type_function=None):
+        self._BaseClass = BaseConfigClass
+        if defaults is None:
+            defaults = {}
+        self._defaults = defaults
+        self._base_kind = BaseConfigClass.__fields__['kind'].default
+        if match_type_function:
+            self._match_type = match_type_function
+    
+    def _match_type(self, type_):
+        return True
+    
+    def _build_from_string(self, file_name):
+        return self._build_from_dictionary(load_config(file_name))
+    
+    def _build_from_io(self, file):
+        return self._build_from_dictionary(yaml.load( file, Loader=PydevmgrLoader))
+
+    def _build_from_dictionary(self,  dictionary):
+        if self._defaults:
+            dictionary = dictionary.copy() # copy to avoid side effect on original dict 
+            for k,v in self._defaults.items():
+                dictionary.setdefault(k,v)
+        
+        kind = dictionary.get('kind', self._base_kind)
+        if not kind:
+            raise ValueError("Cannot figures out the dictionaryect 'kind'")
+        try:
+            type_ = dictionary['type']
+        except KeyError:
+            raise ValueError("Cannot figures our the dictionaryect 'type'")
+        
+        if not self._match_type(type_):
+            raise ValueError(f"type {type_!r} is not a valid type for this {kind} factory")
+        NewConfigClass = get_class(kind, type_).Config
+        if not issubclass(NewConfigClass, self._BaseClass):
+            raise ValueError(f"Input kind={kind}, type={type_} result to an invalid Config Class for this Factory")
+        return NewConfigClass.parse_obj(dictionary)
+
+    def _build_from_config(self, config):
+        for k,v in self._defaults.items():
+            if k not in config.__fields_set__:
+               setattr(config, k, v)
+        
+        if not isinstance(config, self._BaseClass):
+            raise ValueError(f"Input config is not valid for this Factory")
+        return config 
+
+    def build(self, obj):
+
+        if isinstance(obj, str):
+            return self._build_from_string(obj)
+        if isinstance(obj, (_io.TextIOBase, _io.BufferedIOBase, _io.RawIOBase, _io.IOBase)):
+            return self._build_from_io(obj)
+
+        if isinstance(obj, dict):
+            return self._build_from_dictionary(obj)
+        if isinstance(obj, BaseModel):
+            return self._build_from_config(obj)
+        raise ValueError("Input is not a valid config object for this factory")
+
+
+        
     
 class _BaseObjDict(dict, ChildrenCapability):
     

@@ -200,6 +200,14 @@ class ObjDict(_BaseObjDict):
         return ObjDictProperty(name, cls, config=config)
 
 
+###############################
+# LAB 
+###############################
+
+
+
+
+
 
 if __name__ == "__main__":
     from pydevmgr_core import BaseDevice, BaseManager, record_class

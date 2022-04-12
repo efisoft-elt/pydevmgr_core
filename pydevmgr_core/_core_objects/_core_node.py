@@ -3,7 +3,6 @@ from ._core_base import (_BaseObject, _BaseProperty, kjoin,
                            ksplit, BaseData
                         )
 from ._core_parser import parser, BaseParser, _BuiltParser, AnyParserConfig, create_parser_class
-from ._core_obj_dict import ObjDict
 
 from .. import io 
 
@@ -158,10 +157,6 @@ class NodeProperty(_BaseProperty):
         self.fget = func
         return self
 
-class NodeDict(ObjDict):
-    class Config(ObjDict.Config):
-        kinds = set([KINDS.NODE])
-        default_kind = KINDS.NODE
 
 class BaseNode(_BaseObject):
     """ This a base class defining the base methods for a node 
@@ -181,7 +176,6 @@ class BaseNode(_BaseObject):
     Config = BaseNodeConfig
     Property = NodeProperty
 
-    Dict = NodeDict
 
     class Data(BaseData):
         value: Any = None    

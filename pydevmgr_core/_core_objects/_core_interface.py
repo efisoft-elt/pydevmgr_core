@@ -9,7 +9,6 @@ from ._class_recorder import get_interface_class, get_class, record_class, KINDS
 from ._core_com import BaseCom
 from ._core_node import BaseNode
 from ._core_rpc import BaseRpc
-from ._core_obj_dict import ObjDict
 
 from .. import io
 from typing import Optional, Iterable, Union, List, Dict, Callable
@@ -44,11 +43,6 @@ class InterfaceProperty(_BaseProperty):
         if self.fbuild:
             self.fbuild(parent, interface)            
 
-class InterfaceDict(ObjDict):
-    class Config(ObjDict.Config):
-        kinds = set([KINDS.INTERFACE])
-        default_kind= KINDS.INTERFACE 
-
 
 
 @record_class # we can record this type because it should work as standalone        
@@ -62,7 +56,6 @@ class BaseInterface(_BaseObject, ChildrenCapability):
     Data = BaseData
     Node = BaseNode
     Rpc = BaseRpc   
-    Dict = InterfaceDict
     
     def __init__(self, 
            key: Optional[str] = None, 
@@ -74,13 +67,4 @@ class BaseInterface(_BaseObject, ChildrenCapability):
         if self._localdata is None:
             self._localdata = {}
     
-
-    def clear(self):
-        """ clear all cashed intermediate objects """
-        self._clear_all()        
-
-                    
-
-                
-
     

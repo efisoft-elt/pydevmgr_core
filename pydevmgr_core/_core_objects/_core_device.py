@@ -6,7 +6,6 @@ from ._core_node import BaseNode
 from ._core_interface import BaseInterface
 from ._core_rpc import BaseRpc
 
-from ._core_obj_dict import ObjDict
 
 
 from typing import  Optional, Any 
@@ -80,11 +79,6 @@ class DeviceProperty(_BaseProperty):
 
 
 
-class DeviceDict(ObjDict):
-    class Config(ObjDict.Config):
-        kinds = set([KINDS.DEVICE])
-
-        default_kind = KINDS.DEVICE
 
 @record_class
 class BaseDevice(_BaseObject, ChildrenCapability):
@@ -94,7 +88,6 @@ class BaseDevice(_BaseObject, ChildrenCapability):
     Data = BaseData
     Node = BaseNode
     Rpc = BaseRpc    
-    Dict = DeviceDict 
     
     def __init__(self, 
            key: Optional[str] = None, 
@@ -127,12 +120,7 @@ class BaseDevice(_BaseObject, ChildrenCapability):
         """
         return com 
     
-        
-    def clear(self):
-        """ clear all cashed intermediate objects """
-        self._clear_all()  
-            
-            
+                        
     def connect(self):
         """ Connect device to client """
         raise NotImplementedError('connect method not implemented') 
