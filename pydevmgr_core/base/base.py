@@ -1,8 +1,7 @@
-from os import defpath
+from os import path
 from typing import Any, Tuple, Optional, List,  Union, Type, TypeVar, Iterator
-from pydantic import BaseModel, Extra,  validator, create_model, root_validator, ValidationError
+from pydantic import BaseModel, Extra,  create_model, root_validator
 from pydantic.class_validators import root_validator
-from pydantic.errors import NoneIsAllowedError
 
 from .class_recorder import get_class, KINDS
 from .model_var import StaticVar, NodeVar
@@ -27,7 +26,8 @@ CONFIG_MODE_DEFAULT = CONFIG_MODE.DEFAULT
 
 ObjVar = TypeVar('ObjVar')
 
-    
+
+
 class BaseConfig(BaseModel):
     kind: KINDS = ""
     type: str = ""
@@ -67,19 +67,6 @@ class BaseConfig(BaseModel):
             return p
         return get_class(self.kind, self.type)
 
-    @validator('kind')
-    def _kind_validator(cls, kind):
-        return cls.validate_kind(kind)
-
-
-    @classmethod
-    def validate_kind(cls, kind):
-        if kind:
-            return KINDS(kind)
-    
-    @classmethod
-    def validate_type(cls, type_):
-        return type_
     
 
     @classmethod
@@ -685,9 +672,9 @@ class ChildrenCapability:
             try:
                 config = getattr( self.config, attr  )
             except AttributeError:
-                raise AttributeError(f"{attr!r} attribute is not a valid pydevmgr selfect. Nothing in .config matching")
+                raise AttributeError(f"{attr!r} attribute is not a valid pydevmgr object. Nothing in .config matching")
             if not isinstance(config, BaseConfig):
-                raise AttributeError(f"found {attr!r} in config but does not seems to be a pydevmgr config selfect")
+                raise AttributeError(f"found {attr!r} in config but does not seems to be a pydevmgr config object")
             NewClass = config._get_parent_class()
             new = NewClass.new(self, attr, config=config )
             self.__dict__[attr] = new

@@ -6,7 +6,7 @@ from .class_recorder import  record_class, KINDS
 
 from .node import BaseNode
 from .rpc import BaseRpc
-
+from enum import Enum 
 from typing import Optional
 #  ___ _   _ _____ _____ ____  _____ _    ____ _____ 
 # |_ _| \ | |_   _| ____|  _ \|  ___/ \  / ___| ____|
@@ -16,9 +16,14 @@ from typing import Optional
 # 
 
 
+# used to force kind to be a interface
+class INTERFACEKIND(str, Enum):
+    INTERFACE = KINDS.INTERFACE.value
+
+
 class BaseInterfaceConfig(_BaseObject.Config, ChildrenCapabilityConfig):
     """ Config for a Interface """
-    kind: KINDS = KINDS.INTERFACE.value
+    kind: INTERFACEKIND = INTERFACEKIND.INTERFACE
     type: str = "Base"     
     
         

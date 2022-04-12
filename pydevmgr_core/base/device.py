@@ -5,17 +5,22 @@ from .class_recorder import  KINDS,  record_class
 from .node import BaseNode 
 from .interface import BaseInterface
 from .rpc import BaseRpc
-
+from enum import Enum 
 
 
 from typing import  Optional, Any 
+
+
+# used to force kind to be a device
+class DEVICEKIND(str, Enum):
+    DEVICE = KINDS.DEVICE.value
 
 
 
 
 
 class BaseDeviceConfig(_BaseObject.Config, ChildrenCapabilityConfig):
-    kind: KINDS = KINDS.DEVICE.value
+    kind: DEVICEKIND = DEVICEKIND.DEVICE
     type: str = "Base"
     
     

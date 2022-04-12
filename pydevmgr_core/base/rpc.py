@@ -2,28 +2,27 @@ from .class_recorder import  KINDS
 from .base import (_BaseObject, _BaseProperty)
                            
 
-from .. import io
-from typing import Dict, List, Callable, Union , Optional, Any, Type
-from pydantic import create_model, BaseModel
+from typing import Dict, List, Callable, Union , Optional, Type
+from pydantic import create_model
 from .parser_engine import parser, AnyParserConfig
 from inspect import signature , _empty
-
+from enum import Enum 
 import weakref
 
+
+
+# used to force kind to be a rpc 
+class RPCKIND(str, Enum):
+    RPC = KINDS.RPC.value
+
+
 class BaseRpcConfig(_BaseObject.Config):
-    kind: KINDS = KINDS.RPC.value
+    kind: RPCKIND = RPCKIND.RPC
     type: str = ""
     
     arg_parsers: Optional[List[Union[AnyParserConfig, List[Union[str, Callable]], str, Callable]]] = []
     kwarg_parsers: Optional[Dict[str,Union[AnyParserConfig, List[Union[str, Callable]], str, Callable]]] = {}
    
-    @classmethod
-    def validate_kind(cls, kind):
-        if kind:
-            if kind!=KINDS.RPC:
-                raise ValueError(f'expecting a Rpc kind, got a {kind!r}')
-        return kind    
-    
 
 
 class BaseCallCollector:

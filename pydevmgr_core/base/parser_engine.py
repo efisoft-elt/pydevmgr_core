@@ -22,7 +22,7 @@ class AnyParserConfig(BaseModel):
 
 # Config for online built parser
 class ParserConfig(BaseModel):
-    kind: KINDS = KINDS.PARSER.value
+    kind: KINDS = KINDS.PARSER
     type: str = ""
     class Config:
         validate_assignment = True
@@ -30,7 +30,7 @@ class ParserConfig(BaseModel):
         
 # Config for parser classes 
 class ParserElementConfig(BaseModel):    
-    kind: KINDS = KINDS.PARSER.value
+    kind: KINDS = KINDS.PARSER
     type: str = ""
     class Config:
         validate_assignment = True

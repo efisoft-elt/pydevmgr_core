@@ -3,19 +3,25 @@ from .base import (_BaseObject, _BaseProperty, BaseData)
 
 from .parser_engine import parser,  AnyParserConfig 
 
-from .. import io 
+from . import io 
 
 import weakref
 from inspect import signature , _empty
 
 from pydantic import create_model,  validator
 from typing import Dict, Any, Optional, Union, Callable,  List, Dict
+from enum import Enum 
 
 
-        
+
+# used to force kind to be a node 
+class NODEKIND(str, Enum):
+    NODE = KINDS.NODE.value
+
+
 class BaseNodeConfig(_BaseObject.Config):
     """ Config for a Node """
-    kind: KINDS = KINDS.NODE.value
+    kind: NODEKIND = NODEKIND.NODE
     type: str = ""
     #parser: Optional[Union[str, Callable, Iterable]] = None
     parser: Optional[Union[AnyParserConfig, str, List[Union[str, Callable]],  Callable]] = None
@@ -28,13 +34,6 @@ class BaseNodeConfig(_BaseObject.Config):
         if parsers is not None:
             return parser(parsers).config
     
-    @classmethod
-    def validate_kind(cls, kind):
-        if kind:
-            if kind!=KINDS.NODE:
-                raise ValueError(f'expecting a Node kind, got a {kind!r}')
-        return kind    
-
         
 class BaseReadCollector:
     """ Object used to collect nodes values from the same server in one roundtrip 

@@ -7,13 +7,17 @@ from .rpc import BaseRpc
 from .interface import BaseInterface  
 from .class_recorder import KINDS, get_class, record_class
 
-
+from enum import Enum 
 from pydantic import create_model 
+
+# used to force kind to be a manager
+class MANAGERKIND(str, Enum):
+    MANAGER = KINDS.MANAGER.value
 
 
                       
 class ManagerConfig(_BaseObject.Config, ChildrenCapabilityConfig):
-    kind: KINDS = KINDS.MANAGER.value
+    kind: MANAGERKIND = MANAGERKIND.MANAGER
     type: str = "Base"
 
 class ManagerProperty(_BaseProperty):    

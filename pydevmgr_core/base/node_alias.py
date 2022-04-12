@@ -332,7 +332,7 @@ def nodealiasproperty(name, nodes, *args, **kwargs):
         name (str) : name of the node. The key of the node will be parent_key.name
         nodes (iterable): List of a mix of node or string coresponding to the parent attribute pointing
                           to a node.  
-        \*args, \**kwargs: All other arguments necessary for the node construction this is only used 
+        *args, **kwargs: All other arguments necessary for the node construction this is only used 
                          if an laternative cls is given 
     """
     return NodeAlias.prop(name, nodes, *args, **kwargs)
@@ -347,7 +347,7 @@ def nodealias1property(name, node, *args, **kwargs):
         name (str) : name of the node. The key of the node will be parent_key.name
         node (:class:`BaseNode`, str): Either a node or a string coresponding to the parent attribute 
                 pointing to a node.  
-        \*args, \**kwargs: All other arguments necessary for the node construction 
+        *args, **kwargs: All other arguments necessary for the node construction 
     """
     return NodeAlias1.prop(name, node, *args, **kwargs)
 
