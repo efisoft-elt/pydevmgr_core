@@ -1,6 +1,6 @@
 """ some nodes that required numpy to be executed if numpy is not installed theses nodes will not be loaded """
 
-from ._core_objects import  BaseNode, NodeAlias, NodeAlias1, record_class
+from .base import  BaseNode, NodeAlias, NodeAlias1, record_class
 from collections import deque
 from typing import Optional, List, Tuple
 import numpy as np

@@ -1,4 +1,4 @@
-from ._core_objects import NodesReader,  DictReadCollector, BaseNode
+from .node import NodesReader, DictReadCollector, BaseNode
 import time
 
 

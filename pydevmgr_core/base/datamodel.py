@@ -2,9 +2,11 @@ from pydantic import BaseModel, ValidationError, Field
 from pydantic.fields import ModelField
 from .download import download, BaseDataLink, reset
 from .upload import upload
-from ._core_objects import BaseNode, NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar, BaseData, path as to_path
+from .node import BaseNode
+from .model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
+from .base import BaseData, path as to_path 
 
-from typing import TypeVar, Generic, Any, Iterable, Dict, List, Type
+from typing import  Any, Iterable, Dict, List, Type
 
 class C:
     ATTR = 'attr'

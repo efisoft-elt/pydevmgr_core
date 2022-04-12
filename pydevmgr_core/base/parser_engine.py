@@ -8,7 +8,7 @@ from .base import reconfig
 import math
 from enum import Enum 
 
-from ..io import load_config
+from .io import load_config
 parser_loockup = {}
 
 def get_parser_class(type_):
@@ -384,14 +384,6 @@ def conparser(parsers, **kwargs):
      return type( p.__class__.__name__+"Type", (_BaseParserTyping, ), {"_parser": p})
 
 
-
- 
-
-        
-
-        
-
-        # return ExpEval(config.formula).eval({config.varname:value})            
 
 class _BaseModelConfigParse(BaseModel):
     class Config:

@@ -10,7 +10,7 @@ from .model_var import StaticVar, NodeVar
 from .pydantic_tools import _default_walk_set
 from enum import Enum 
 import yaml
-from ..io import ioconfig, load_config, parse_file_name, PydevmgrLoader
+from .io import ioconfig, load_config, parse_file_name, PydevmgrLoader
 import io as _io
 import logging 
 import weakref

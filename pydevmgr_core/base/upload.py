@@ -1,5 +1,4 @@
-
-from ._core_objects import NodesWriter, BaseNode
+from .node import NodesWriter, BaseNode
 from .download import BaseDataLink
 
 from typing import Union, Optional, Callable, Any, Dict 

@@ -1,4 +1,4 @@
-from ._core_objects import  BaseNode, NodeAlias, NodeAlias1, record_class, parser
+from .base import  BaseNode, NodeAlias, NodeAlias1, record_class, parser
 
 from collections import deque
 import time

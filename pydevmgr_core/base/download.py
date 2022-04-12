@@ -1,4 +1,6 @@
-from ._core_objects import NodesReader, BaseNode, kjoin, _BaseObject
+from .node import NodesReader, BaseNode
+from .base import  _BaseObject
+
 
 import time
 from collections import  OrderedDict
