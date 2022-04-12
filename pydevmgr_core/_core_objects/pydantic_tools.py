@@ -1,4 +1,4 @@
-from pydevmgr_core._core_objects._class_recorder import get_class, KINDS
+from pydevmgr_core._core_objects.class_recorder import get_class, KINDS
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import ModelField
 from typing import Optional, TypeVar, Generic 

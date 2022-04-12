@@ -4,10 +4,10 @@ from pydantic import BaseModel, Extra,  validator, create_model, root_validator,
 from pydantic.class_validators import root_validator
 from pydantic.errors import NoneIsAllowedError
 
-from ._class_recorder import get_class, KINDS
-from ._core_model_var import StaticVar, NodeVar
+from .class_recorder import get_class, KINDS
+from .model_var import StaticVar, NodeVar
 
-from ._core_pydantic import _default_walk_set
+from .pydantic_tools import _default_walk_set
 from enum import Enum 
 import yaml
 from ..io import ioconfig, load_config, parse_file_name, PydevmgrLoader

@@ -1,11 +1,11 @@
-from ._core_base import (_BaseObject, _BaseProperty, ksplit, BaseData, kjoin,  open_object, ChildrenCapabilityConfig,
+from .base import (_BaseObject, _BaseProperty, ksplit, BaseData, kjoin,  open_object, ChildrenCapabilityConfig,
                             ChildrenCapability)
 
-from ._core_device import BaseDevice 
-from ._core_node import BaseNode
-from ._core_rpc import BaseRpc  
-from ._core_interface import BaseInterface  
-from ._class_recorder import KINDS, get_class, record_class
+from .device import BaseDevice 
+from .node import BaseNode
+from .rpc import BaseRpc  
+from .interface import BaseInterface  
+from .class_recorder import KINDS, get_class, record_class
 
 
 from pydantic import create_model 

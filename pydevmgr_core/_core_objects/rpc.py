@@ -1,12 +1,11 @@
-from ._class_recorder import get_rpc_class, KINDS
-from ._core_base import (_BaseObject, _BaseProperty)
+from .class_recorder import  KINDS
+from .base import (_BaseObject, _BaseProperty)
                            
-from ._core_com import BaseCom
 
 from .. import io
 from typing import Dict, List, Callable, Union , Optional, Any, Type
 from pydantic import create_model, BaseModel
-from ._core_parser import parser, AnyParserConfig
+from .parser_engine import parser, AnyParserConfig
 from inspect import signature , _empty
 
 import weakref
@@ -163,34 +162,6 @@ class BaseRpc(_BaseObject):
     
     def fcall(self, *args, **kwargs):
         raise NotImplementedError('fcall')
-
-
-
-class ComRpc(BaseRpc):
-    """ a BaseRpc with a com attribute """
-    class Config(BaseRpc.Config):
-        type: str= "ComRpc"
-        com: Optional[BaseCom.Config] = None
-    
-    def __init__(self, 
-           key: Optional[str], 
-           config: Optional[Config] =None, *, 
-           com: Optional[Any] =None,  
-           **kwargs
-        ) -> None:
-        self._com = com         
-        super().__init__(key, config=config, **kwargs)
-
-    @property
-    def com(self):
-        return self._com
-    
-    @classmethod
-    def new_args(cls, parent, config):
-        d = super().new_args(parent, config)
-        d.upadte(com=parent.com)
-        return d        
-    
         
 
 def rpcproperty(name, *args, **kwargs):

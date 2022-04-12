@@ -1,10 +1,10 @@
-from ._core_base import (_BaseObject, _BaseProperty, BaseData, open_object, 
+from .base import (_BaseObject, _BaseProperty, BaseData, open_object, 
                         ChildrenCapability, ChildrenCapabilityConfig
                         )
-from ._class_recorder import  KINDS,  record_class
-from ._core_node import BaseNode 
-from ._core_interface import BaseInterface
-from ._core_rpc import BaseRpc
+from .class_recorder import  KINDS,  record_class
+from .node import BaseNode 
+from .interface import BaseInterface
+from .rpc import BaseRpc
 
 
 

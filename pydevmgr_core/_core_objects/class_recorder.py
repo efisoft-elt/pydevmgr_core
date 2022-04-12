@@ -32,23 +32,6 @@ def get_class(kind: KINDS, type_: str, default=None) -> Type:
             raise ValueError(f"Unknown {kind!r} of type {type_!r}")
         else:
             return default
-def get_parser_class(type_: str)-> Type:
-    return get_class(KINDS.PARSER, type_)
-
-def get_node_class(type_: str)-> Type:
-    return get_class(KINDS.NODE, type_)
-
-def get_rpc_class(type_: str)-> Type:
-    return get_class(KINDS.RPC, type_)
-        
-def get_interface_class(type_: str)-> Type:
-    return get_class(KINDS.INTERFACE, type_)
-
-def get_device_class(type_: str)-> Type:
-    return get_class(KINDS.DEVICE, type_)
-
-def get_manager_class(type_: str)-> Type:
-    return get_class(KINDS.DEVICE, type_)
 
 def record_class(
          _cls_: Type =None, *, 
@@ -113,7 +96,7 @@ def _record_class_as(kind, type, cls, overwrite=False):
         setattr(Managers, type, cls)
     
 
-def list_class(kind: Optional[KINDS] = None)-> Union[List[tuple],List[str]]:
+def list_classes(kind: Optional[KINDS] = None)-> Union[List[tuple],List[str]]:
     """ list all class names recorded class accessible with :func:`get_class` 
     
     Args:

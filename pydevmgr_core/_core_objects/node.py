@@ -1,17 +1,15 @@
-from ._class_recorder import get_node_class, KINDS
-from ._core_base import (_BaseObject, _BaseProperty, kjoin, 
-                           ksplit, BaseData
-                        )
-from ._core_parser import parser, BaseParser, _BuiltParser, AnyParserConfig, create_parser_class
+from .class_recorder import get_class, KINDS, record_class    
+from .base import (_BaseObject, _BaseProperty, BaseData)
+
+from .parser_engine import parser,  AnyParserConfig 
 
 from .. import io 
 
 import weakref
 from inspect import signature , _empty
 
-from pydantic import create_model, Extra, BaseModel, validator
-from typing import Dict, Any, Optional, Union, Callable, Iterable, List, Dict, Tuple
-
+from pydantic import create_model,  validator
+from typing import Dict, Any, Optional, Union, Callable,  List, Dict
 
 
         
@@ -290,16 +288,6 @@ class BaseNode(_BaseObject):
                 
 
 
-def nodeproperty(name,  *args, **kwargs):
-    """ A decorator for a quick node creation 
-    
-    This shall be implemented in a parent interface or any class 
-    
-    Args:
-        name (str) : name of the node. The key of the node will be parent_key.name
-        \*args, \*\*kwargs: All other arguments necessary for the node construction
-    """
-    return BaseNode.prop(name, *args, **kwargs)
 
 def node(key: Optional[str] =None):
     """ This is a node decorator 
@@ -452,10 +440,10 @@ def new_node(type_, *args, **kwargs):
     Is just a short cut for
 
     ::
-        get_node_class(tpe)(*args, **kwargs)
+        get_class(KINDS.NODe, tpe)(*args, **kwargs)
     
     """
-    cls = get_node_class(type_)
+    cls = get_class(KINDS.NODE, type_)
     return cls(*args, **kwargs) 
         
         
@@ -527,5 +515,43 @@ def _node_func(func, type_):
     
 
 
+
+#  _____      _                 
+# | ____|_  _| |_ _ __ __ _ ___ 
+# |  _| \ \/ / __| '__/ _` / __|
+# | |___ >  <| |_| | | (_| \__ \
+# |_____/_/\_\\__|_|  \__,_|___/
+                              
+
+
+class LocalNodeConfig(BaseNode.Config):
+    default: Any = None
+    type = "Local"
+
+class StaticNodeConfig(BaseNode.Config):    
+    type = "Static"
+    value: Any
+    
+@record_class
+class StaticNode(BaseNode):
+    """ """
+    Config = StaticNodeConfig    
+    def fget(self):        
+        return self.config.value    
+    
+@record_class
+class LocalNode(BaseNode):
+    """ A Node getting and setting values inside the localdata dictionary 
+    
+    The node can only work if its localdata dictionary is an attribute
+    """    
+    Config = LocalNodeConfig
+    def fget(self):
+        if self.localdata is None:
+            return self.config.default                
+        return self.localdata.get(self.key,self.config.default)
+        
+    def fset(self, value):
+        self.localdata[self.key] = value
 
         

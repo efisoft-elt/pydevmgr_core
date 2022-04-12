@@ -1,17 +1,13 @@
-import weakref
-from ._core_base import (_BaseObject, _BaseProperty,
-                          BaseData, 
-                         ChildrenCapabilityConfig,  ChildrenCapability
-                        )
+from .base import ( _BaseObject, _BaseProperty, BaseData, 
+                     ChildrenCapabilityConfig,  ChildrenCapability
+                  )
                          
-from ._class_recorder import get_interface_class, get_class, record_class, KINDS
+from .class_recorder import  record_class, KINDS
 
-from ._core_com import BaseCom
-from ._core_node import BaseNode
-from ._core_rpc import BaseRpc
+from .node import BaseNode
+from .rpc import BaseRpc
 
-from .. import io
-from typing import Optional, Iterable, Union, List, Dict, Callable
+from typing import Optional
 #  ___ _   _ _____ _____ ____  _____ _    ____ _____ 
 # |_ _| \ | |_   _| ____|  _ \|  ___/ \  / ___| ____|
 #  | ||  \| | | | |  _| | |_) | |_ / _ \| |   |  _|  
