@@ -1,11 +1,9 @@
-from .base import  BaseNode, NodeAlias, NodeAlias1, record_class, parser
+from pydevmgr_core.base import  BaseNode, NodeAlias, NodeAlias1, record_class
 
 from collections import deque
 import time
 from  datetime import datetime, timedelta
 from typing import Union, List, Dict, Optional
-from pydantic import validator
-from enum import Enum
 from py_expression_eval import Parser
 from dataclasses import dataclass
 import math 
@@ -40,7 +38,11 @@ __all__ = [
 "SumNode", 
 "MeanNode", 
 "MinNode", 
-"MaxNode"
+"MaxNode",
+"MaxOfNode", 
+"MinOfNode",
+"MeanOfNode",
+"BitsNode"
 ]
 
 @record_class
@@ -256,6 +258,7 @@ class DequeNode1(NodeAlias1):
 class AllTrue(NodeAlias):
     class Config(NodeAlias.Config):
         type = "AllTrue"
+    @staticmethod
     def fget(*nodes):
         return all(nodes)
 
@@ -263,6 +266,7 @@ class AllTrue(NodeAlias):
 class AnyTrue(NodeAlias):
     class Config(NodeAlias.Config):
         type = "AnyTrue"
+    @staticmethod
     def fget(*nodes):
         return any(nodes)
         
@@ -270,6 +274,7 @@ class AnyTrue(NodeAlias):
 class AllFalse(NodeAlias):
     class Config(NodeAlias.Config):
         type = "AllFalse"
+    @staticmethod 
     def fget(*nodes):
         return not any(nodes)
 
@@ -277,6 +282,7 @@ class AllFalse(NodeAlias):
 class AnyFalse(NodeAlias):
     class Config(NodeAlias.Config):
         type = "AnyFalse"
+    @staticmethod
     def fget(*nodes):
         return not all(nodes)
 
@@ -285,7 +291,9 @@ class NegNode(NodeAlias1):
     """ Return the boolean oposite of the aliased node """
     class Config(NodeAlias1.Config):
         type = "NegNode"
-    def fget(self, value):
+    
+    @staticmethod
+    def fget(value):
         return not value 
 
 @record_class
@@ -384,7 +392,9 @@ class PosNameNode(NodeAlias1):
        
     :: 
        
-       PosNameNode('pos_name', motor1.stat.pos_actual, {'FREE':0.0, ''})
+       posname = PosNameNode(node=motor1.stat.pos_actual, poses={'FREE':0.0, ''}, tol=0.01 )
+       posname.get()
+
     """
     class Config(NodeAlias1.Config):
         type = "PosName"
@@ -595,14 +605,45 @@ class MaxNode(_Stat):
             self._max = value
         return self._max
 
+
+@record_class
+class MaxOfNode(NodeAlias, type="MaxOf"):
+    fget = staticmethod(max)
         
+@record_class
+class MinOfNode(NodeAlias, type="MinOf"):
+    fget = staticmethod(min)
+
+@record_class
+class MeanOfNode(NodeAlias, type="MeanOf"):
+    @staticmethod
+    def fget(*values):
+        return sum(values)/float(len(values))
+
+
+
 @record_class
 class FormatNode(NodeAlias):
     class Config(NodeAlias.Config):
         type: str = "Format"
         format: str = "{0}"
-    
     def fget(self, *values):
         return self.config.format.format(*values)
         
-        
+@record_class
+class BitsNode(NodeAlias, type="Bits"):
+    """ from a list of boolean node build an integer number 
+
+    the node alias works in both way, change a number to switch boolean nodes as bits 
+
+    The weakest weight is the first node of the input list 
+    """
+    def fget(self, *bits):
+        out = 0 
+        for bit in reversed(bits):
+            out = (out << 1) | bit
+        return out
+    def fset(self, num ):
+        out = [bool(num & (1<<i)) for i in range(len(self._nodes))  ]
+        return out
+

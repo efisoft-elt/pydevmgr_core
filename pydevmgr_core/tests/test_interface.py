@@ -16,9 +16,9 @@ def test_interface_node():
             configured_node2 = DefaultNode.Config(default=100)
             
         not_configured_node = DefaultNode.prop( default=99 )
-        configured_node = DefaultNode.prop( default=199, config_mode="DEFAULT")
+        configured_node = DefaultNode.prop( default=199)
         
-        configured_node2 = DefaultNode.prop( default=299, config_mode="OVERWRITE")
+        configured_node2 = DefaultNode.prop( default=299, frozen_parameters=set(['default']))
     
         
 

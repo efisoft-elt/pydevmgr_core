@@ -7,7 +7,6 @@ from .class_recorder import get_class, KINDS
 from .model_var import StaticVar, NodeVar
 
 from .pydantic_tools import _default_walk_set
-from enum import Enum 
 import yaml
 from .io import ioconfig, load_config, parse_file_name, PydevmgrLoader
 import io as _io
@@ -16,16 +15,8 @@ import weakref
 
 log = logging.getLogger('pydevmgr')
 
-class CONFIG_MODE(str, Enum):
-    OVERWRITE = "OVERWRITE"
-    DEFAULT = "DEFAULT"
-
-
-CONFIG_MODE_DEFAULT = CONFIG_MODE.DEFAULT
-
 
 ObjVar = TypeVar('ObjVar')
-
 
 
 class BaseConfig(BaseModel):
@@ -360,19 +351,8 @@ def new_key(config):
 
 
 class _BaseProperty:    
-    """ A Property is basically calling a constructor with dynamical and static arguments 
-    
-    The Property has the followind signature : 
-        Property(constructor, name, *args, config=None, **kwargs)
-        
-    The constructor is called with the following signature
-        constructor( parent , name, *args, config=config, **kwargs)
-    
-    So it must have at least two positional arguments a config keyword argument and 
-    optional keyword arguments  
-    
-    """    
-    def __init__(self, cls, constructor, name, *args, config=None, config_path=None, config_mode=CONFIG_MODE_DEFAULT, **kwargs):
+    """ A Property is basically calling a constructor with dynamical and static arguments """    
+    def __init__(self, cls, constructor, name, *args, config=None, config_path=None, frozen_parameters=None,  **kwargs):
         
         self._cls = cls 
         self._constructor = constructor
@@ -380,9 +360,17 @@ class _BaseProperty:
         
         self._config = config 
         self._config_path = config_path
-        self._config_mode = config_mode 
+        if frozen_parameters is None:
+            frozen_parameters = set()
+        self._frozen_parameters = frozen_parameters
         self._args = args
         self._kwargs = kwargs
+
+        for p in self._frozen_parameters:
+            try:
+                self._config.__dict__[p]
+            except KeyError:
+                ValueError(f"forzen parameter {p!r} does not exists in config")
         
     @property
     def congig(self):
@@ -434,13 +422,14 @@ class _BaseProperty:
         if config is not self._config:
             if not isinstance( config, type(self._config) ):
                 log.warning( f"The configuration Class missmatch in property {self._name!r} " )
-
-            if self._config_mode == CONFIG_MODE.DEFAULT:
-                _default_walk_set(self._config, config)
-            else:
-                for k,v in self._config.dict( exclude_unset=True ).items():
-                    log.warning( f"config var {k} overwriten by property" )
-                    setattr(config, k, v)
+            
+            for p in self._frozen_parameters:
+                if p in config.__fields_set__:
+                    if getattr(config, p) != getattr(self._config, p):
+                        raise ValueError("Cannot configure parameter {p!r}, frozen in property")
+                setattr(config, p, getattr(self._config, p)) 
+            _default_walk_set(self._config, config)
+                
         return config    
             
                 
@@ -517,7 +506,7 @@ class _BaseObject:
         return cls(kjoin(parent.key, name), config=config, **cls.new_args(parent, name, config))
     
     @classmethod
-    def prop(cls, name: Optional[str] = None, config_path=None, config_mode=CONFIG_MODE_DEFAULT, **kwargs):
+    def prop(cls, name: Optional[str] = None, config_path=None, frozen_parameters=None,  **kwargs):
         """ Return an object  property  to be defined in a class 
         
         Exemple:
@@ -531,7 +520,7 @@ class _BaseObject:
         """
         # config = cls.Config.parse_obj(kwargs)
         config = cls.parse_config(kwargs)
-        return cls.Property(cls, cls.new, name, config=config, config_path=config_path, config_mode=config_mode)
+        return cls.Property(cls, cls.new, name, config=config, config_path=config_path, frozen_parameters=frozen_parameters)
     
     @classmethod
     def from_cfgfile(cls, 

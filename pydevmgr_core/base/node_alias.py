@@ -214,6 +214,8 @@ class NodeAlias(BaseNode):
     def set(self, value: Any, data: Optional[Dict] =None) -> None:
         """ set the node alias value to server or to data dictionary if given """
         values = self.fset(value)
+        if len(values)!=len(self._nodes):
+            raise RuntimeError(f"fset method returned {len(values)} values while {len(self._nodes)} is on the node alias") 
         if data is None:
             NodesWriter(dict(zip(self._nodes, values))).write()                        
             #for n,v in zip(self._nodes, values):
@@ -309,8 +311,6 @@ class NodeAlias1(BaseNode):
         value = self.fset(value)
         if data is None:
             NodesWriter({self._node:value}).write()                        
-            #for n,v in zip(self._nodes, values):
-            #    n.set(v)
         else:
             data[self._node] = value
     
