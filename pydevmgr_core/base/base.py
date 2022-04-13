@@ -499,7 +499,7 @@ class _BaseObject:
         raise ValueError(f"got an unexpected object for config : {type(__config__)}")
             
     @classmethod
-    def new_args(cls, parent, config: Config) -> dict:
+    def new_args(cls, parent, name, config: Config) -> dict:
         """ build a dictionary of dynamical variables inerited from a parent """
         return dict( localdata = getattr(parent, "localdata", None) )
             
@@ -514,7 +514,7 @@ class _BaseObject:
         config = cls.parse_config(config, **kwargs)
         if name is None:
             name = new_key(config)                                
-        return cls(kjoin(parent.key, name), config=config, **cls.new_args(parent, config))
+        return cls(kjoin(parent.key, name), config=config, **cls.new_args(parent, name, config))
     
     @classmethod
     def prop(cls, name: Optional[str] = None, config_path=None, config_mode=CONFIG_MODE_DEFAULT, **kwargs):
