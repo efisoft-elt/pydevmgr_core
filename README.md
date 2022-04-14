@@ -27,7 +27,7 @@ For usage here is an example using pydevmgr_ua to access an OPC-UA node :
 
 ```python
 from pydevmgr_ua import UaRpc, UaNode, UaCom
-from pydevmgr_core import InsideIntervalNode
+from pydevmgr_core.nodes import InsideInterval
 import time 
 
 com = UaCom(address="opc.tcp://192.168.1.11:4840", prefix="MAIN")
@@ -36,7 +36,7 @@ target = 7.0
 
 move = UaRpc( com=com, suffix="Motor1.RPC_MoveAbs", args_parser=[float, float])
 pos = UaNode( com=com,  suffix="Motor1.stat.lrPosActual" )
-test = InsideIntervalNode( node = pos, min=target-0.1, max=target+0.1 )
+test = InsideInterval( node = pos, min=target-0.1, max=target+0.1 )
 
 
 try:

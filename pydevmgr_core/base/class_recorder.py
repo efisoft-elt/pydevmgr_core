@@ -42,14 +42,13 @@ def record_class(
     """ record a new class by its kind and type 
     
     This can be used as decorator or function 
-    """    
+    """   
     if _cls_ is None:
         def obj_decorator(cls) -> Type:
-            return record_class(cls, overwrite=overwrite, type=type)
+            return record_class(cls, overwrite=overwrite, type=type, kind=kind)
         return obj_decorator
     else:
         cls = _cls_
-        
     try:
         C = cls.Config
     except AttributeError:
@@ -78,10 +77,18 @@ def record_class(
 def _record_class_as(kind, type, cls, overwrite=False):
     if not hasattr(cls, "Config"):
         raise ValueError("recorded class must have a Config attribute")
-    if not overwrite and (kind, type) in object_loockup:
-        raise ValueError(f"{kind} {type} object is already recorded, use overwrite keyword to replace")
-    object_loockup[(kind, type)] = cls
+    try:
+        recorded_cls = object_loockup[(kind, type)]
+    except KeyError:
+        pass
+    else:
+        if cls is recorded_cls:
+            return
+        if not overwrite:
+            raise ValueError(f"{kind} {type} object is already recorded, use overwrite keyword to replace")
     
+    object_loockup[(kind, type)] = cls
+
     if kind == KINDS.PARSER:
         setattr(Parsers, type, cls)
     elif kind == KINDS.NODE:

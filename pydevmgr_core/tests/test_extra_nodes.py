@@ -1,4 +1,8 @@
-from pydevmgr_core import BitsNode, BaseNode, MaxOfNode, MinOfNode, MeanOfNode, AllTrue, AnyTrue, AnyFalse, AllFalse
+from pydevmgr_core import  BaseNode
+from pydevmgr_core.nodes import AllTrue, AnyTrue, AnyFalse, AllFalse
+
+from pydevmgr_core import nodes
+
 import pytest 
 from typing import Any 
 
@@ -26,7 +30,7 @@ def test_bit_node(MyNode):
     b1 =  MyNode(value=False)
     b2 =  MyNode(value=True)
 
-    b = BitsNode( nodes=[b0,b1,b2])
+    b = nodes.Bits( nodes=[b0,b1,b2])
     assert b.get() == 5
     b.set(3)
     assert b0.get() is True
@@ -46,15 +50,15 @@ def test_bit_node(MyNode):
 
 
 def text_max_of(MyNode):
-    max = MaxOfNode( nodes = [MyNode(value=v) for v in [2,10,3] ])
+    max = nodes.MaxOf( nodes = [MyNode(value=v) for v in [2,10,3] ])
     assert max.get() == 10
 
 def text_min_of(MyNode):
-    min = MinOfNode( nodes = [MyNode(value=v) for v in [2,10,3] ])
+    min = nodes.MinOf( nodes = [MyNode(value=v) for v in [2,10,3] ])
     assert min.get() == 2
 
 def test_mean_of(MyNode):
-    mean = MeanOfNode( nodes = [MyNode(value=v) for v in [2,4,6] ])
+    mean = nodes.MeanOf( nodes = [MyNode(value=v) for v in [2,4,6] ])
     assert mean.get() == 4.0
 
 
@@ -78,4 +82,44 @@ def test_all_false(MyNode):
     assert not AllFalse( nodes=[ MyNode(value=False),  MyNode(value=True) ]).get()
     assert AllFalse( nodes=[ MyNode(value=False),  MyNode(value=False) ]).get()
 
-    
+
+def test_sum():
+    s = nodes.Sum( node=nodes.Counter())
+    assert s.get() == 1.0
+    assert s.get() == 3.0
+    assert s.get() == 6.0
+    s.reset() 
+    assert s.get() == 4.0
+
+def test_mean():
+    m = nodes.Mean( node=nodes.Counter())
+    assert m.get() == 1.0
+    assert m.get() == 1.5
+    assert m.get() == 2.0 
+    m.reset()
+    assert m.get() == 4.0
+
+def test_min():
+    v = nodes.Value(value=2.0)
+    m  = nodes.Min( node=v)
+    assert  m.get()==2.0
+    v.set(10.0) 
+    assert m.get() == 2.0
+    v.set(1.0)
+    assert m.get() == 1.0
+
+
+def test_max():
+    v = nodes.Value(value=2.0)
+    m  = nodes.Max( node=v)
+    assert  m.get()==2.0
+    v.set(10.0) 
+    assert m.get() == 10.0
+    v.set(1.0)
+    assert m.get() == 10.0
+
+def test_format():
+
+    f = nodes.Format( nodes=[nodes.Value(value=4.56), nodes.Value(value="meter")], format="{0:.1f} {1}" )
+    assert f.get() == "4.6 meter"
+     

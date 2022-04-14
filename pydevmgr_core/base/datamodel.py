@@ -164,7 +164,8 @@ class DataLink(BaseDataLink):
         
         ::
         
-            from pydevmgr_core import LocalUtcNode, NodeVar, DataLink
+            from pydevmgr_core import NodeVar, DataLink
+            from pydevmgr_core.nodes import UtcTime
             from pydantic import BaseModel, Field
             
             class MotorStatData(BaseModel):
@@ -189,7 +190,7 @@ class DataLink(BaseDataLink):
                 
                 # This node is standalone, not linked to input object, 
                 # it must be specified in Field with the node keyword 
-                utc:         NodeVar[str]   = Field('1950-01-01T00:00:00.00000', node=LocalUtcNode('utc'))
+                utc:         NodeVar[str]   = Field('1950-01-01T00:00:00.00000', node=UtcTime('utc'))
                 
                 
             >>> data = MotorData()

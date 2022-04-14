@@ -8,8 +8,7 @@ from .node import (BaseNode, node,
                    NodesReader, NodesWriter, 
                    DictReadCollector, DictWriteCollector, 
                    BaseReadCollector, BaseWriteCollector, 
-                   new_node, 
-                   StaticNode, LocalNode
+                   new_node
                 )
 from .node_alias import (NodeAlias, NodeAlias1, nodealiasproperty, nodealias, nodealias1, to_nodealias_class)
 

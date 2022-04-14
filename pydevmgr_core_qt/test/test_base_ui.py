@@ -1,5 +1,6 @@
 from pydevmgr_core_qt import * 
-from pydevmgr_core import MeanFilterNode, MaxNode, MinNode, DequeNode1, NoiseNode, LocalUtcNode, LocalNode, BaseDevice, Downloader, NodeVar, parser
+from pydevmgr_core import MeanFilterNode, MaxNode, MinNode,  NoiseNode,  BaseDevice, Downloader, NodeVar, parser
+from pydevmgr_core.nodes import UtcTime, Local
 from pydantic import Field
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton
@@ -42,8 +43,8 @@ class TestWidget(QWidget):
         
 class TestDevice(BaseDevice):
     noise = NoiseNode.prop()        
-    utc = LocalUtcNode.prop()
-    counter = LocalNode.prop(default=0, parser=parser("Bounded", max=3, min=0))
+    utc = UtcTime.prop()
+    counter = Local.prop(default=0, parser=parser("Bounded", max=3, min=0))
     
 class TestUiLinker(BaseUiLinker):
     Widget = TestWidget

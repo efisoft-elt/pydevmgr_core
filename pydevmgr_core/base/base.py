@@ -512,9 +512,11 @@ class _BaseObject:
         Exemple:
            
            ::
-           
+                from pydevmgr_core import BaseDevice
+                from pydevmgr_core.nodes import Static
+                
                 def MyDevice(BaseDevice):
-                   ref_temperature = StaticNode.prop(value=22.0
+                   ref_temperature = Static.prop(value=22.0)
                 
                 MyDevice().ref_temperature.get()   
         """

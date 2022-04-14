@@ -13,7 +13,7 @@ def test_interface_node():
             node9: DefaultNode.Config = DefaultNode.Config( default=9 )
             
             configured_node  = DefaultNode.Config(default=100)
-            configured_node2 = DefaultNode.Config(default=100)
+            configured_node2 = DefaultNode.Config()
             
         not_configured_node = DefaultNode.prop( default=99 )
         configured_node = DefaultNode.prop( default=199)
