@@ -28,11 +28,11 @@ communication.
 
 The :class:`pydevmgr_core.BaseParser`: base parser class has a configuration (a
 `Pydantic`_  ``BaseModel`` as for all config objects in pydevmgr) to specify
-some parsing parameters. Example on the :class:`pydevmgr_core.Clipped` parser :
+some parsing parameters. Example on the :class:`pydevmgr_core.parsers.Clipped` parser :
 
 ::
 
-    from pydevmgr_core import Clipped
+    from pydevmgr_core.parsers import Clipped
     
     p = Clipped( min=0.0, max=1.0 )
     
@@ -50,8 +50,9 @@ that their is only one name space for config parameter. So two parameters with
 the same name will enter in confict.
 
 ::
-    
-    from pydevmgr_core import Bounded, Formula, parser
+
+    from pydevmgr_core import parser 
+    from pydevmgr_core.parsers import Bounded, Formula
     
     p = parser((Bounded, Formula, ToString), min=0, max=1.0, formula="x * 100", format="%.2f %%")
 
@@ -73,7 +74,7 @@ file, following the above example :
 
 ::
     
-    from pydevmgr_core import Bounded, Formula, parser
+    from pydevmgr_core.parsers import Bounded, Formula, ToString, parser
     import yaml 
 
     cfg = """
@@ -96,7 +97,7 @@ Normal function can also be used and combined inside a parser :
 
 ::
     
-    from pydevmgr_core import Rounded, parser
+    from pydevmgr_core.parsers import Rounded, parser
     p = parser( (float, Rounded), ndigits = 2 )
 
 ::

@@ -160,7 +160,8 @@ def create_parser_class(
     
     ::
     
-        >>> from pydevmgr_core import create_parser_class, Clipped, Rounded
+        >>> from pydevmgr_core import create_parser_class
+        >>> from pydevmgr_core.parsers import Clipped, Rounded
         >>> FBR = create_parser_class( (float, Rounded, Clipped) )
         >>> FBR.Config()
         FloatRoundedClippedConfig(kind=<KINDS.PARSER: 'Parser'>, type='Rounded', min=-inf, max=inf, ndigits=0)
@@ -257,7 +258,8 @@ def parser(parsers, config=None, **kwargs):
     
     ::
     
-        >>> from pydevmgr_core import parser, Bounded, Rounded
+        >>> from pydevmgr_core import parser
+        >>> from pydevmgr_core.parsers import Bounded, Rounded
         >>> p = parser( (float,Bounded,Rounded), min=0, max=1.0, ndigits=2)
         >>> p('0.223546243')
         0.22
@@ -270,7 +272,7 @@ def parser(parsers, config=None, **kwargs):
         
     ::
        
-        >>> from pydevmgr_core import parser, Formula, Clipped
+        >>> from pydevmgr_core.parsers import parser, Formula, Clipped
         >>> p = parser( (float, Formula, Clipped), formula="2*x+10", max=100)
         >>> [p(10), p(20), p(30), p(40), p(50), p(60)]
         [30.0, 50.0, 70.0, 90.0, 100.0, 100.0]
