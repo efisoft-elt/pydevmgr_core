@@ -1,8 +1,7 @@
 from .base import * 
 from .base import _BaseObject
-from .parsers import * 
 from . import nodes
-
+from . import parsers
 
 try:
     import numpy
