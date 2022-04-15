@@ -104,7 +104,18 @@ class BaseDevice(_BaseObject, ChildrenCapability):
         if self._localdata is None:
             self._localdata = {}
     
+    def __enter__(self):
+        try:
+            self.disconnect()
+        except (ValueError, RuntimeError):
+            pass 
+        self.connect()
+        return self
 
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
+        return False # if exception it will be raised 
+    
     @classmethod
     def parse_config(cls, config, **kwargs):
         if isinstance(config, dict):

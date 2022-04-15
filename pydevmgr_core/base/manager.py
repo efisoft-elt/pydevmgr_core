@@ -97,7 +97,18 @@ class BaseManager(_BaseObject, ChildrenCapability):
         for device in self.devices:
             device.disconnect()                
                 
-                    
+    def __enter__(self):
+        try:
+            self.disconnect()
+        except (ValueError, RuntimeError):
+            pass 
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
+        return False # False-> If exception it will be raised
+    
     @classmethod
     def parse_config(cls, config, **kwargs):
         if isinstance(config, dict):
