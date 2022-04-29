@@ -56,14 +56,22 @@ def test_nodealias1_decorator(node10):
 
 def test_nodealias1_property_decorator(MyNode):
      class Interface(BaseInterface):
-        value = MyNode.prop(value=5.0)
-        @NodeAlias1.prop( node="value")
+        value1 = MyNode.prop(value=5.0)
+        value2 = MyNode.prop(value=4.0)
+        @NodeAlias1.prop( node="value1")
         def offsetted(self, value):
             return value + 10.0
-     
+        
+        @NodeAlias.prop(nodes=["value1", "value2"])
+        def squared(self, v1, v2):
+            return v1*v2
+        
+        
+
      interface = Interface()
      assert interface.offsetted.get() == 15.0  
-
+     assert interface.squared.get() == 4.0*5.0 
+     
 def test_nodealias_property_decorator(MyNode):
      class Interface(BaseInterface):
         value1 = MyNode.prop(value=5.0)

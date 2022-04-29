@@ -10,7 +10,7 @@ from .node import (BaseNode, node,
                    BaseReadCollector, BaseWriteCollector, 
                    new_node
                 )
-from .node_alias import (NodeAlias, NodeAlias1, nodealiasproperty, nodealias, nodealias1, to_nodealias_class)
+from .node_alias import (NodeAlias, NodeAlias1,  nodealias, nodealias1) 
 
 from .rpc import RpcError, BaseRpc
 from .interface import BaseInterface
@@ -31,5 +31,3 @@ from .datamodel import (DataLink, BaseData, NodeVar, NodeVar_R, NodeVar_W,
                         NodeVar_RW, StaticVar, model_subset)
 
 
-
-from . import io

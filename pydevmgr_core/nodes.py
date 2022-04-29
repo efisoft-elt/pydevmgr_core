@@ -3,11 +3,10 @@ from pydevmgr_core.base import  BaseNode, NodeAlias, NodeAlias1, record_class
 from collections import deque
 import time
 from  datetime import datetime, timedelta
-from typing import Union, List, Dict, Optional
+from typing import Union, List, Dict, Optional, Any
 from py_expression_eval import Parser
 from dataclasses import dataclass
 import math 
-from typing import Any
 
 _eval_parser = Parser()
 
@@ -15,10 +14,37 @@ _eval_parser = Parser()
 __all__ = [
 "BaseNode", 
 "NodeAlias", 
-"NodeAlias1", 
+"NodeAlias1",
+"Local", 
+"Static", 
+"Value", 
 "Time", 
 "DateTime", 
-"UtcTime"
+"UtcTime", 
+"Counter", 
+"AllTrue", 
+"AnyTrue", 
+"AllFalse", 
+"AnyFalse", 
+"Oposite", 
+"DequeList", 
+"Deque", 
+"InsideInterval", 
+"InsideCircle", 
+"PosName", 
+"Formula", 
+"Formula1", 
+"Polynom", 
+"Statistics",
+"Sum", 
+"Mean", 
+"Min", 
+"Max", 
+"Format", 
+"Bits", 
+"MaxOf", 
+"MinOf", 
+"MeanOf", 
 ]
 
 
@@ -783,4 +809,5 @@ class MeanOf(NodeAlias, type="MeanOf"):
 
 
 
-
+del record_class, deque, time, datetime, timedelta, Union, List, Dict, Optional
+del Parser, dataclass, math, Any, _eval_parser 

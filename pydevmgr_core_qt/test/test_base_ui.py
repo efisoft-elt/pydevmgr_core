@@ -1,6 +1,7 @@
 from pydevmgr_core_qt import * 
-from pydevmgr_core import MeanFilterNode, MaxNode, MinNode,  NoiseNode,  BaseDevice, Downloader, NodeVar, parser
-from pydevmgr_core.nodes import UtcTime, Local
+from pydevmgr_core import  BaseDevice, Downloader, NodeVar, parser
+from pydevmgr_core.np_nodes import Noise, Mean, Max
+from pydevmgr_core.nodes import UtcTime, Local 
 from pydantic import Field
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton
@@ -42,7 +43,7 @@ class TestWidget(QWidget):
         self.ly.addWidget(self.go2)
         
 class TestDevice(BaseDevice):
-    noise = NoiseNode.prop()        
+    noise = Noise.prop()        
     utc = UtcTime.prop()
     counter = Local.prop(default=0, parser=parser("Bounded", max=3, min=0))
     
@@ -51,11 +52,11 @@ class TestUiLinker(BaseUiLinker):
         
     class Data(BaseDevice.Data):
         noise: NodeVar[float] = 0.0
-        maxnoise: NodeVar[float] = Field(0.0, node=MaxNode.prop(node="noise"))
+        maxnoise: NodeVar[float] = Field(0.0, node=Max.prop(node="noise"))
         
         utc: NodeVar[str] = ""
         counter: NodeVar[int] = 0
-        meancounter: NodeVar[float] = Field(0.0, node=MeanFilterNode.prop(node="counter"))
+        meancounter: NodeVar[float] = Field(0.0, node=Mean.prop(node="counter"))
         
     def init_vars(self):
         self.outputs.noise = self.outputs.Float(self.widget.label0)

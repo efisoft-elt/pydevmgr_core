@@ -7,63 +7,93 @@ import numpy as np
 from enum import Enum 
 
 __all__ = [
-"NoiseNode",
-"NoiseAdderNode",
-"HistogramNode",
-"MeanFilterNode", 
-"MaxFilterNode", 
-"MinFilterNode", 
-"VarianceFilterNode", 
-"RmsFilterNode", 
-"MedianFilterNode", 
-"PickToValleyFilterNode"
+"DISTRIBUTION", 
+"Noise",
+"NoiseAdder",
+"Histogram",
+"MeanFilter", 
+"MaxFilter", 
+"MinFilter", 
+"VarianceFilter", 
+"RmsFilter", 
+"MedianFilter", 
+"PickToValleyFilter"
 ]
 
-def random(mean, scale, size):
+def _random(mean, scale, size):
     return np.random.random(size)*scale+mean
 
 
-class RANDOM_FUNC(Enum):
+class DISTRIBUTION(Enum):
     RANDOM = "random"
     NORMAL = "normal"
     LOGNORMAL = "lognormal"
-RANDOM_FUNC.RANDOM.func = random
-RANDOM_FUNC.NORMAL.func = np.random.normal
-RANDOM_FUNC.LOGNORMAL.func = np.random.lognormal
+DISTRIBUTION.RANDOM.func = _random
+DISTRIBUTION.NORMAL.func = np.random.normal
+DISTRIBUTION.LOGNORMAL.func = np.random.lognormal
 
 @record_class
-class NoiseNode(BaseNode):
+class Noise(BaseNode):
+    """ Node returning random value 
+
+    Config:
+        mean (optional, float): centre of the distribution (default 0.0)
+        scale (optional, float): Standard deviation (spread or width) (default 1.0)
+        size : Returned array size (default is scalar number = None)
+        distribution (DISTRIBUTION, str): "random", "normal", "lognormal"
+
+    """
     class Config(BaseNode.Config):
         type: str = "Noise"
         mean: float = 0.0 # Mean ("centre") of the distribution
         scale: float = 1.0 # Standard deviation (spread or "width") of the distribution
         size: Optional[List[int]] = None
-        distribution: RANDOM_FUNC = RANDOM_FUNC.NORMAL
+        distribution: DISTRIBUTION = DISTRIBUTION.NORMAL
     
     def fget(self):
         c = self.config
-        return RANDOM_FUNC(c.distribution).func(c.mean, c.scale, c.size)
+        return DISTRIBUTION(c.distribution).func(c.mean, c.scale, c.size)
         
 @record_class
-class NoiseAdderNode(NodeAlias1):
+class NoiseAdder(NodeAlias1):
+    """ NodeAlias1, add anode to the original node value 
+        
+    Config:
+        scale (optional, float): Standard deviation (spread or width) (default 1.0)
+        distribution (DISTRIBUTION, str): "random", "normal", "lognormal"
+    """
     class Config(NodeAlias1.Config):
         type: str = "NoiseAdder"
         scale: float = 1.0 # Standard deviation (spread or "width") of the distribution
-        distribution: RANDOM_FUNC = RANDOM_FUNC.NORMAL
+        distribution: DISTRIBUTION = DISTRIBUTION.NORMAL
     
     def fget(self, value):
         c = self.config
-        return RANDOM_FUNC(c.distribution).func(value, c.scale)
+        return DISTRIBUTION(c.distribution).func(value, c.scale)
         
 @record_class
-class HistogramNode(NodeAlias1):
+class Histogram(NodeAlias1):
+    """ NodeAlias1, return an histogram from original node value 
+
+    Config:
+        bins (3 tuple): (min, max, nbin)   
+    
+    Feature:
+        reset() method rebuild the bins array and clean histogram 
+        bins  attribute is the bins array built at init or reset
+    """
     class Config(NodeAlias1.Config):
         type: str = "Histogram"
-        bins: Tuple[float,float,int] = (-100,100,100)        
+        bins: Tuple[float,float,int] = (-100,100,10)        
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.reset()
+    
+    @property
+    def bins(self):
+        return self._bins
+    
     def reset(self):
         min,max,n = self.config.bins
         self._bins = np.linspace(min,max,n)
@@ -80,38 +110,75 @@ class HistogramNode(NodeAlias1):
 
 class _Filter(NodeAlias1):
     class Config(NodeAlias1.Config):
-        nval : int = 10
+        size : int = 10
         
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._data = deque([], self.config.nval)
+        self.reset()
+
+    def reset(self):
+        self._data = deque([], self.config.size)
     
     def fget(self, value):
         self._data.append(value)
         return self._func(self._data)
 
-@record_class
-class MeanFilterNode(_Filter):
+@record_class(overwrite=True)
+class MeanFilter(_Filter):
+    """ NodeAlias1, Filter input Node by mean
+    
+    The filter is apply on a sliding window of size ``size``. 
+    
+    Config:
+        size (int): size of the filter (default 10)
+    
+    """
     class Config(_Filter.Config):
         type = "MeanFilter"    
     _func = staticmethod(np.mean)    
 
-@record_class
-class MaxFilterNode(_Filter):
+@record_class(overwrite=True)
+class MaxFilter(_Filter):
+    """ NodeAlias1, Filter input Node by max
+    
+    The filter is apply on a sliding window of size ``size``. 
+    
+    Config:
+        size (int): size of the filter (default 10)
+    
+    """
+
     class Config(_Filter.Config):
         type = "MaxFilter"    
     _func = staticmethod(np.max)  
       
-@record_class
-class MinFilterNode(_Filter):
+@record_class(overwrite=True)
+class MinFilter(_Filter):
+    """ NodeAlias1, Filter input Node by min
+    
+    The filter is apply on a sliding window of size ``size``. 
+    
+    Config:
+        size (int): size of the filter (default 10)
+    
+    """
     class Config(_Filter.Config):
         type = "MinFilter"    
     _func = staticmethod(np.min)
 
 @record_class
-class VarianceFilterNode(_Filter):
+class VarianceFilter(_Filter):
+    """ NodeAlias1, Filter input Node by vartiance
+    
+    The filter is apply on a sliding window of size ``size``. 
+    
+    Config:
+        size (int): size of the filter (default 10)
+    
+    """
     class Config(_Filter.Config):
         type = "VarianceFilter"
+    
     @staticmethod
     def _func(data):
         data = np.asarray(data)
@@ -119,9 +186,18 @@ class VarianceFilterNode(_Filter):
         return (data-m)**2/len(data)
 
 @record_class
-class RmsFilterNode(_Filter):
+class RmsFilter(_Filter):
+    """ NodeAlias1, Filter input Node by rms 
+    
+    The filter is apply on a sliding window of size ``size``. 
+    
+    Config:
+        size (int): size of the filter (default 10)
+    
+    """
     class Config(_Filter.Config):
         type = "RmsFilter"
+    
     @staticmethod
     def _func(data):
         data = np.asarray(data)
@@ -129,17 +205,35 @@ class RmsFilterNode(_Filter):
         return np.sqrt(  (data-m)**2/len(data) )         
 
 @record_class
-class MedianFilterNode(_Filter):
+class MedianFilter(_Filter):
+    """ NodeAlias1, Filter input Node by maedian
+    
+    The filter is apply on a sliding window of size ``size``. 
+    
+    Config:
+        size (int): size of the filter (default 10)
+    
+    """
+    
     class Config(_Filter.Config):
         type = "MedianFilter"    
     _func = staticmethod(np.median)
 
 @record_class
-class PickToValleyFilterNode(_Filter):
+class PickToValleyFilter(_Filter):
+    """ NodeAlias1, Filter input Node by pick to valley 
+    
+    The filter is apply on a sliding window of size ``size``. 
+    
+    Config:
+        size (int): size of the filter (default 10)
+    
+    """
     class Config(_Filter.Config):
         type = "PickToValleyFilter"
+    
     @staticmethod
     def _func(data):
         return  np.max(data)-np.min(data)  
    
-        
+del record_class, deque, Optional, List, Tuple, np, Enum         

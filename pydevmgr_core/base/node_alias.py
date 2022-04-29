@@ -46,6 +46,13 @@ class NodeAlias(BaseNode):
     
     NodeAlias object can be easely created with the @nodealias() decorator
     
+    ..note::
+    
+        :class:`pydevmgr_core.NodeAlias` can accept one or several input node from the unique ``nodes`` argument. 
+        To remove any embiguity NodeAlias1 is iddentical but use only one node as input from the ``node`` argument.  
+            
+
+
     Args:
         key (str): Key of the node
         nodes (list, class:`BaseNode`): list of nodes necessary for the alias node. When the 
@@ -54,57 +61,88 @@ class NodeAlias(BaseNode):
                      
     Example: 
     
+    Using a dummy node as imput (for illustration purpose).
+    
+    
+
     ::
-    
-        >>> is_inpos_for_test = NodeAlias('is_inpos_for_test', [mgr.motor1.stat.pos_actual])
-        >>> is_inpos_for_test.fget = lambda pos: abs(pos-4.56)<0.01
-        >>> is_inpos_for_test.get()
-    
-    :: 
-    
-        @nodealias("is_all_standstill", [mgr.motor1.stat.substate, mgr.motor2.stat.substate])
-        def is_all_standstill(m1_substate, m2_substate):
-            return m1_substate == Motor.SUBSTATE.OP_STANDSTILL and m2_substate == Motor.SUBSTATE.OP_STANDSTILL
-    
-        >>> is_all_standstill.get()
-        True
         
-        >>> downloader = Downloader( [is_all_standstill] )
-        >>> downloader.download()        
-        >>> downloader.get_data()
-        {'fcs.motor1.substate': 100,
-         'fcs.motor2.substate': 100,
-         'is_all_standstill': False}
-         
-    In the exemple above one can see that the mgr.motor/1/2.stat.substate has been automatically added 
-    to the nodes to be fetched from OPC-UA server(s). 
+        from pydevmgr_core.nodes import Value 
+        from pydevmgr_core import NodeAlias
+        position = Value('position', value=10.3)
+        
+        is_in_position = NodeAlias( nodes=[position])
+        is_in_position.fget =  lambda pos: abs(pos-4.56)<0.1
+        is_in_position.get()
+        # False
+        
     
-    Here is an exemple of customized NodeAlias, it return the mean and the max of a value, updated
-    at each get :
+    Using the nodealias decorator
+
+    ::
+
+        from pydevmgr_core.nodes import Value 
+        from pydevmgr_core import NodeAlias
+        position = Value('position', value=10.3)
+        
+        @nodealias('is_in_position')
+        def is_in_position(pos):
+            return abs(pos-4.56)<0.1
+ 
+    Derive the NodeAlias Class and add target position and precision  in configuration
+
+    ::
+ 
+
+        from pydevmgr_core.nodes import Value 
+        from pydevmgr_core import NodeAlias
+        position = Value('position', value=10.3)
+
+        
+        class InPosition(NodeAlias):
+            class Config(NodeAlias.Config):
+                target_position: float = 0.0 
+                precision : float = 1.0 
+            
+            def fget(self, position):
+                return abs( position - self.config.target_position) < self.config.precision 
+        
+        is_in_position = InPosition('is_in_position', nodes=[position],  target_position=4.56, precision=0.1)
+        
+        is_in_position.get()
+        # False
+        position.set(4.59)
+        is_in_position.get()
+        # True 
+            
+    NodeAlias can accept several nodes as input: 
     
     ::
-    
-        import numpy as np 
+
+        from pydevmgr_core.nodes import Value 
+        from pydevmgr_core import NodeAlias
         
-        class MinMaxNode(NodeAlias):
-            min = +np.inf
-            max = -np.inf
+        class InsideCircle(NodeAlias):
+            class Config(NodeAlias.Config):
+                x: float = 0.0 
+                y: float = 0.0
+                radius: float = 1.0 
             
-            def fget(self, pos):
-                self.min = min(pos, self.min)
-                self.max = max(pos, self.max)
-                return ( self.min , self.max )
-            
-            def reset(self):
-                self.min = +np.inf
-                self.max = -np.inf
+            def fget(self, x, y):
+                return  ( (x-self.config.x)**2 + (y-self.config.y)**2 ) < self.config.radius**2
                 
-        mot1_minmax = MinMaxNode( "minmax",  [mgr.motor1.stat.pos_actual])
-                
+        position_x = Value('position_x', value=2.3)
+        position_y = Value('position_y', value=1.4)
+        is_in_target = InsideCircle( 'is_in_target', nodes=[position_x, position_y], x=2.0, y=1.0, radius=0.5 )
+        is_in_target.get()
+        # True
+
+
+       
     .. seealso::  
         :func:`nodealias`
-        :func:`nodealiasproperty`
-        :class:`NodeAlias`            
+        :class:`NodeAlias1`            
+
     """
     Config = NodeAliasConfig
     Property = NodeAliasProperty
@@ -169,34 +207,40 @@ class NodeAlias(BaseNode):
         elif hasattr(nodes, "__call__"):
             nodes = nodes(parent)
                                 
-        parsed_nodes, node_names = zip(*(cls._parse_node(parent, n) for n in path(nodes)))
+        parsed_nodes  = [ cls._parse_node(parent, n) for n in path(nodes) ]
         
-        return cls(kjoin(parent.key, name), parsed_nodes, config=config, localdata=parent.localdata, node_names=node_names)
+        return cls(kjoin(parent.key, name), parsed_nodes, config=config, localdata=parent.localdata)
     
     @classmethod
     def _parse_node(cls, parent: _BaseObject, in_node: Union[tuple,str,BaseNode]) -> 'NodeAlias':
         if isinstance(in_node, BaseNode):
-            return in_node, in_node.key
+            return in_node
         
         
         if isinstance(in_node, str):
-            in_node, _, surname = in_node.partition(" as ")
-            
-            node = getattr(parent, in_node)
-            if not isinstance(node, BaseNode):
-                raise ValueError("Attribute {!r} of parent is not node got a {}".format(in_node, type(node)))
-            return node, surname or in_node        
+            try:
+                node = getattr(parent, in_node)
+            except AttributeError:
+                raise ValueError(f"The node named {in_node!r} does not exists in parent {parent}")
+            else: 
+                if not isinstance(node, BaseNode):
+                    raise ValueError(f"Attribute {in_node!r} of parent is not node got a {node}")
+                return node      
         
         if isinstance(in_node, tuple):
             cparent = parent
             for sn in in_node[:-1]:
                 cparent = getattr(cparent, sn)
             
-            name, _, surname = in_node[-1].partition(" as ")
-            node = getattr(cparent, name)
-            if not isinstance(node, BaseNode):
-                raise ValueError("Attribute {!r} of parent is not a node got a {}".format(in_node , type(node)))
-            return node, name or surname
+            name  = in_node[-1]
+            try:
+                node = getattr(cparent, name)
+            except AttributeError:
+                 raise ValueError(f"Attribute {name!r} does not exists in  parent {cparent}")
+            else:
+                if not isinstance(node, BaseNode):
+                    raise ValueError(f"Attribute {in_node!r} of parent is not a node got a {type(node)}")
+                return node
             
         raise ValueError('node shall be a parent attribute name, a tuple or a BaseNode got a {}'.format(type(in_node)))         
         
@@ -244,7 +288,6 @@ class NodeAlias1(BaseNode):
           node: Optional[BaseNode] = None,
           config: Optional[Config] = None, 
           localdata: Optional[dict] = None, 
-          node_name: Optional[str] = None, 
           **kwargs
          ):        
         super().__init__(key, config=config, localdata=localdata, **kwargs)    
@@ -252,7 +295,6 @@ class NodeAlias1(BaseNode):
             raise ValueError("the node pointer is empty, alias node cannot work without")    
                     
         self._node = node
-        self._node_name = node_name
     
     @property
     def sid(self):
@@ -291,9 +333,9 @@ class NodeAlias1(BaseNode):
             node = config.node 
         if node is None:
             raise ValueError("node origin pointer is not defined")                             
-        parsed_node, node_name = NodeAlias._parse_node(parent, path(node))    
+        parsed_node  = NodeAlias._parse_node(parent, path(node))    
         
-        return cls(kjoin(parent.key, name), parsed_node, config=config, localdata=parent.localdata, node_name=node_name)
+        return cls(kjoin(parent.key, name), parsed_node, config=config, localdata=parent.localdata)
     
     
     def get(self, data: Optional[Dict] =None) -> Any:
@@ -323,35 +365,6 @@ class NodeAlias1(BaseNode):
         return value
 
 
-def nodealiasproperty(name, nodes, *args, **kwargs):
-    """ A decorator for a quick alias node creation 
-    
-    This shall be implemented in a parent interface or any class with the ``get_node`` method
-    
-    Args:
-        name (str) : name of the node. The key of the node will be parent_key.name
-        nodes (iterable): List of a mix of node or string coresponding to the parent attribute pointing
-                          to a node.  
-        *args, **kwargs: All other arguments necessary for the node construction this is only used 
-                         if an laternative cls is given 
-    """
-    return NodeAlias.prop(name, nodes, *args, **kwargs)
-
-
-def nodealias1property(name, node, *args, **kwargs):
-    """ A decorator for a quick alias node creation 
-    
-    This shall be implemented in a parent interface or any class with the ``get_node`` method
-    
-    Args:
-        name (str) : name of the node. The key of the node will be parent_key.name
-        node (:class:`BaseNode`, str): Either a node or a string coresponding to the parent attribute 
-                pointing to a node.  
-        *args, **kwargs: All other arguments necessary for the node construction 
-    """
-    return NodeAlias1.prop(name, node, *args, **kwargs)
-
-
 
 def nodealias(key: Optional[str] =None, nodes: Optional[list] = None):
     """ This is a node alias decorator 
@@ -372,6 +385,7 @@ def nodealias(key: Optional[str] =None, nodes: Optional[list] = None):
     A simulator of value:
     
     ::
+        from pydevmgr_core import node, nodealias 
         
         # To be replaced by real stuff of course
         @node('temperature')
@@ -424,6 +438,9 @@ def nodealias1(key: Optional[str] = None, node: Optional[BaseNode] = None) -> Ca
     A simulator of value:
     
     ::
+        
+        from pydevmgr_core import nodealias1, node 
+        import numpy as np 
         
         @node('temperature_volt')
         def temperature_volt():
