@@ -10,7 +10,7 @@ from .node import (BaseNode, node,
                    BaseReadCollector, BaseWriteCollector, 
                    new_node
                 )
-from .node_alias import (NodeAlias, NodeAlias1,  nodealias, nodealias1) 
+from .node_alias import (NodeAlias, NodeAlias1,  nodealias, nodealias1, BaseNodeAlias, BaseNodeAlias1) 
 
 from .rpc import RpcError, BaseRpc
 from .interface import BaseInterface

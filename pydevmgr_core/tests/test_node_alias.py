@@ -1,5 +1,5 @@
 import pytest
-from pydevmgr_core import BaseNode, BaseInterface, NodeAlias1, NodeAlias, nodealias1
+from pydevmgr_core import BaseNode, BaseInterface, NodeAlias1, NodeAlias, nodealias1, BaseNodeAlias1
 from typing import Any  
 
 
@@ -129,11 +129,6 @@ def test_bad_number_of_fset_outputs_should_raise_error(node10, node20):
         dummy.set( [10] )
     with pytest.raises(RuntimeError):
         dummy.set( [10, 20, 30] )
-
-
-
-
-
 
 
 
