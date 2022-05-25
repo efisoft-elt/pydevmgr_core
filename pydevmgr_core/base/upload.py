@@ -81,24 +81,24 @@ class Uploader:
                   
     def run(self, 
           period: float = 1.0, 
-          stopsignal: Callable = lambda : False, 
+          stop_signal: Callable = lambda : False, 
           sleepfunc:  Callable = time.sleep
         ) -> None:
-        """ Run the upload infinitly or until stopsignal is True 
+        """ Run the upload infinitly or until stop_signal is True 
         
         Args:
             period (float, optional): period of each upload cycle
-            stopsignal (callable, optional): A function called at each cycle, if True the loop is break
+            stop_signal (callable, optional): A function called at each cycle, if True the loop is break
                        and run returns    
         """
-        while not stopsignal():
+        while not stop_signal():
             s_time = time.time()
             self.upload()
             sleepfunc( max( period-(time.time()-s_time), 0))
     
     def runner(self, 
           period: float = 1.0, 
-          stopsignal: Callable = lambda : False, 
+          stop_signal: Callable = lambda : False, 
           sleepfunc:  Callable = time.sleep
         ) -> Callable:
         """ return a function to updload 
@@ -107,7 +107,7 @@ class Uploader:
         
         Args:
             period (float, optional): period of each upload cycle
-            stopsignal (callable, optional): A function called at each cycle, if True the loop is break
+            stop_signal (callable, optional): A function called at each cycle, if True the loop is break
                        and run returns
         
         Example:
@@ -122,7 +122,7 @@ class Uploader:
                                
         """           
         def run_func():
-            self.run( period=period, sleepfunc=sleepfunc, stopsignal=stopsignal)
+            self.run( period=period, sleepfunc=sleepfunc, stop_signal=stop_signal)
         return run_func
     
 

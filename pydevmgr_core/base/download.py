@@ -20,63 +20,63 @@ class DataView:
             prefix = prefix.key 
         
         if not prefix:
-            key2data = {n.key:n for n in data if hasattr(n, "key") }
+            key_lookup = {n.key:n for n in data if hasattr(n, "key") }
         else:                    
-            key2data = {}
+            key_lookup = {}
             pref = prefix+"."
             lp = len(pref)
             for n in data:
                 if hasattr(n, "key") and n.key.startswith(pref):
-                    key2data[n.key[lp:]] = n
+                    key_lookup[n.key[lp:]] = n
         
-        self._key2data = key2data    
+        self._key_lookup = key_lookup    
     
     def __repr__(self):
-        return repr({k:self._data[n] for k,n in self._key2data.items() })
+        return repr({k:self._data[n] for k,n in self._key_lookup.items() })
     
     def __str__(self):
-        return str({k:self._data[n] for k,n in self._key2data.items() })
+        return str({k:self._data[n] for k,n in self._key_lookup.items() })
         
     def __getitem__(self, item):
-        return self._data[self._key2data[item]]
+        return self._data[self._key_lookup[item]]
     
     def __setitem__(self, item, value):
-        self._data[self._key2data[item]] = value
+        self._data[self._key_lookup[item]] = value
     
     def __delitem__(self, item):
-        del self._data[self._key2data[item]]
+        del self._data[self._key_lookup[item]]
     
     def __getattr__(self, attr):
-        return self._data[self._key2data[attr]]
+        return self._data[self._key_lookup[attr]]
     
     def __has__(self, item):
-        return item in self._key2data
+        return item in self._key_lookup
     
     def update(self, __d__={}, **kwargs) -> None:
         for k,v in dict(__d__, **kwargs).iteritems():
-            self._data[self._key2data[k]] = v
+            self._data[self._key_lookup[k]] = v
     
     def pop(self, item) -> Any:
         """ Pop an item from the root data ! """
-        return self._data.pop(self._key2data[item])    
+        return self._data.pop(self._key_lookup[item])    
     
     def popitem(self, item) -> Any:
         """ Pop an item from the root data ! """
-        return self._data.popitem(self._key2data[item])  
+        return self._data.popitem(self._key_lookup[item])  
     
     def keys(self) -> Iterable:
         """ D.keys() ->iterable on D's root keys with matching prefix
         
         Shall be avoided to use in a :class:`Prefixed` object
         """
-        return self._key2data.__iter__()
+        return self._key_lookup.__iter__()
     
     def items(self) -> Iterable:
-        for k,n in self._key2data.items():
+        for k,n in self._key_lookup.items():
             yield k, self._data[n]
     
     def values(self) -> Iterable:
-        for k,n in self._key2data.items():
+        for k,n in self._key_lookup.items():
             yield self._data[n]    
     
     def clear(self) -> None:
@@ -85,7 +85,7 @@ class DataView:
         Shall be avoided to use in a :class:`Prefixed` object
         """        
         pref = self._prefix+"."
-        for k, n in list(self._key2data.items()):            
+        for k, n in list(self._key_lookup.items()):            
             self._data.pop(n)
 
 
@@ -219,6 +219,9 @@ class DownloaderConnection:
         self._check_connection() 
         self._downloader.remove_failure_callback(self._token, *callbacks)
 
+class StopDownloader(StopIteration):
+    pass
+
 class Downloader:
     """ object dedicated to download nodes, feed data and run some callback 
 
@@ -292,8 +295,9 @@ class Downloader:
                                      
     """
     
-    _did_failed = False 
+    _did_failed_flag = False 
     Connection = DownloaderConnection
+    StopDownloader = StopDownloader
     
     def __init__(self,  
             nodes_or_datalink: Union[Iterable, BaseDataLink] = None,  
@@ -597,27 +601,27 @@ class Downloader:
     
     def run(self, 
             period: float =1.0, 
-            stopsignal: Callable =lambda : False, 
+            stop_signal: Callable =lambda : False, 
             sleepfunc: Callable =time.sleep
         ) -> None:
-        """ run indefinitely or when stopsignal return True the download 
+        """ run the download indefinitely or when stop_signal return True 
         
         Args:
             period (float, optional): period between downloads in second
-            stopsignal (callable, optional): a function returning True to stop the loop or False to continue
+            stop_signal (callable, optional): a function returning True to stop the loop or False to continue
             
         """
         try:
-            while not stopsignal():
+            while not stop_signal():
                 s_time = time.time()
                 self.download()
                 sleepfunc( max( period-(time.time()-s_time), 0))
-        except StopIteration: # any downloader call back can send a StopIteration to stop the runner 
+        except StopDownloader: # any downloader call back can send a StopDownloader to stop the runner 
             return 
             
     def runner(self, 
         period: float =1.0, 
-        stopsignal: Callable =lambda : False, 
+        stop_signal: Callable =lambda : False, 
         sleepfunc: Callable =time.sleep
         ) -> Callable: 
         """ Create a function to run the download in a loop 
@@ -626,7 +630,7 @@ class Downloader:
         
         Args:
             period (float, optional): period between downloads in second
-            stopsignal (callable, optional): a function returning True to stop the loop or False to continue
+            stop_signal (callable, optional): a function returning True to stop the loop or False to continue
         
         Example:
             
@@ -636,7 +640,7 @@ class Downloader:
             
         """       
         def run_func():
-            self.run(period=period, sleepfunc=sleepfunc, stopsignal=stopsignal)
+            self.run(period=period, sleepfunc=sleepfunc, stop_signal=stop_signal)
         return run_func
     
     def download(self) -> None:
@@ -655,7 +659,7 @@ class Downloader:
             self._to_read.read(self._data)
         except Exception as e:
             if self._failure_callbacks:
-                self._did_failed = True
+                self._did_failed_flag = True
                 for func in self._failure_callbacks:                    
                     func(e)
             else:
@@ -666,8 +670,8 @@ class Downloader:
                 for dl in dls:
                     dl._download_from(self._data)
             
-            if self._did_failed:
-                self._did_failed = False
+            if self._did_failed_flag:
+                self._did_failed_flag = False
                 for func in self._failure_callbacks:                    
                     func(None)
                     
@@ -725,22 +729,14 @@ class Downloader:
         return n
 
 
-def reset(nodes):
-    """ from a list of nodes reset the ones with a reset method defined 
-    
-    the reset method shall not take positional argument
-    """
+def reset(nodes: Iterable):
+    """ Execute the reset() method of a list of nodes """
     for n in nodes:
-        try:
-            r = n.reset
-        except AttributeError:
-            pass
-        else:
-            r()
+        n.reset()
 
 def download(nodes, data: Optional[Dict] = None) -> Union[list,None]:
-    """ read node values from remotes in one call per remote
-    
+    """ read node values from remote servers in one call per server    
+
     Args:
         nodes (iterable):
              Iterable of nodes, like [mgr.motor1.stat.pos_actual, mgr.motor2.stat.pos_actual]

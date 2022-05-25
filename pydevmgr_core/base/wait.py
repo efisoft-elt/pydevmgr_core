@@ -1,3 +1,4 @@
+from typing import Any, Callable, Dict, Iterable, Optional, Union
 from .node import NodesReader, DictReadCollector, BaseNode
 import time
 
@@ -22,10 +23,22 @@ class Waiter:
             if time since the call of the function exceed timeout an
             ValueError is raised.
             timeout is in second as well
-        stopper (callable, optional): this function is called at each cycle, it should raise a StopIteration
-                                      or any error. 
+        stop_signal (callable, optional): A callable object returning True to stop the wait. A stop signal will
+                execute an optional stop_function and then raise a RuntimeError
+                The example bellow is equivalent to setting a timeout. However timeout argument is kept for
+                compatibility reason
+
+                ::
+                    
+                    from pydevmgr_core.signals import Timeout 
+                    from pydevmgr_core import wait 
+                    wait( [... som stuff...], stop_signal=Timeout(60.0) )
+        stop_function (callable, optional):  A callable to be executed in case of stop_signal 
         data (None, dict, optional):  If given input nodes values are taken from the 
                data dictionary which is expected to be updated in someother place.
+        lag (float) : lag is a time in second corresponding to a sleep time before starting the wait process
+                      This can be usefull to make sure that an action as started on the server before checking
+                      the nodes
         
     Example:
         
@@ -51,7 +64,17 @@ class Waiter:
         timeout (float): timeout in second, a RuntimeError is raised if conditions
                          are still false after timeout.
     """
-    def __init__(self, node_or_func_list, logic="all_true", period=0.1, timeout=60, stopper=lambda:None, data=None, ):        
+    def __init__(self, 
+            node_or_func_list, 
+            logic="all_true", 
+            period=0.1,
+            timeout=60,
+            stop_signal = lambda: False,
+            stop_function = lambda: None, 
+            data=None,
+            lag=0.0
+          ) -> None:        
+        
         nodes = []
         functions = []
         if not hasattr(node_or_func_list, "__iter__"): 
@@ -72,6 +95,9 @@ class Waiter:
         except KeyError:
             raise ValueError("undefined logic %r must be one of %s"%(logic, ",".join(_logic_loockup.keys())))
         
+
+        
+
         if data is None:
             reader = NodesReader(nodes)
         else:
@@ -82,23 +108,12 @@ class Waiter:
         self.reader = reader    
         self.period  = period
         self.timeout = timeout
-        self.stopper = stopper
+        self.stop_signal = stop_signal
+        self.stop_function = stop_function
+        self.lag = lag 
         
-    def wait(self, lag=0.0):
-        """ run the wait condition 
-        
-        Args:
-            lag (float, optional): Add a flat time lag (in second) before starting to wait. 
-                        This could be used to make sure that the last operation has been digested by server. 
-                             
-                        Bellow the lag is used to make sure that when ``wait`` starts the motor is moving
-                              
-                        ::
-                                
-                            >>> waiter = Waiter([mgr.motor1.stat.is_standstill])
-                            >>> mgr.motor1.move_rel(1.0, 0.25)
-                            >>> waiter.wait( 0.1 )                
-        """
+    def wait(self):
+        """ run the wait condition """
         check_nodes     = self.check_nodes
         check_func     = self.check_func
         reader  = self.reader
@@ -106,10 +121,11 @@ class Waiter:
         functions = self._functions         
         timeout   = self.timeout
         period    = self.period
-        stopper   = self.stopper 
+        stop_signal = self.stop_signal
+        
         s_time = time.time()
-        if lag>0.0:
-            time.sleep(lag)
+        if self.lag>0.0:
+            time.sleep(self.lag)
         
         data_nodes = {}
         def check():
@@ -122,9 +138,9 @@ class Waiter:
         
         # do the function first 
         while not check():
-            stopper() # raise a SopIteration if needed to stop. The StopIteration shall be catched 
-                      # at higher level like in Measure.run or Download.run  
-                                
+            if stop_signal():
+                self.stop_function()
+                raise RuntimeError(f"Wait interupted by stop_signal: {stop_signal}")
             if (time.time()-s_time)>timeout:
                 raise RuntimeError('wait timeout')
             time.sleep(period)
@@ -132,7 +148,16 @@ class Waiter:
         return True
     
 
-def wait(node_or_func_list, logic="all_true", period=0.1, timeout=60, lag=0.0, stopper=lambda:None, data=None):
+def wait(
+     node_or_func_list: Union[Iterable, BaseNode, Callable], 
+     logic: str ="all_true", 
+     period: float = 0.1, 
+     timeout: float = 60, 
+     stop_signal: Callable = lambda: False, 
+     stop_function: Callable = lambda: None,  
+     lag: float =0.0,  
+     data: Optional[Dict[BaseNode, Any]]=None
+    ) -> None:
     """ wait until a list of function return True
 
     Args:
@@ -158,9 +183,19 @@ def wait(node_or_func_list, logic="all_true", period=0.1, timeout=60, lag=0.0, s
                              
                         >>> mgr.motor1.move_rel(1.0, 0.25)
                         >>> wait( [mgr.motor1.stat.is_standstill], lag=0.1 )
-                            
-        stopper (callable, optional): this function is called at each cycle, it should raise a StopIteration
-                                      or any error. 
+                        
+        stop_signal (callable, optional): A callable object returning True to stop the wait. A stop signal will
+                raise a RuntimeError
+                The example bellow is equivalent to setting a timeout. However timeout argument is kept for
+                compatibility reason
+
+                ::
+                    
+                    from pydevmgr_core.signals import Timeout 
+                    from pydevmgr_core import wait 
+                    wait( [... som stuff...], stop_signal=Timeout(60.0) )
+        stop_function (callable, optional): To be executed when a stop_signal is True
+
         data (None, dict, optional):  If given input nodes values are taken from the 
                data dictionary which is expected to be updated in someother place.
 
@@ -183,7 +218,8 @@ def wait(node_or_func_list, logic="all_true", period=0.1, timeout=60, lag=0.0, s
             > wait( [is_arrived, camera_ready])
 
     """
-    Waiter(node_or_func_list, logic=logic, period=period, timeout=timeout, stopper=stopper, data=data).wait(lag)
+    Waiter(node_or_func_list, logic=logic, period=period, timeout=timeout,  stop_signal = stop_signal, 
+            stop_function = stop_function, data=data, lag=lag).wait()
 
 def _all_true(functions):
     """ all_true(lst) -> return True if all function  list return True """

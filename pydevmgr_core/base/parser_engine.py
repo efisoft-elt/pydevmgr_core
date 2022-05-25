@@ -62,6 +62,10 @@ class _BuiltParser:
     Config = ParserConfig
     __parsers__ = [] # yes this is the list and it is defined in the class 
     
+    def __init_subclass__(cls, **kwargs) -> None:
+        if kwargs:
+            cls.Config = create_model(  cls.__name__+"Config",  __base__=cls.Config, **kwargs)
+
     def __init__(self, config=None, **kwargs):
         self.config = reconfig(self.Config, config, kwargs)
     

@@ -2,7 +2,7 @@ from pydevmgr_core import  BaseNode
 from pydevmgr_core.nodes import AllTrue, AnyTrue, AnyFalse, AllFalse
 
 from pydevmgr_core import nodes
-
+import time 
 import pytest 
 from typing import Any 
 
@@ -122,4 +122,10 @@ def test_format():
 
     f = nodes.Format( nodes=[nodes.Value(value=4.56), nodes.Value(value="meter")], format="{0:.1f} {1}" )
     assert f.get() == "4.6 meter"
-     
+
+
+def test_elapsed_time():
+    t = nodes.ElapsedTime()
+    t.get()
+    time.sleep(1.0)
+    assert t.get()>1.0 

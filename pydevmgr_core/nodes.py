@@ -22,8 +22,8 @@ __all__ = [
 "DateTime", 
 "UtcTime", 
 "Counter", 
-"AllTrue", 
-"AnyTrue", 
+"AllTrue","All",  
+"AnyTrue","Any", 
 "AllFalse", 
 "AnyFalse", 
 "Oposite", 
@@ -167,7 +167,35 @@ class UtcTime(BaseNode):
     def fget(self) -> str:
         tc = datetime.utcnow()+timedelta(seconds=self.config.delta)   
         return tc.strftime(self.config.format)
+    
+
+@record_class
+class ElapsedTime(BaseNode):
+    """ A basic node returning elapsed seconds since the first get 
+
+    Args:
+        key (str, optional): default is 'elapsed_time'
+        scale (float, optional): scale the time to an other unit than second  
+    """
+    class Config(BaseNode.Config):
+        type = "ElapsedTime"  
+        scale: float = 1.0
+    
+    def __init__(self, key : str ='elapsed_time', config=None, **kwargs):
+        super().__init__(key, config=config, **kwargs)
+        self.reset()
         
+    def fget(self) -> float:
+        if self._time_reference is None:
+            self._time_reference = time.time()
+            return 0.0
+        return (time.time()-self._time_reference)*self.config.scale
+
+    def reset(self):
+        self._time_reference = None
+
+
+       
 
 @record_class
 class Counter(BaseNode):
@@ -214,6 +242,7 @@ class AllTrue(NodeAlias):
     @staticmethod
     def fget(*nodes):
         return all(nodes)
+All = AllTrue
 
 @record_class
 class AnyTrue(NodeAlias):
@@ -222,7 +251,8 @@ class AnyTrue(NodeAlias):
     @staticmethod
     def fget(*nodes):
         return any(nodes)
-        
+Any = AnyTrue
+
 @record_class        
 class AllFalse(NodeAlias):
     class Config(NodeAlias.Config):

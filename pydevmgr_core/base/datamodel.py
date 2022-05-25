@@ -160,7 +160,7 @@ class DataLink(BaseDataLink):
     Example: 
     
         In the following, it is assumed that the motor1 object has a .stat attribute and the .stat
-        object have nodes has `pos_actual`, `vel_actual`, etc ... 
+        object have nodes as `pos_actual`, `vel_actual`, etc ... 
         
         ::
         

@@ -18,6 +18,102 @@ devices. Let us start with the main objects definition and usage.
 Objects
 -------
 
+In pydevmgr several objects use a Config class to handle object parameters. 
+The user configuration parameters are not directly implemented into the object 
+but inside a ``.config`` structure attribute. However the config parameters can 
+be set directly into the init function of object class or by parsing a ``config`` 
+argument to the init object.
+
+The idea is to separate the engines and business logic to the user configuration 
+which can comme from external payload as a yaml configuration file for instance.
+
+The configuration are `PYDANTIC`_ objects which brings data validation for all 
+configuration.
+
+In pydevmgr all config parameters stays inside the config structure of Base objects
+except for :class:`pydevmgr_core.BaseDevice.Config`,  :class:`pydevmgr_core.BaseInterface.Config`,
+:class:`pydevmgr_core.BaseNode.Config`,  :class:`pydevmgr_core.BaseRpc.Config`.
+
+For instance if a Node ``Config`` is included inside a Device ``Config``
+it gives to the device class an attribute to build dynamically the node. 
+For instance:
+
+::
+    
+    from pydevmgr_core import BaseDevice
+    from pydevmgr_core.np_nodes import Noise
+    
+    class MyDevice(BaseDevice):
+        class Config(BaseDevice.Config): 
+            temp: Noise.Config = Noise.Config( mean=22, scale=0.3 )
+            model: str = "PT100"
+
+
+    my_device = MyDevice()
+    my_device.temp.get()
+    
+The `temp` is part of my_device attribute (Because it is configured as a node) but not the `model` str 
+configuraiton parameter which stays in config: 
+
+::
+
+    assert my_device.config.model == "PT100"
+
+
+One can also build a config from a payload, with some caveat explained below: 
+
+::
+
+    payload = {"model": "PT100", "temp": {"scale": 2.0} }
+    config = MyDevice.Config( **payload)
+    assert config.temp.scale == 2.0
+    assert config.temp.mean == 0.0  # <- Not 22.0
+
+Because the "temp" payload is not complete, the mean value get the default value of the `Noise.Config` class 
+and not the mean defined in the temp instance of ``MyDevice`` class. To avoid this pydevmgr has a 
+:class:`pydevmgr_core.Defaults` typing object. 
+
+::
+
+    from pydevmgr_core import BaseDevice, Defaults
+    from pydevmgr_core.np_nodes import Noise
+    
+    class MyDevice(BaseDevice):
+        class Config(BaseDevice.Config): 
+            temp: Defaults[Noise.Config] = Noise.Config( mean=22, scale=0.3 )
+            model: str = "PT100"
+
+    payload = {"model": "PT100", "temp": {"scale": 2.0} }
+    config = MyDevice.Config( **payload)
+    assert config.temp.scale == 2.0
+    assert config.temp.mean == 22.0  # <- Yes, 22.0 
+
+
+If a node,  or any other child object, has no vocation to be configured by the user, it can be directly
+inserted to the parent class thanks to the `.prop` (for property) class method:
+
+
+::
+
+    from pydevmgr_core import BaseDevice
+    from pydevmgr_core.np_nodes import Noise
+    
+    class MyDevice(BaseDevice):
+        temp = Noise.prop( scale=0.3, mean=22.0)
+    
+        
+    my_device = MyDevice()
+    my_device.temp.get()
+    # some value around 22 with 0.3 sigma 
+
+    assert not hasattr( my_device.config, "temp")  # temp node is not part of config 
+
+
+
+.. _PYDANTIC: https://pydantic-docs.helpmanual.io
+
+
+
 Parser
 ++++++
 
@@ -46,8 +142,8 @@ some parsing parameters. Example on the :class:`pydevmgr_core.parsers.Clipped` p
 
 
 One can combine Parser together for a chain of parsing, the only restriction is
-that their is only one name space for config parameter. So two parameters with
-the same name will enter in confict.
+that their is only one name space for config parameters. So two parameters with
+the same name will enter in conflict.
 
 ::
 
@@ -64,7 +160,7 @@ the same name will enter in confict.
     
  
 The above example will raise an ValueError if the input value is outside [0,1],
-apply the formula and convert it to string with a given format.
+apply the formula and then convert it to string with a given format.
 
 ``min`` and ``max`` parameters are for the ``Bounded`` parser, ``formula``
 obviously for the ``Formula`` parser and ``format`` for the ``ToString`` parser.  
@@ -106,6 +202,36 @@ Normal function can also be used and combined inside a parser :
     3.14
 
 
+Also one can create a combined parser class easily using the create_parser_class method 
+
+
+::
+
+    from pydevmgr_core.parsers import Bounded, Rounded
+    from pydevmgr_core import create_parser_class
+    
+    BoundedNumber = create_parser_class( (Bounded, Rounded) )
+    BoundedNumber.Config()
+
+    #  BoundedRoundedConfig(kind=<KINDS.PARSER: 'Parser'>, type='BoundedRounded', ndigits=0, min=-inf, max=inf)
+
+    
+    parse_motor_efficiency = BoundedNumber( ndigits=2, min=0, max=1.0)    
+    
+A parser class can also be created with new default config parameters:
+
+
+::
+
+    from pydevmgr_core.parsers import Bounded, Rounded
+    from pydevmgr_core import create_parser_class
+    
+    class Efficiency( create_parser_class((Bounded, Rounded)), min=0.0, max=1.0):
+        pass
+
+    parse_motor_efficiency = Efficiency( ndigits= 3) 
+
+
 Node 
 ++++
 
@@ -117,9 +243,10 @@ the :class:`pydevmgr_core.BaseNode` which cannot do much by itself but is the
 base brick for Node implementation. See for instance the `pydevmgr_ua:UaNode` to
 retrieve a node value from an OPC-UA server. 
 
-Each Node type has its own __init__ signature, mostlikely one will want to add to the __init__ a 
-socket, a serial, or any open communication object use to retrieve the value. 
-However the get and set methods are garanty to have always the same signature: 
+Each Node type has its own `__init__` signature, most likely one will want to add to the `__init__` a 
+socket, a serial com, or any open communication object used to retrieve the value, somewhere. But the ``new``
+method has a fix signature and is used to create nodes in the context of a parent object. 
+(:class:`pydevmgr_core.BaseDevice`, :class:`pydevmgr_core.BaseInterface`, ...).
 
 ::
     
@@ -142,7 +269,8 @@ However the get and set methods are garanty to have always the same signature:
 
 Node are mostly used by a parent object like a :class:`pydevmgr_core.BaseDevice` or
 :class:`pydevmgr_core.BaseInterface`. The `classmethod` :meth:`pydevmgr_core.BaseNode.new` is used to build the node
-within the context of its parent. In other word when doing this for the first ::
+within the context of its parent. The ``new`` method must have a fixed signature. 
+In other word when doing this for the first time ::
 
     my_device.my_node 
 
@@ -207,8 +335,26 @@ unique key is build.
     >>> n1.key 
     'my_node'
 
+Node Aliases 
+++++++++++++
 
 
+Rpc
++++
+
+Interface
++++++++++
+
+Device 
+++++++
+
+Manager 
++++++++
+
+
+
+Functions & Tools
+-----------------
 
 
 Download & Upload
@@ -222,7 +368,7 @@ As mentioned above node values can be red from the ``.get`` method. However for
 a large number of nodes retrieving node values one by one on a remote server can
 be inefficient  because each node's get would be a request. The
 :func:`pydevmgr_core.download` and :func:`pydevmgr_core.upload` are dedicated
-for this purpose they can read and write a bunch of nodes in one call.
+for this purpose they can read and write a bunch of nodes in one call per server.
 
 With one argument (list of nodes), download returns a list of retrieved values.
 
@@ -268,8 +414,6 @@ A class :class:`pydevmgr_core.Downloader`
    This Documentation is in progress 
 
 
-
-.. _Pydantic:  https://pydantic-docs.helpmanual.io/
 
 
 Module Indexes

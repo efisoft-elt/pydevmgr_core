@@ -10,6 +10,8 @@ def test_node_ipa():
     assert node.sid == 0
     assert node.parser is None
     
+    assert node.reset() is None
+
     node.read_collector().add(node)
     node.write_collector().add(node, 0)
 

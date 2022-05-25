@@ -104,11 +104,11 @@ class BaseNodeAlias(BaseNode):
                 data[n] = v        
     
     def fget(self, *args) -> Any:
-        """ Process all input value (taken from Nodes) and return a computed value """
+        # Process all input value (taken from Nodes) and return a computed value 
         return args 
     
     def fset(self, value) -> Any:
-        """ Process one argument and return new values for the aliased Nodes """
+        # Process one argument and return new values for the aliased Nodes 
         raise NotImplementedError('fset')    
 
 

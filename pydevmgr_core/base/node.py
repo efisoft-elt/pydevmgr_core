@@ -276,7 +276,7 @@ class BaseNode(_BaseObject):
     #
     # To be implemented by the inerated class  
     #
-    
+     
     def fget(self):
         """ This is the function we need to implement to get real data """
         raise NotImplementedError('fget')
@@ -285,6 +285,10 @@ class BaseNode(_BaseObject):
         """ This is the function we need to implement to set real data """
         raise NotImplementedError('fset')
                 
+    ### #############################################
+    #  Optional reset will be mainly used on NodeAlias with some persistant data  
+    def reset(self):
+        pass
 
 
 
