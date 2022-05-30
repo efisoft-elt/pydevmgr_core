@@ -14,9 +14,11 @@ def test_rpc_api():
         def fcall(self, arg1, arg2):
             return arg1+arg2
         
-    myrpc = MyRpc('test')
+    myrpc = MyRpc('test', arg_parsers=[int, int])
     
     assert myrpc.call(0, 0) is 0
+
+    assert myrpc.call(0, 0.2) is 0
     assert myrpc.call(1, 10) is 11
     
     with pytest.raises(RuntimeError):

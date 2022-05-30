@@ -1,8 +1,10 @@
+from .parser_engine import BaseParser
+
 from .class_recorder import  KINDS
 from .base import (_BaseObject, _BaseProperty)
                            
 
-from typing import Dict, List, Callable, Union , Optional, Type
+from typing import Dict, List, Callable, Union , Optional, Type, Any
 from pydantic import create_model
 from .parser_engine import parser, AnyParserConfig
 from inspect import signature , _empty
@@ -23,6 +25,40 @@ class BaseRpcConfig(_BaseObject.Config):
     arg_parsers: Optional[List[Union[AnyParserConfig, List[Union[str, Callable]], str, Callable]]] = []
     kwarg_parsers: Optional[Dict[str,Union[AnyParserConfig, List[Union[str, Callable]], str, Callable]]] = {}
    
+
+
+class ArgParsers:
+    """ responsable to parse a list of arguments """
+    def __init__(self, parsers: List[BaseParser]):
+        self._parsers = parsers
+    
+    def parse(self, args: List[Any]):
+        modified_args = list(args)
+        for i,(p,a) in enumerate(zip(self._parsers, args)):
+            modified_args[i] = p.parse(a) 
+        return modified_args
+
+class DummyArgParser:
+    """ dummy parser returning input """
+    def parse(self, args):
+        return args 
+
+class KwargParsers:
+    """ responsable to parse a dictionary of argument """
+    def __init__(self, parsers: Dict[str, BaseParser]):
+        self._parsers = parsers
+    
+    def parse(self, kwargs: Dict[str, Any]):
+        modified_kwargs = dict(kwargs)
+        
+        for key,parser in self._parsers:
+            if key in kwargs:
+                modified_kwargs[key] = parser.parse( modified_kwargs[key] )
+        
+        return modified_kwargs
+    
+    
+         
 
 
 class BaseCallCollector:
@@ -79,8 +115,9 @@ class BaseRpc(_BaseObject):
     Config = BaseRpcConfig
     Property = RpcProperty
     
-    _arg_parsers = None
-    _kwarg_parsers = None
+    _arg_parsers = DummyArgParser()
+    _kwarg_parsers = DummyArgParser()
+    
     def __init__(self, 
            key: Optional[str] = None, 
            config: Optional[Config] =None, 
@@ -89,17 +126,19 @@ class BaseRpc(_BaseObject):
         super().__init__(key, config=config, **kwargs)
         
         if self.config.arg_parsers:
-            _arg_parsers = []
+            arg_parsers = []
             for i,p in enumerate(self.config.arg_parsers):                
-                _arg_parsers.append(parser(p)) 
-                self.config.arg_parsers[i] = _arg_parsers[i].config
-            self._arg_parsers = _arg_parsers
+                arg_parsers.append(parser(p)) 
+                self.config.arg_parsers[i] = arg_parsers[i].config
+            self._arg_parsers = ArgParsers(arg_parsers)
+            
         if self.config.kwarg_parsers:
-            _kwarg_parsers = {}
+            kwarg_parsers = {}
             for k,p in self.config.kwarg_parsers.items():
-                _kwarg_parsers[k] = parser(p)
-                self.config.kwarg_parsers[k] = _kwarg_parsers[k].config    
-            self._kwarg_parsers  = _kwarg_parsers
+                kwarg_parsers[k] = parser(p)
+                self.config.kwarg_parsers[k] = kwarg_parsers[k].config
+            
+            self._kwarg_parsers  = KwargParsers(kwarg_parsers)
 
 
     @property
@@ -118,20 +157,6 @@ class BaseRpc(_BaseObject):
     def call_collector(self):
         """ Return a collector for method call """
         return BaseCallCollector()
-    
-    def parse_args(self, args, kwargs):
-        """ Modify in place a list of args and kwargs thans to the defined arg_parsers and kwarg_parsers """
-        if self._arg_parsers:
-            for i,(p,a) in enumerate(zip(self._arg_parsers, args)):
-                args[i] = p(a) 
-        if self._kwarg_parsers:
-            for k,a in kwargs.items():
-                try:
-                    p = self._kwarg_parsers[k]
-                except KeyError:
-                    pass
-                else:
-                    kwargs[k] = p(a)
                 
     def call(self, *args, **kwargs):
         """ Call the method and return what return the server 
@@ -143,8 +168,8 @@ class BaseRpc(_BaseObject):
            :func:`BaseRpc.rcall` method
           
         """
-        args = list(args)
-        self.parse_args(args, kwargs)
+        args   = self._arg_parsers.parse(args)
+        kwargs = self._kwarg_parsers.parse(kwargs)
         return self.fcall(*args, **kwargs)
     
     def rcall(self, *args, **kwargs):

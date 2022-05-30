@@ -186,7 +186,7 @@ file, following the above example :
 
 ::
 
-    >>> p(0.4)
+    >>> p.parse(0.4)
     '40.00 %' 
 
 Normal function can also be used and combined inside a parser : 
@@ -198,7 +198,7 @@ Normal function can also be used and combined inside a parser :
 
 ::
     
-    >>> p("3.141592653589793")
+    >>> p.parse("3.141592653589793")
     3.14
 
 
@@ -230,6 +230,29 @@ A parser class can also be created with new default config parameters:
         pass
 
     parse_motor_efficiency = Efficiency( ndigits= 3) 
+
+To create a costom parser class one can inerit from :class:`pydevmgr_core.BaseParser` and implement 
+the ``fparse`` method as a static or classmethod  
+
+::
+
+    from pydevmgr_core import BaseParser
+    
+    class Prefixed(BaseParser):
+        class Config(BaseParser.Config): 
+            prefix: str # mendatory 
+
+        @staticmethod
+        def fparse( value, config): 
+            if value.startswith(config.prefix): 
+                return value
+            return config.prefix+value 
+
+    
+    p = Prefixed( prefix="[WARNING] ")
+    p.parse( "Something went wrong") 
+        
+
 
 
 Node 

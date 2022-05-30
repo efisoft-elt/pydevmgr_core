@@ -20,11 +20,11 @@ def _make_global_parsers(names):
     """ Build automaticaly some parser from python types """
     for tpe in names:        
         Tpe = tpe.__name__.capitalize()
-        def parse(value, config, tpe=tpe):
+        def fparse(value, config, tpe=tpe):
             return tpe(value)
         class Config(BaseParser.Config):
             type: str = Tpe 
-        cls = type( Tpe , (BaseParser,), {'parse':staticmethod(parse), 'Config':Config} )    
+        cls = type( Tpe , (BaseParser,), {'fparse':staticmethod(fparse), 'Config':Config} )    
         record_class(cls)
         record_class(cls, type=tpe.__name__)
         globals()[ Tpe ] = cls
@@ -41,7 +41,7 @@ class Clipped(BaseParser):
         max: float = math.inf
     
     @staticmethod
-    def parse(value, config):
+    def fparse(value, config):
         return min(config.max,max(config.min, value))
 
            
@@ -53,7 +53,7 @@ class Bounded(BaseParser):
         max: float = math.inf
     
     @staticmethod
-    def parse(value, config):        
+    def fparse(value, config):        
         if value<config.min :
             raise ValueError(f'{value} is lower than {config.min}')
         if value>config.max :
@@ -72,7 +72,7 @@ class Loockup(BaseParser):
         loockup_default : Optional[Any] = _Empty_
     
     @staticmethod
-    def parse(value, config):
+    def fparse(value, config):
         if value not in config.loockup:
             try:
                 if config.loockup_default is not _Empty_:
@@ -103,7 +103,7 @@ class Enumerated(BaseParser):
             return value 
             
     @staticmethod
-    def parse(value, config):
+    def fparse(value, config):
         return config.enumerator(value)    
 
 
@@ -114,7 +114,7 @@ class Rounded(BaseParser):
         ndigits: Optional[int] = 0 
         
     @staticmethod      
-    def parse(value, config):
+    def fparse(value, config):
         return round(value, config.ndigits)          
 
 @record_class
@@ -124,7 +124,7 @@ class ToString(BaseParser):
         format : str = "%s"
         
     @staticmethod    
-    def parse(value, config):
+    def fparse(value, config):
         return config.format%(value,)
 
 @record_class
@@ -132,7 +132,7 @@ class Capitalized(BaseParser):
     class Config(BaseParser.Config):
         type: str = "Capitalized" 
     @staticmethod
-    def parse(value, config):
+    def fparse(value, config):
         return value.capitalize()
 
 @record_class(type="Lower")
@@ -141,7 +141,7 @@ class Lowered(BaseParser):
     class Config(BaseParser.Config):
         type: str = "Lowered"
     @staticmethod
-    def parse(value, config):
+    def fparse(value, config):
         return value.lower()
 
 @record_class(type="Upper")
@@ -150,7 +150,7 @@ class Uppered(BaseParser):
     class Config(BaseParser.Config):
         type: str = "Uppered"
     @staticmethod
-    def parse(value, config):
+    def fparse(value, config):
         return value.upper()
 
 @record_class
@@ -159,7 +159,7 @@ class Stripped(BaseParser):
         type: str = "Stripped"
         strip: Optional[str] = None
     @staticmethod
-    def parse(value, config):
+    def fparse(value, config):
         return value.strip(config.strip)
 
 @record_class
@@ -168,7 +168,7 @@ class LStripped(BaseParser):
         type: str = "LStripped"
         lstrip: Optional[str] = None
     @staticmethod
-    def parse(value, config):
+    def fparse(value, config):
         return value.lstrip(config.lstrip)
 
 @record_class
@@ -177,7 +177,7 @@ class RStripped(BaseParser):
         type: str = "RStripped"
         rstrip: Optional[str] = None
     @staticmethod
-    def parse(value, config):
+    def fparse(value, config):
         return value.rstrip(config.rstrip)
 
 @record_class
@@ -188,7 +188,7 @@ class Formula(BaseParser):
         varname: str = 'x'
     
     @staticmethod
-    def parse(value, config):
+    def fparse(value, config):
         # Cash the Eval expression inside the condig.__dict__
         
         # exp = config.__dict__.setdefault( "__:"+config.formula, ExpEval(config.formula ))

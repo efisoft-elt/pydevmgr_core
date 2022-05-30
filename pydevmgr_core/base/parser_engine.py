@@ -51,11 +51,11 @@ class BaseParser:
         self.config = reconfig(self.Config, config, kwargs)
     
     @staticmethod
-    def parse(value, config: Optional[ParserElementConfig]) -> Any:
+    def fparse(value, config: Optional[ParserElementConfig]) -> Any:
         return value 
     
-    def __call__(self, value: Any) -> Any:        
-        return self.parse(value, self.config)
+    def parse(self, value) -> Any:
+        return self.fparse(value, self.config)
 
 
 class _BuiltParser:
@@ -70,13 +70,15 @@ class _BuiltParser:
         self.config = reconfig(self.Config, config, kwargs)
     
     @classmethod
-    def parse(cls, value, config):
+    def fparse(cls, value, config):
         for parser in cls.__parsers__:
             value = parser(value, config)
         return value
     
-    def __call__(self, value):
-        return self.parse(value, self.config)        
+    def parse(self, value) -> Any:
+        return self.fparse(value, self.config)
+
+
 
     
 def to_parser_class(_func_: Callable =None, *, type: Optional[str] = None) -> Type[BaseParser]:
@@ -214,14 +216,14 @@ def create_parser_class(
     for obj in parsers:  
         if isinstance(obj, (BaseParser, _BuiltParser)):
             ParserCls = obj.__class__
-            _cls_parsers.append( ParserCls.parse )
+            _cls_parsers.append( ParserCls.fparse )
             Tmp_model = create_model( ParserCls.Config.__name__, **obj.config.dict(exclude_unset=True), __base__= ParserCls.Config)
             _model_bases.append(Tmp_model)
             _name += ParserCls.__name__ + str(id(obj.config))
             _type += str(ParserCls.Config.__fields__['type'].default)
         elif isinstance(obj, type) and issubclass(obj, (BaseParser, _BuiltParser)): 
             ParserCls = obj 
-            _cls_parsers.append( ParserCls.parse )                                      
+            _cls_parsers.append( ParserCls.fparse )                                      
             _model_bases.append(obj.Config)
             _name +=  ParserCls.__name__         
             _type += str(ParserCls.Config.__fields__['type'].default)
@@ -349,12 +351,8 @@ class _BaseParserTyping(Generic[ParserVar]):
             raise ValidationError(errors, cls)
 
         if cls._parser:
-            valid_value = cls._parser(val_f)
+            valid_value = cls._parser.parse(val_f)
 
-            # try:
-            #     valid_value = cls._parser(val_f)
-            # except ValueError as er:
-            #     errors.append(er)
         else:
             valid_value = val_f
             
@@ -401,7 +399,7 @@ class ConfigParse(BaseParser):
         model: Optional[Type] = _BaseModelConfigParse
         
     @staticmethod
-    def parse(value, config):
+    def fparse(value, config):
         if isinstance( value, str):
             value = load_config( value )
         if not isinstance( value, (BaseModel, dict) ):

@@ -216,7 +216,7 @@ class BaseNode(_BaseObject):
         """
         if not self._parser:
             return value
-        return self._parser(value)
+        return self._parser.parse(value)
     
                     
     def read_collector(self) -> BaseReadCollector:
