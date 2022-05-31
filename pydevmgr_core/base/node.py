@@ -1,7 +1,7 @@
 from .class_recorder import get_class, KINDS, record_class    
 from .base import (_BaseObject, _BaseProperty, BaseData)
 
-from .parser_engine import parser,  AnyParserConfig 
+from .parser_engine import parser,  AnyParserConfig, BaseParser 
 
 from . import io 
 
@@ -23,9 +23,7 @@ class BaseNodeConfig(_BaseObject.Config):
     """ Config for a Node """
     kind: NODEKIND = NODEKIND.NODE
     type: str = ""
-    #parser: Optional[Union[str, Callable, Iterable]] = None
-    parser: Optional[Union[AnyParserConfig, str, List[Union[str, Callable]],  Callable]] = None
-    
+    parser: Optional[Any] = None 
     description: str = ""
     unit: str = ""
     
