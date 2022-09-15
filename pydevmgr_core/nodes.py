@@ -840,4 +840,4 @@ class MeanOf(NodeAlias, type="MeanOf"):
 
 
 del record_class, Union, List, Dict, Optional
-del Parser, dataclass,  Any, _eval_parser 
+del Parser, dataclass,  Any 

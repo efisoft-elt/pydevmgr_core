@@ -2,12 +2,13 @@ from .base.class_recorder import record_class
 from .base.parser_engine import BaseParser, parser
 from .misc.math_parser import ExpEval
 
-from enum import Enum
+from enum import Enum, auto
 import math
 from typing import Any, Optional , Type
 from pydantic import validator
 
 __all__ = [
+"BadValue", 
 "BaseParser", 
 "parser", 
 "Int", "Float", "Complex", "Bool", "Str", "Tuple", "Set", "List", 
@@ -15,6 +16,21 @@ __all__ = [
 "Enumerated", "Rounded", "ToString", "Capitalized", "Lowered", 
 "Uppered", "Stripped", "LStripped", "RStripped", "Formula", 
 ]
+
+
+class ParseErrors(Enum):
+    
+    OUT_OF_BOUND = auto()
+    NOT_IN_LOOCKUP = auto()
+
+
+class BadValue(ValueError):
+    """ Value Error bringing a meaningfull error code """
+    def __init__(self, error_code, message):
+        self.error_code = error_code
+        self.message = message
+        super().__init__(message)
+
 
 def _make_global_parsers(names):
     """ Build automaticaly some parser from python types """
@@ -55,9 +71,9 @@ class Bounded(BaseParser):
     @staticmethod
     def fparse(value, config):        
         if value<config.min :
-            raise ValueError(f'{value} is lower than {config.min}')
+            raise BadValue(ParseErrors.OUT_OF_BOUND, f'{value} is lower than {config.min}')
         if value>config.max :
-            raise ValueError(f'{value} is higher than {config.max}')
+            raise BadValue(ParseErrors.OUT_OF_BOUND, f'{value} is higher than {config.max}')
         return value
 
 
@@ -78,9 +94,9 @@ class Loockup(BaseParser):
                 if config.loockup_default is not _Empty_:
                     return config.loockup_default
                 else:
-                    raise ValueError(f'must be one of {config.loockup} got {value}')
+                    raise BadValue(ParseErrors.NOT_IN_LOOCKUP, f'must be one of {config.loockup} got {value}')
             except KeyError:            
-                raise ValueError(f'must be one of {config.loockup} got {value}')
+                raise BadValue(ParseErrors.NOT_IN_LOOCKUP, f'must be one of {config.loockup} got {value}')
         return value    
 
 
@@ -104,7 +120,10 @@ class Enumerated(BaseParser):
             
     @staticmethod
     def fparse(value, config):
-        return config.enumerator(value)    
+        try:
+            return config.enumerator(value)    
+        except ValueError as err:
+            raise BadValue( ParseErrors.NOT_IN_LOOCKUP, str(err))
 
 
 @record_class
