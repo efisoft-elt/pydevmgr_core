@@ -383,7 +383,7 @@ class Deque(NodeAlias1):
        :class:`DequeList` 
         
     """
-    class Config(NodeAlias.Config):
+    class Config(NodeAlias1.Config):
         type = "Deque"
         maxlen: int = 10000        
     

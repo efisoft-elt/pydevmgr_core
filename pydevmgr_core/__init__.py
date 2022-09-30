@@ -1,5 +1,5 @@
 from .base import * 
-from .base import _BaseObject
+from .base import BaseObject
 from . import nodes
 from . import parsers
 try:

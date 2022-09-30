@@ -1,28 +1,38 @@
-from .base import (_BaseObject, _BaseProperty, ksplit, BaseData, kjoin,  open_object, ChildrenCapabilityConfig,
-                            ChildrenCapability)
+from .base import (BaseParentObject, _BaseProperty,  ksplit, BaseData, kjoin,  open_object)
+
+from .factory_object import ObjectFactory
 
 from .device import BaseDevice 
 from .node import BaseNode
 from .rpc import BaseRpc  
 from .interface import BaseInterface  
-from .class_recorder import KINDS, get_class, record_class
+from .class_recorder import KINDS,  record_class, record_factory
 
 from enum import Enum 
-from pydantic import create_model 
 
 # used to force kind to be a manager
 class MANAGERKIND(str, Enum):
     MANAGER = KINDS.MANAGER.value
 
+@record_factory("Manager")
+class ManagerFactory(ObjectFactory):
+    """ A Factory for any type of manager 
+    
+    The manager is defined by the type string and must have been recorded before
+    """
+    kind: MANAGERKIND = MANAGERKIND.MANAGER
 
-                      
-class ManagerConfig(_BaseObject.Config, ChildrenCapabilityConfig):
+
+
+class ManagerConfig(BaseParentObject.Config ):
     kind: MANAGERKIND = MANAGERKIND.MANAGER
     type: str = "Base"
+     
 
 class ManagerProperty(_BaseProperty):    
     fbuild = None    
     def builder(self, func):
+
         """ Decorator for the interface builder """
         self.fbuild = func
         return self
@@ -62,7 +72,7 @@ def open_manager(cfgfile, path=None, prefix="", key=None, default_type=None, **k
 
 
 @record_class        
-class BaseManager(_BaseObject, ChildrenCapability):
+class BaseManager(BaseParentObject):
     Property  = ManagerProperty
     Config = ManagerConfig
     Data = BaseData
@@ -80,11 +90,6 @@ class BaseManager(_BaseObject, ChildrenCapability):
     @property
     def devices(self):
         return self.find( BaseDevice )
-        # for obj in self.__dict__.values():
-        #     if isinstance(obj, BaseDevice):
-        #         yield obj
-    
-               
    
 
     def connect(self) -> None:

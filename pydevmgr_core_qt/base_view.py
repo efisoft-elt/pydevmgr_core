@@ -2,7 +2,7 @@ from .base import BaseUiLinker, WidgetControl, WidgetFactory, get_widget_factory
 from pydantic import BaseModel, validator
 from typing import Iterable, Union, Optional, List, Dict
 from .io import find_ui
-from pydevmgr_core import _BaseObject, BaseData, BaseDevice
+from pydevmgr_core import BaseObject, BaseData, BaseDevice
 
 
 
@@ -226,7 +226,7 @@ class ViewUiLinker(BaseUiLinker):
             for _, linker in self._device_linkers:
                 linker.disconnect()
     
-    def setup_ui(self, obj_list: List[_BaseObject], data: BaseData):
+    def setup_ui(self, obj_list: List[BaseObject], data: BaseData):
         self.disconnect()
         self.clear()
         
@@ -281,7 +281,7 @@ class DevicesWidgetLinker(BaseUiLinker):
             self._view_linker.clear()
             self._view_linker.widget.setParent(None)
         
-    def setup_ui(self, obj_list: List[_BaseObject], data: BaseData):
+    def setup_ui(self, obj_list: List[BaseObject], data: BaseData):
         self.disconnect()
         self.clear()
         self._view_linker = None

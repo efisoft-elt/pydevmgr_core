@@ -1,8 +1,8 @@
-from .base import ( _BaseObject, _BaseProperty, BaseData, 
-                     ChildrenCapabilityConfig,  ChildrenCapability
-                  )
+from .base import ( BaseParentObject, _BaseProperty, BaseData)
+
+from .factory_object import ObjectFactory
                          
-from .class_recorder import  record_class, KINDS
+from .class_recorder import  record_class, KINDS, record_factory
 
 from .node import BaseNode
 from .rpc import BaseRpc
@@ -21,11 +21,22 @@ class INTERFACEKIND(str, Enum):
     INTERFACE = KINDS.INTERFACE.value
 
 
-class BaseInterfaceConfig(_BaseObject.Config, ChildrenCapabilityConfig):
+@record_factory("Interface")
+class InterfaceFactory(ObjectFactory):
+    """ A factory for any kind of interface  
+
+    The interface is defined from the type keyword and must have been properly recorded before
+    """
+    kind: INTERFACEKIND = INTERFACEKIND.INTERFACE
+
+
+
+class BaseInterfaceConfig(BaseParentObject.Config):
     """ Config for a Interface """
     kind: INTERFACEKIND = INTERFACEKIND.INTERFACE
     type: str = "Base"     
-    
+
+
         
 class InterfaceProperty(_BaseProperty):    
     fbuild = None
@@ -47,7 +58,7 @@ class InterfaceProperty(_BaseProperty):
 
 
 @record_class # we can record this type because it should work as standalone        
-class BaseInterface(_BaseObject, ChildrenCapability):
+class BaseInterface(BaseParentObject):
     """ BaseInterface is holding a key, and is in charge of building nodes """    
     
     _subclasses_loockup = {} # for the recorder 

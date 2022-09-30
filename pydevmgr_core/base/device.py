@@ -1,7 +1,7 @@
-from .base import (_BaseObject, _BaseProperty, BaseData, open_object, 
-                        ChildrenCapability, ChildrenCapabilityConfig
-                        )
-from .class_recorder import  KINDS,  record_class
+from .base import (BaseParentObject, _BaseProperty, BaseData, open_object)
+from .factory_object import ObjectFactory
+
+from .class_recorder import  KINDS,  record_class,  record_factory
 from .node import BaseNode 
 from .interface import BaseInterface
 from .rpc import BaseRpc
@@ -15,11 +15,17 @@ from typing import  Optional, Any
 class DEVICEKIND(str, Enum):
     DEVICE = KINDS.DEVICE.value
 
+@record_factory("Device", kind="Device")
+class DeviceFactory(ObjectFactory):
+    """ A Factory for any type of device 
+    
+    The device is defined by the type string and must have been recorded before
+    """
+    kind: DEVICEKIND = DEVICEKIND.DEVICE
 
 
 
-
-class BaseDeviceConfig(_BaseObject.Config, ChildrenCapabilityConfig):
+class BaseDeviceConfig(BaseParentObject.Config):
     kind: DEVICEKIND = DEVICEKIND.DEVICE
     type: str = "Base"
     
@@ -86,7 +92,7 @@ class DeviceProperty(_BaseProperty):
 
 
 @record_class
-class BaseDevice(_BaseObject, ChildrenCapability):
+class BaseDevice(BaseParentObject):
     Property = DeviceProperty
     Config = BaseDeviceConfig
     Interface = BaseInterface

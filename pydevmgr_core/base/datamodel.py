@@ -4,8 +4,8 @@ from .download import download, BaseDataLink, reset
 from .upload import upload
 from .node import BaseNode
 from .model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
-from .base import BaseData, path as to_path 
-
+from .base import BaseData, BaseFactory, path as to_path 
+from .object_path import ObjPath
 from typing import  Any, Iterable, Dict, List, Type
 
 class C:
@@ -47,11 +47,10 @@ def _extract_static(obj, name, field):
         
 def _extract_node(obj, name, field):
     """ called when a NodeVar is detected in datamodel """
-    
     if C.NODE in field.field_info.extra:
-        
+         
         node = field.field_info.extra[C.NODE]
-        node = to_path(node)    
+        #node = to_path(node)  
         if field.field_info.extra.get(C.ATTR, None) is not None:
             raise MatchError(f'node={C.NODE!r} and attr={C.ATTR!r} cannot be both set, choose one.')
         
@@ -63,12 +62,21 @@ def _extract_node(obj, name, field):
                                         
         if isinstance(node, BaseNode.Property):
             _, node = node.new(obj)
+        
+        elif isinstance( node, BaseFactory):
+            node = node.build(obj, name)
+            if not isinstance(node, BaseNode):
+                raise ValueError(f'factory {name} does not resolve to a node object')
+    
         elif isinstance(node, str):
             try:
                 attr = node
                 node = getattr(obj, attr)
             except AttributeError:
-                raise MatchError(f'{attr!r} is not a node in {obj.__class__.__name__!r}')
+                try:
+                    node = ObjPath(attr).resolve(obj)
+                except:
+                    raise MatchError(f'{attr!r} is not a node in {obj.__class__.__name__!r}')
         elif hasattr(node, "__iter__"):
             
             attr = node
@@ -303,7 +311,7 @@ class DataLink(BaseDataLink):
                     if strick_match: raise e
                 else:                  
                     self._wnode_fields.setdefault(node, []).append((name, model))   
-                
+           
             elif issubclass(field.type_, BaseModel):
                 # chidren is ignored if path is broken
                 sub_model = getattr(model, name)

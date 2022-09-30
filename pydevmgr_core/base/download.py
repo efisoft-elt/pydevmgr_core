@@ -1,5 +1,5 @@
 from .node import NodesReader, BaseNode
-from .base import  _BaseObject
+from .base import  BaseObject
 
 
 import time
@@ -11,7 +11,7 @@ from typing import Any, Dict, Iterable, Union, Optional, Callable
 class DataView:
     def __init__(self, 
             data: Dict[BaseNode,Any], 
-            prefix: Optional[Union[str, _BaseObject]] = None
+            prefix: Optional[Union[str, BaseObject]] = None
           ) -> None:
         self._data = data
         if prefix is None:

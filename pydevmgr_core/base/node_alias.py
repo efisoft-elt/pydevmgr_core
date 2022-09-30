@@ -1,5 +1,8 @@
+from _pytest.outcomes import xfail
 from .node import BaseNode, NodesReader, NodesWriter
-from .base import kjoin, _BaseObject, new_key, path 
+from .base import kjoin, BaseObject, new_key 
+from .object_path import ObjPath
+
 from typing import Union, List, Optional, Any, Dict, Callable
 from pydantic import create_model, validator
 from inspect import signature , _empty
@@ -260,12 +263,12 @@ class NodeAlias(BaseNodeAlias):
         elif hasattr(nodes, "__call__"):
             nodes = nodes(parent)
                                 
-        parsed_nodes  = [ cls._parse_node(parent, n, config) for n in path(nodes) ]
+        parsed_nodes  = [ cls._parse_node(parent, n, config) for n in nodes ]
         
         return cls(kjoin(parent.key, name), parsed_nodes, config=config, localdata=parent.localdata)
     
     @classmethod
-    def _parse_node(cls, parent: _BaseObject, in_node: Union[tuple,str,BaseNode], config: Config) -> 'NodeAlias':
+    def _parse_node(cls, parent: BaseObject, in_node: Union[tuple,str,BaseNode], config: Config) -> 'NodeAlias':
         if isinstance(in_node, BaseNode):
             return in_node
         
@@ -274,11 +277,14 @@ class NodeAlias(BaseNodeAlias):
             try:
                 node = getattr(parent, in_node)
             except AttributeError:
-                raise ValueError(f"The node named {in_node!r} does not exists in parent {parent}")
-            else: 
-                if not isinstance(node, BaseNode):
-                    raise ValueError(f"Attribute {in_node!r} of parent is not node got a {node}")
-                return node      
+                
+                try:
+                    node = ObjPath(in_node).resolve(parent)
+                except Exception:
+                    raise ValueError(f"The node named {in_node!r} cannot be resolved from its parent {parent}")
+            if not isinstance(node, BaseNode):
+                raise ValueError(f"Attribute {in_node!r} of parent is not node got a {node}")
+            return node      
         
         if isinstance(in_node, tuple):
             cparent = parent
@@ -470,7 +476,7 @@ class NodeAlias1(BaseNodeAlias1):
             node = config.node 
         if node is None:
             raise ValueError("node origin pointer is not defined")                             
-        parsed_node  = NodeAlias._parse_node(parent, path(node), config)    
+        parsed_node  = NodeAlias._parse_node(parent, node, config)    
         
         return cls(kjoin(parent.key, name), parsed_node, config=config, localdata=parent.localdata)
     

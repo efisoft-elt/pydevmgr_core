@@ -1,6 +1,6 @@
 from .widget_io import Inputs, Outputs, InputOutputs
 from .io import find_ui
-from pydevmgr_core import Downloader, _BaseObject, DataLink, BaseData, RpcError
+from pydevmgr_core import Downloader, BaseObject, DataLink, BaseData, RpcError
 from typing import Union, Optional, Callable, Iterable
 from PyQt5.QtWidgets import QLayout,  QBoxLayout,  QGridLayout , QWidget, QAction, QComboBox, QVBoxLayout, QBoxLayout, QGridLayout
 from PyQt5 import uic, QtCore
@@ -168,7 +168,7 @@ class WidgetControl:
       
         - linker :class:`BaseUiLinker` 
         - downloader  :class:`Downloader`the downloader used by linker to connect widget and device output
-        - obj :class:`_BaseObject` device/interface/manager.. used by the linker to connect widget and action methods    
+        - obj :class:`BaseObject` device/interface/manager.. used by the linker to connect widget and action methods    
         - data Optional[BaseData]: As created by the linker connection 
    
     Examples:
@@ -188,7 +188,7 @@ class WidgetControl:
     def __init__(self, 
           linker, 
           downloader: Downloader, 
-          device: _BaseObject, 
+          device: BaseObject, 
           data: BaseData 
         ) -> None:
         self.linker  = linker
@@ -391,14 +391,14 @@ class BaseUiLinker:
         
     def connect(self, 
            downloader: Downloader, 
-           obj: _BaseObject,
+           obj: BaseObject,
            data = None,       
         ) -> WidgetControl:
         """ Connect the widget to a obj 
         
         Args:
             downloader (:class:`pydevmgr_core.Downloader` or :class:`pydevmgr_core.DownloaderConnection`)
-            obj  (:class:`pydevmgr_core._BaseObject`): most probably a  :class:`pydevmgr_core.BaseDevice`
+            obj  (:class:`pydevmgr_core.BaseObject`): most probably a  :class:`pydevmgr_core.BaseDevice`
             data (optional, :class:`pydantic.BaseModel`): data structure to be linked. If not given
                   It is created from the class .Data attribute
           
@@ -454,7 +454,7 @@ class BaseUiLinker:
         """ init all widget input and output handlers """
         pass
     
-    def setup_ui(self, obj: _BaseObject, data: BaseData) -> None:
+    def setup_ui(self, obj: BaseObject, data: BaseData) -> None:
         """ setup the UI for a input device and associated data 
         
         setup change the static data and the actions associated to buttons, dropdown, etc ...
@@ -509,7 +509,7 @@ class LayoutLinker:
                 l.disable()
                 
     def add_device(self, 
-            device : _BaseObject, 
+            device : BaseObject, 
             widget_kind: str , 
             data: BaseData =None, 
             default_factory: Optional['WidgetFactory'] = None, 
@@ -566,7 +566,7 @@ class WidgetFactory:
                 
     def build_and_connect(self, 
           downloader: Downloader, 
-          device: _BaseObject, 
+          device: BaseObject, 
           data: BaseData = None, 
           widget: Optional[QWidget] =None
         )-> WidgetControl:

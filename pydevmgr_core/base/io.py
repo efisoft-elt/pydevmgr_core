@@ -4,6 +4,127 @@ import re
 from pydantic import BaseModel
 from typing import Tuple, Optional, List, Dict, Optional, Callable, Any
 from ._yaml_loader import PydevmgrLoader
+from enum import Enum
+
+from py_expression_eval import Parser 
+math_parser  = Parser()
+del Parser
+
+
+# ##################################################################
+# \ \ / /_ _ _ __ ___ | | |  _ \ __ _ _ __ ___  ___ _ __ 
+#  \ V / _` | '_ ` _ \| | | |_) / _` | '__/ __|/ _ \ '__| 
+#   | | (_| | | | | | | | |  __/ (_| | |  \__ \  __/ |   
+#   |_|\__,_|_| |_| |_|_| |_|   \__,_|_|  |___/\___|_|  
+# ##################################################################
+                                                                      
+class Tags(str, Enum):
+    INCLUDE = '!include'
+    MATH = '!math'
+    # some other tags tag constructor are defined in the object definition files 
+
+class PydevmgrLoader(yaml.CLoader):
+    """ yaml loader with the !include constructor 
+    
+    !include constructor can be built a scalar string (file path) or a mapping 
+    
+    - if a file path : it shall be a a yaml configuration file, it is loaded and included in place 
+    - if a mapping : the files to include shall be in a includes list of files path 
+    the contents of files (which shall be a mapping) are included inside the mapping a value  
+    inside the last file will erase the previous one. Ultimatly the values can be overwriten 
+    by in the current mapping 
+    
+    Exemple
+    -------
+
+    ---
+    name : test
+    config: !include path/to/config.yml
+    
+
+    --- 
+    name: test 
+    config: !include
+     include_files: [path/to/config1.yml, path/to/config2.yml]
+     overwriten_key: 34.5 
+    
+    """
+
+
+def add_multi_constructor(tag, constructor):
+    return yaml.add_multi_constructor( tag, constructor, PydevmgrLoader)
+def add_constructor(tag, constructor):
+    return yaml.add_constructor( tag, constructor, PydevmgrLoader)
+
+
+
+def include_constructor(loader, tag_suffix, node):
+    
+    if isinstance(node, yaml.MappingNode):
+        data = loader.construct_mapping(node)
+
+        _,_, path = tag_suffix.partition(":")
+
+        path, _, name = path.partition(":")
+        if name:
+            path = f"{path}[{name}]"
+
+        src = load_config( path) 
+        if not isinstance(src, dict):
+            raise ValueError("included file inside a mapping is expected to be a mapping")
+        _merge_dictionary(data, src)    
+        return data 
+
+add_multi_constructor( Tags.INCLUDE, include_constructor)
+
+
+def _merge_dictionary(dst, src):
+    stack = [(dst, src)]
+    while stack:
+        current_dst, current_src = stack.pop()
+        for key in current_src:
+            if key not in current_dst:
+                current_dst[key] = current_src[key]
+            else:
+                if isinstance(current_src[key], dict) and isinstance(current_dst[key], dict) :
+                    stack.append((current_dst[key], current_src[key]))
+                #else:
+                #    current_dst[key] = current_src[key]
+    
+
+
+def math_constructor(loader, node):
+    return math_parser.parse(loader.construct_scalar(node)).evaluate({})
+
+add_constructor( Tags.MATH, math_constructor)
+
+def factory_constructor(loader, node, Factory, def_type=None):
+    if isinstance(node, yaml.MappingNode):
+        raw = loader.construct_mapping(node)
+        if def_type:
+            if 'type' in raw and raw['type'] != def_type:
+                raise ValueError(f"Conflictual value for type between yaml tag and 'type' keyword {def_type}!={raw['type']}")
+            raw['type']  = def_type
+        new = Factory.parse_obj(raw) 
+        return new
+    else:
+        raise ValueError(f"Expecting a mapping for {Tags.FACTORY} tag")
+
+def add_factory_constructor(tag, Factory):
+    def constructor(loader,  node):
+        if isinstance(node, yaml.MappingNode):
+            raw = loader.construct_mapping(node, deep=True)
+        elif isinstance(node, yaml.ScalarNode):
+            raw = loader.construct_scalar(node)
+        else:
+            raise ValueError( f"Expecting a mapping or a string for tag {tag}")
+        return Factory.parse_obj(raw)  
+    add_constructor( tag, constructor)
+
+
+
+## ############################################################################################
+
 
 class IOConfig(BaseModel):
     cfgpath : str = 'CFGPATH'
@@ -16,15 +137,17 @@ ioconfig = IOConfig()
 
 
 _re_path_pattern = re.compile( '^([^\\[]+)\\[([^\\]]*)\\]$' )
+_re_path_pattern_brackets = re.compile( '^([^\\(]+)\\(([^\\)]*)\\)$' )
 def parse_file_name(file_name: str):
     """ split a file name into real file and path tuple"""
     g = _re_path_pattern.search(file_name)
     if not g:
-        return file_name, None
-    else:
-        file, path = g[1], g[2]
-         
-        return file.strip(' '), tuple( p for p in path.strip(' ').split('.') if p)
+        g = _re_path_pattern_brackets.search(file_name)
+        if not g:
+            return file_name, None
+        
+    file, path = g[1], g[2]     
+    return file.strip(' '), tuple( p for p in path.strip(' ').split('.') if p)
 
 
 def load_config(file_name: str, ioconfig: IOConfig = ioconfig) -> Dict:

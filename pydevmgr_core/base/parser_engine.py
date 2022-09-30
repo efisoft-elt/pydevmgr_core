@@ -1,27 +1,84 @@
 from typing import Any, Optional, Type, Callable, Union, Iterable, List, Generic, TypeVar
+import weakref
 from pydantic import BaseModel , create_model, Extra, validator, ValidationError
+from pydantic.fields import ModelField
 
 from pydantic.fields import ModelField
 from inspect import signature , _ParameterKind, _empty, isbuiltin
 from .class_recorder import get_class, KINDS, record_class
-from .base import reconfig
+from .base import  reconfig, BaseFactory
 import math
 from enum import Enum 
 
 from .io import load_config
 parser_loockup = {}
 
+
+# used to force kind to be a parser 
+class PARSERKIND(str, Enum):
+    PARSER = KINDS.PARSER.value
+
 def get_parser_class(type_):
     return get_class(KINDS.PARSER, type_)
 
-class AnyParserConfig(BaseModel):
-    """ A base model for any kind of parser """
-    type: Union[List[Union[str, Callable]], str, Callable] = ""
+
+ParserVar = TypeVar('ParserVar')
+class ParserFactory(BaseFactory, Generic[ParserVar]):
+    """ A Factory for any type of parser 
+    
+    The factory is defined by the type string and must have been recorded before
+    """
     class Config:
-        extra = Extra.allow
+        extra = "allow" 
+    def __init__(self, __parsers__=None, **kwargs):
+        if __parsers__:
+            kwargs['type'] = __parsers__
+        super().__init__(**kwargs)
+    
+    
+    def build(self, parent=None, name=None):
+        return parser(self.type, **self.dict(exclude=set(['type'])))
+    
+    @classmethod
+    def parse_obj(cls, obj):
+        if not isinstance(obj, dict):
+            obj = {'type':obj}
+        return super().parse_obj(obj)
+
+    @classmethod
+    def __get_validators__(cls):
+        # one or more validators may be yielded which will be called in the
+        # order to validate the input, each validator will receive as an input
+        # the value returned from the previous validator
+        yield cls.validate
+    
+    @classmethod
+    def validate(cls, v, field: ModelField):
+        if not field.sub_fields:
+            return ParserFactory(v)
+
+
+class NoneParserFactory(ParserFactory):
+    def build(self, parent = None, name=None):
+        return None
+
+class _Ineritance:
+    def _parent_class_ref(cls):
+        # this is overwriten in __init_subclass__ of BaseObject by a weak reference of the parent class
+        return None
+    
+
+    def _get_parent_class(self):
+        """ Return the parent pydevmgr Object (Manager, Device, Interface, Node or Rpc ) for this configuration """
+        p = self._parent_class_ref()
+        if p is not None:
+            return p
+        return get_class(self.kind, self.type)
+
+
 
 # Config for online built parser
-class ParserConfig(BaseModel):
+class ParserConfig(ParserFactory,  _Ineritance):
     kind: KINDS = KINDS.PARSER
     type: str = ""
     class Config:
@@ -29,13 +86,19 @@ class ParserConfig(BaseModel):
         extra = "forbid"
         
 # Config for parser classes 
-class ParserElementConfig(BaseModel):    
+class ParserElementConfig(ParserFactory,_Ineritance):    
     kind: KINDS = KINDS.PARSER
     type: str = ""
     class Config:
         validate_assignment = True
         extra = "forbid"
-        
+   
+    def build(self, parent=None, name=None):
+        if parent is None:
+            return self._get_parent_class()( name, config=self )
+        else:
+            return self._get_parent_class().new(parent, name, config=self)
+   
 class BaseParser:       
     """ Callable Parser class """      
     Config = ParserElementConfig
@@ -43,7 +106,8 @@ class BaseParser:
     def __init_subclass__(cls, **kwargs) -> None:
         if kwargs:
             cls.Config = create_model(  cls.__name__+"Config",  __base__=cls.Config, **kwargs)
-   
+            cls.Config._parent_class_ref = weakref.ref(cls)
+ 
     def __init__(self, 
            config: Optional[ParserElementConfig] = None, 
            **kwargs
@@ -65,6 +129,8 @@ class _BuiltParser:
     def __init_subclass__(cls, **kwargs) -> None:
         if kwargs:
             cls.Config = create_model(  cls.__name__+"Config",  __base__=cls.Config, **kwargs)
+            cls.Config._parent_class_ref = weakref.ref(cls)
+
 
     def __init__(self, config=None, **kwargs):
         self.config = reconfig(self.Config, config, kwargs)
@@ -293,9 +359,6 @@ def parser(parsers, config=None, **kwargs):
     if isinstance(parsers, (BaseParser, _BuiltParser)) and not config and not kwargs:
         return parsers
     
-    if isinstance(parsers, AnyParserConfig): # Use for a generic config of parser
-        Parser = create_parser_class(parsers.type)
-        kwargs = {**kwargs, **parsers.dict(exclude=set(["type"]))}
         
     elif isinstance(parsers, (BaseParser.Config, _BuiltParser.Config)):
         return get_parser_class(parsers.type)(config=parsers, **kwargs)
@@ -303,7 +366,7 @@ def parser(parsers, config=None, **kwargs):
     elif isinstance(parsers, dict):
         type_ = parsers.get('type', None)
         if not type_ :
-            raise ValueError('parser type cannot be None')
+            raise ValueError('parser type must be defined')
         Parser = create_parser_class(type_)
         parsers = dict(parsers) # make a copy 
         parsers.pop("type", None) # type shall be inside the class definition (always as a string)

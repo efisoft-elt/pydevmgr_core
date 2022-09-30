@@ -1,15 +1,14 @@
-from .class_recorder import get_class, KINDS, record_class    
-from .base import (_BaseObject, _BaseProperty, BaseData)
+from .class_recorder import get_class, KINDS, record_factory
+from .base import (BaseObject, _BaseProperty, BaseData)
+from .factory_object import ObjectFactory
 
-from .parser_engine import parser,  AnyParserConfig, BaseParser 
-
-from . import io 
+from .parser_engine import  ParserFactory, NoneParserFactory 
 
 import weakref
 from inspect import signature , _empty
 
 from pydantic import create_model,  validator
-from typing import Dict, Any, Optional, Union, Callable,  List, Dict
+from typing import Dict, Any, Optional,  Callable,  Dict
 from enum import Enum 
 
 
@@ -19,18 +18,21 @@ class NODEKIND(str, Enum):
     NODE = KINDS.NODE.value
 
 
-class BaseNodeConfig(_BaseObject.Config):
+@record_factory("Node")
+class NodeFactory(ObjectFactory):
+    """ A Factory for any type of node 
+    
+    The node is defined by the type string and must have been recorded before
+    """
+    kind: NODEKIND = NODEKIND.NODE
+
+class BaseNodeConfig(BaseObject.Config):
     """ Config for a Node """
     kind: NODEKIND = NODEKIND.NODE
     type: str = ""
-    parser: Optional[Any] = None 
+    parser: Optional[ParserFactory] = NoneParserFactory()
     description: str = ""
     unit: str = ""
-    
-    @validator('parser')
-    def _parser_validator(cls, parsers):
-        if parsers is not None:
-            return parser(parsers).config
     
         
 class BaseReadCollector:
@@ -153,7 +155,7 @@ class NodeProperty(_BaseProperty):
         return self
 
 
-class BaseNode(_BaseObject):
+class BaseNode(BaseObject):
     """ This a base class defining the base methods for a node 
     
     The requirement for a Node is to have: 
@@ -182,12 +184,10 @@ class BaseNode(_BaseObject):
          ) -> None:
                                          
         super().__init__(key, config=config, **kwargs)
-        if self._config.parser:
-            self._parser = parser(self._config.parser)
-            # write in the __dict__ to avoid attribute assignement 
-            self._config.__dict__['parser'] = self._parser.config
-            
-
+        if self._config.parser is not None:
+            # !!! the parser builder can return None
+            self._parser = self._config.parser.build(self) 
+         
     @property
     def sid(self):
         """ default id server is 0 
@@ -212,9 +212,9 @@ class BaseNode(_BaseObject):
         Return:
             parsed_value (any): value parsed as it is done by the .set method 
         """
-        if not self._parser:
+        if not self.parser:
             return value
-        return self._parser.parse(value)
+        return self.parser.parse(value)
     
                     
     def read_collector(self) -> BaseReadCollector:

@@ -4,8 +4,9 @@
 !include to include a nested yaml file 
 
 """
+from enum import Enum
 import yaml 
-from yaml import ScalarNode, MappingNode, SequenceNode
+from yaml import ScalarNode, MappingNode, SequenceNode, add_multi_constructor
 from py_expression_eval import Parser 
 import os
 
@@ -18,6 +19,13 @@ MATH_TAG = '!math'
 
 math_parser  = Parser()
 del Parser
+
+class Tags(str, Enum):
+    INCLUDE = '!include'
+    MATH = '!math'
+    FACTORY = '!pydevmgr_obj'
+
+
 
 
 def find_config(file_name):
@@ -62,10 +70,32 @@ class PydevmgrLoader(yaml.CLoader):
     
     """
     find_config = staticmethod(find_config)
-   	
 
 
-def include_constructor(loader, node):
+
+def include_constructor(loader, tag_suffix, node):
+    
+    if isinstance(node, MappingNode):
+        data = loader.construct_mapping(node)
+
+        _,_, path = tag_suffix.partition(":")
+
+        path, _, name = path.partition(":")
+        if name:
+            path = f"{path}[{name}]"
+        print(path)
+        with open(find_config(path), 'r') as f:
+            src = yaml.load(f, PydevmgrLoader)
+            if not isinstance(src, dict):
+                raise ValueError("included file inside a mapping is expected to be a mapping")
+            _merge_dictionary(data, src)    
+        return data 
+
+add_multi_constructor( Tags.INCLUDE, include_constructor, PydevmgrLoader)
+
+
+
+def back_include_constructor(loader, node):
 
     if isinstance(node, ScalarNode):
 
@@ -104,7 +134,7 @@ def math_constructor(loader, node):
     #     return yaml.load(f, Loader)    
     # return     
 
-PydevmgrLoader.add_constructor(INCLUDE_TAG, include_constructor)
+#PydevmgrLoader.add_constructor(INCLUDE_TAG, include_constructor)
 PydevmgrLoader.add_constructor(MATH_TAG, math_constructor)
 
 

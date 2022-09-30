@@ -110,6 +110,42 @@ inserted to the parent class thanks to the `.prop` (for property) class method:
 
 
 
+Actually a ``Config`` class is a special  :class:`pydevmgr_core.BaseFactory` (in v>0.6) which is responsible from inputs
+argument to build the object from a parent object. The Factory class in this case is also use to hold configuration for
+the object. One can make any kind of factory 
+
+::
+
+    from pydevmgr_core import BaseFactory, BaseDevice, BaseNode
+    from pydevmgr_core,np_nodes import Noise
+    from pydevmgr_core.nodes import Static
+    from typing import Optional 
+
+    class MyNodeFactory(BaseFactory):
+        scale: float = 1.0
+        mean: float = 0.0
+        value: Optional[float] = None
+        
+        def build(self, parent, name):
+            if self.value is None:
+                return Noise.Config(scale=self.scale, mean=self.mean).build(parent, name)
+            else:
+                return Static(value=self.value).build(parent, name)
+
+    class MyDevice(BaseDevice): 
+        my_node = MyNodeFactory( value=-9.9 )
+
+    
+Therefore a ``Config`` object can be also used inside class declaration to build an object as `.prop` method does  : 
+
+::
+
+    class MyDevice(BaseDevice):
+        temp = Noise.Config( scale=0.3, mean=22.0)
+
+
+        
+    
 .. _PYDANTIC: https://pydantic-docs.helpmanual.io
 
 

@@ -1,12 +1,13 @@
-from .parser_engine import BaseParser
+from pydevmgr_core.base.factory_dict import FactoryDict
+from pydevmgr_core.base.factory_list import FactoryList
+from .parser_engine import BaseParser, ParserFactory
 
-from .class_recorder import  KINDS
-from .base import (_BaseObject, _BaseProperty)
-                           
+from .class_recorder import  KINDS,  record_factory
+from .base import (BaseObject, _BaseProperty)
+from .factory_object import ObjectFactory
 
-from typing import Dict, List, Callable, Union , Optional, Type, Any
+from typing import Dict, List, Callable,  Optional, Type, Any
 from pydantic import create_model
-from .parser_engine import parser, AnyParserConfig
 from inspect import signature , _empty
 from enum import Enum 
 import weakref
@@ -18,13 +19,17 @@ class RPCKIND(str, Enum):
     RPC = KINDS.RPC.value
 
 
-class BaseRpcConfig(_BaseObject.Config):
+@record_factory("Rpc")
+class RpcFactory(ObjectFactory):
+    kind: RPCKIND = RPCKIND.RPC
+
+
+class BaseRpcConfig(BaseObject.Config):
     kind: RPCKIND = RPCKIND.RPC
     type: str = ""
     
-    arg_parsers: Optional[List[Union[AnyParserConfig, List[Union[str, Callable]], str, Callable]]] = []
-    kwarg_parsers: Optional[Dict[str,Union[AnyParserConfig, List[Union[str, Callable]], str, Callable]]] = {}
-   
+    arg_parsers: FactoryList[ParserFactory] = FactoryList(Factory=ParserFactory)
+    kwarg_parsers: FactoryDict[ParserFactory] = FactoryDict(Factory=ParserFactory)
 
 
 class ArgParsers:
@@ -51,7 +56,7 @@ class KwargParsers:
     def parse(self, kwargs: Dict[str, Any]):
         modified_kwargs = dict(kwargs)
         
-        for key,parser in self._parsers:
+        for key,parser in self._parsers.items():
             if key in kwargs:
                 modified_kwargs[key] = parser.parse( modified_kwargs[key] )
         
@@ -110,7 +115,7 @@ class RpcProperty(_BaseProperty):
 
 
 
-class BaseRpc(_BaseObject):
+class BaseRpc(BaseObject):
     
     Config = BaseRpcConfig
     Property = RpcProperty
@@ -125,22 +130,14 @@ class BaseRpc(_BaseObject):
         ) -> None:  
         super().__init__(key, config=config, **kwargs)
         
-        if self.config.arg_parsers:
-            arg_parsers = []
-            for i,p in enumerate(self.config.arg_parsers):                
-                arg_parsers.append(parser(p)) 
-                self.config.arg_parsers[i] = arg_parsers[i].config
-            self._arg_parsers = ArgParsers(arg_parsers)
-            
-        if self.config.kwarg_parsers:
-            kwarg_parsers = {}
-            for k,p in self.config.kwarg_parsers.items():
-                kwarg_parsers[k] = parser(p)
-                self.config.kwarg_parsers[k] = kwarg_parsers[k].config
-            
-            self._kwarg_parsers  = KwargParsers(kwarg_parsers)
+        
+        if self.config.arg_parsers is not None:
+            self._arg_parsers = ArgParsers( self.config.arg_parsers.build(self) )
+        if self.config.kwarg_parsers is not None:
+            self._kwarg_parsers = KwargParsers( self.config.kwarg_parsers.build(self) )
+        
 
-
+  
     @property
     def sid(self):
         """ default id server is 0 

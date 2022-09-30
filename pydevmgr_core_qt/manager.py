@@ -3,6 +3,8 @@ from PyQt5 import QtCore
 
 from .base import WidgetControl
 from .base import get_widget_factory, BaseUiLinker, WidgetFactory
+
+
 from typing import List, Tuple, Optional
 from pydevmgr_core import BaseDevice, DataLink
 from .base_view import DevicesWidgetLinker

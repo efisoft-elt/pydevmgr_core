@@ -45,6 +45,13 @@ class NodeVar(Generic[ValType]):
     def __repr__(self):
         return f'{self.__class__.__name__}({super().__repr__()})'
 
+
+
+
+
+
+
+
 class NodeVar_RW(NodeVar):
     """ Alias of :class:`NodeVar` """
     pass

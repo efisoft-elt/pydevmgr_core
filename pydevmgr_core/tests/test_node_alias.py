@@ -1,6 +1,11 @@
 import pytest
 from pydevmgr_core import BaseNode, BaseInterface, NodeAlias1, NodeAlias, nodealias1, BaseNodeAlias1
-from typing import Any  
+from typing import Any
+from pydevmgr_core.base.device import BaseDevice
+from pydevmgr_core.base.factory_list import FactoryList
+
+from pydevmgr_core.base.manager import BaseManager
+from pydevmgr_core.nodes import Static  
 
 
 @pytest.fixture
@@ -11,6 +16,9 @@ def MyNode():
         def fset(self, value):
             self.config.value = value
     return MyNode
+
+
+
 
 @pytest.fixture
 def node10(MyNode):
@@ -83,6 +91,22 @@ def test_nodealias_property_decorator(MyNode):
      
      interface = Interface()
      assert interface.total.get() == 15.0   
+
+def test_embeded_node_alias():
+
+    class Device(BaseDevice, node = Static.Config(value=9)):
+        pass
+
+    class Manager(BaseManager):
+        dev_list = FactoryList( [Device.Config()], Device.Config)
+        node_alias = NodeAlias1.prop(node="dev_list[0].node")
+
+
+    m = Manager()
+    m.node_alias
+
+    assert m.node_alias.get() == m.dev_list[0].node.get()
+
 
 def test_nodealias_get_set(MyNode):
     bit1 = MyNode(value=False, parser=bool)
