@@ -90,7 +90,7 @@ and not the mean defined in the temp instance of ``MyDevice`` class. To avoid th
 
 
 If a node,  or any other child object, has no vocation to be configured by the user, it can be directly
-inserted to the parent class thanks to the `.prop` (for property) class method:
+inserted to the parent class thanks also to the `.Config`  class:
 
 
 ::
@@ -99,7 +99,7 @@ inserted to the parent class thanks to the `.prop` (for property) class method:
     from pydevmgr_core.np_nodes import Noise
     
     class MyDevice(BaseDevice):
-        temp = Noise.prop( scale=0.3, mean=22.0)
+        temp = Noise.Config( scale=0.3, mean=22.0)
     
         
     my_device = MyDevice()

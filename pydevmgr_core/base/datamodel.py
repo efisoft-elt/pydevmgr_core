@@ -60,10 +60,7 @@ def _extract_node(obj, name, field):
         if field.field_info.extra.get(C.ITEM, None) is not None:
             raise MatchError(f'node={C.NODE!r} and item={C.ITEM!r} cannot be both set, choose one.')
                                         
-        if isinstance(node, BaseNode.Property):
-            _, node = node.new(obj)
-        
-        elif isinstance( node, BaseFactory):
+        if isinstance( node, BaseFactory):
             node = node.build(obj, name)
             if not isinstance(node, BaseNode):
                 raise ValueError(f'factory {name} does not resolve to a node object')
@@ -163,7 +160,7 @@ class DataLink(BaseDataLink):
                       :class:`BaseNode` attributes in its hierarchy
                          
         model (:class:`pydantic.BaseModel`): a data model. Is expecting that the data model structure 
-            contains :class:`NodeVar` type hint signature.
+            contains some :class:`NodeVar` type hint signature.
             
     Example: 
     

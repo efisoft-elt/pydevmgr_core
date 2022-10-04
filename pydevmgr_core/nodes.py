@@ -340,7 +340,7 @@ class DequeList(NodeAlias):
     
     @property
     def columns(self):
-        return [n.key for n in self.nodes]
+        return [n.key for n in self.nodes()]
     
         
     def fget(self, *values): 
@@ -512,17 +512,19 @@ class Formula(NodeAlias):
     
     def __init__(self, *args, **kwargs):                            
         super().__init__(*args, **kwargs)
+        nodes = list(self.nodes())
+
         if isinstance(self.config.varnames, str):
             varnames = [self.config.varnames]
         else:
             varnames = self.config.varnames
         if varnames is  None:
-            if len(self.nodes)==1:
+            if len(nodes)==1:
                 varnames = ('x',)
             else:
-                varnames = tuple( 'x'+str(i+1) for i in range(len(self.nodes)) )
-        elif len(varnames)!=len(self.nodes):
-            raise ValueError( f"Got {len(self.nodes)} nodes but configured varnames has size {len(self.config.varnames)}")
+                varnames = tuple( 'x'+str(i+1) for i in range(len(nodes)) )
+        elif len(varnames)!=len(nodes):
+            raise ValueError( f"Got {len(nodes)} nodes but configured varnames has size {len(self.config.varnames)}")
                     
         self._parser = _eval_parser.parse(self.config.formula)
         self._inputs = {'nan': math.nan}
@@ -819,9 +821,9 @@ class Bits(NodeAlias, type="Bits"):
             out = (out << 1) | bit
         return out
     def fset(self, num ):
-        out = [bool(num & (1<<i)) for i in range(len(self._nodes))  ]
-        return out
-
+        for i,_ in enumerate(self.nodes()):
+            yield bool(num & (1<<i))  
+        
 
 @record_class
 class MaxOf(NodeAlias, type="MaxOf"):

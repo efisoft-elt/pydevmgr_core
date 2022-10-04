@@ -3,6 +3,8 @@ from pydevmgr_core import BaseNode, BaseInterface, NodeAlias1, NodeAlias, nodeal
 from typing import Any
 from pydevmgr_core.base.device import BaseDevice
 from pydevmgr_core.base.factory_list import FactoryList
+from pydevmgr_core.base.makers import nodealias_maker
+from pydevmgr_core.decorators import nodealias 
 
 from pydevmgr_core.base.manager import BaseManager
 from pydevmgr_core.nodes import Static  
@@ -34,7 +36,7 @@ def Scaler():
         def fget(self, value):
             return value* self.config.scale
         def fset(self, value):
-            return value/self.config.scale
+            yield value/self.config.scale
     return Scaler 
 
 
@@ -48,29 +50,30 @@ def test_nodealias1_class(node10, Scaler):
 
 def test_nodealias1_property(MyNode, Scaler):
     class Interface(BaseInterface):
-        value = MyNode.prop(value=5.0) 
-        scaled =  Scaler.prop( node="value", scale=10.0)
+        value = MyNode.Config(value=5.0) 
+        scaled =  Scaler.Config( node="value", scale=10.0)
 
     interface = Interface()
     assert interface.scaled.get() == 50.0
 
 def test_nodealias1_decorator(node10):
     
-    @nodealias1(node=node10)
-    def offset(value):
+    @nodealias_maker(node10)
+    def offset( value):
         return value+20
     
     assert offset.get() == 30
 
 def test_nodealias1_property_decorator(MyNode):
      class Interface(BaseInterface):
-        value1 = MyNode.prop(value=5.0)
-        value2 = MyNode.prop(value=4.0)
-        @NodeAlias1.prop( node="value1")
+        value1 = MyNode.Config(value=5.0)
+        value2 = MyNode.Config(value=4.0)
+
+        @nodealias("value1") 
         def offsetted(self, value):
             return value + 10.0
         
-        @NodeAlias.prop(nodes=["value1", "value2"])
+        @nodealias("value1", "value2")
         def squared(self, v1, v2):
             return v1*v2
         
@@ -82,10 +85,10 @@ def test_nodealias1_property_decorator(MyNode):
      
 def test_nodealias_property_decorator(MyNode):
      class Interface(BaseInterface):
-        value1 = MyNode.prop(value=5.0)
-        value2 = MyNode.prop(value=10.0)
+        value1 = MyNode.Config(value=5.0)
+        value2 = MyNode.Config(value=10.0)
         
-        @NodeAlias.prop( nodes=["value1", "value2"])
+        @nodealias("value1", "value2")
         def total(self, value1, value2):
             return value1 + value2 
      
@@ -99,7 +102,7 @@ def test_embeded_node_alias():
 
     class Manager(BaseManager):
         dev_list = FactoryList( [Device.Config()], Device.Config)
-        node_alias = NodeAlias1.prop(node="dev_list[0].node")
+        node_alias = NodeAlias1.Config(node="dev_list[0].node")
 
 
     m = Manager()

@@ -43,20 +43,20 @@ class TestWidget(QWidget):
         self.ly.addWidget(self.go2)
         
 class TestDevice(BaseDevice):
-    noise = Noise.prop()        
-    utc = UtcTime.prop()
-    counter = Local.prop(default=0, parser=parser("Bounded", max=3, min=0))
+    noise = Noise.Config()        
+    utc = UtcTime.Config()
+    counter = Local.Config(default=0, parser=parser("Bounded", max=3, min=0))
     
 class TestUiLinker(BaseUiLinker):
     Widget = TestWidget
         
     class Data(BaseDevice.Data):
         noise: NodeVar[float] = 0.0
-        maxnoise: NodeVar[float] = Field(0.0, node=Max.prop(node="noise"))
+        maxnoise: NodeVar[float] = Field(0.0, node=Max.Config(node="noise"))
         
         utc: NodeVar[str] = ""
         counter: NodeVar[int] = 0
-        meancounter: NodeVar[float] = Field(0.0, node=Mean.prop(node="counter"))
+        meancounter: NodeVar[float] = Field(0.0, node=Mean.Config(node="counter"))
         
     def init_vars(self):
         self.outputs.noise = self.outputs.Float(self.widget.label0)

@@ -1,6 +1,6 @@
-from .base import (BaseParentObject, _BaseProperty, BaseData, open_object)
+from .base import (BaseParentObject, BaseData, open_object)
 from .factory_object import ObjectFactory
-
+from .decorators import finaliser 
 from .class_recorder import  KINDS,  record_class,  record_factory
 from .node import BaseNode 
 from .interface import BaseInterface
@@ -56,44 +56,8 @@ def open_device(cfgfile, path=None, prefix="", key=None, default_type=None, **kw
     return open_object(cfgfile, path=path, prefix=prefix, key=key, default_type=default_type, **kwargs) 
 
 
-
-
-class DeviceProperty(_BaseProperty):    
-    fbuild = None    
-    
-    def builder(self, func):
-        """ Decorator for the interface builder """
-        self.fbuild = func
-        return self
-     
-   
-    def __call__(self, func):
-        """ The call is used has fbuild decorator 
-        
-        this allows to do
-        
-        ::
-            
-            class MyManager(BaseManager):
-                @MyDevice.prop('motor2')
-                def motor2(self, motor):
-                    # do somethig
-                    
-        """
-        self.fbuild = func
-        return self
-    
-    def _finalise(self, parent, device):
-        # overwrite the fget, fset function to the node if defined         
-        if self.fbuild:
-            self.fbuild(parent, device)  
-
-
-
-
 @record_class
 class BaseDevice(BaseParentObject):
-    Property = DeviceProperty
     Config = BaseDeviceConfig
     Interface = BaseInterface
     Data = BaseData
@@ -162,4 +126,7 @@ class BaseDevice(BaseParentObject):
         self._com = self.new_com(self._config)
     
         
-
+    @classmethod
+    def prop(cls,  name: Optional[str] = None, config_path=None, frozen_parameters=None,  **kwargs):
+        cls._prop_deprecation( 'Device: prop() method is deprecated, use instead the pydevmgr_core.decorators.finaliser to decorate the object creation tunning', name, config_path, frozen_parameters)
+        return finaliser( cls.Config(**kwargs) )  

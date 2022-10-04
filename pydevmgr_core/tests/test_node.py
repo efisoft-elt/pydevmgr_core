@@ -24,7 +24,6 @@ def test_node_ipa():
          
     mynode = MyNode('test')
     assert mynode.get() == 99
-    assert mynode.get( {mynode:1} ) == 1
     mynode.set( 10 )
     assert mynode.get() == 10
 

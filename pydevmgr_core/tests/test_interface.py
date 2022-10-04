@@ -15,10 +15,8 @@ def test_interface_node():
             configured_node  = DefaultNode.Config(default=100)
             configured_node2 = DefaultNode.Config()
             
-        not_configured_node = DefaultNode.prop( default=99 )
-        configured_node = DefaultNode.prop( default=199)
+        not_configured_node = DefaultNode.Config( default=99 )
         
-        configured_node2 = DefaultNode.prop( default=299, frozen_parameters=set(['default']))
     
         
 
@@ -33,7 +31,7 @@ def test_interface_node():
     assert i.not_configured_node.key == 'test.not_configured_node'
     
     assert i.configured_node.get() == 100
-    assert i.configured_node2.get() == 299
+    assert i.configured_node2.get() == 0
     
     assert i.node1 is i.node1
 

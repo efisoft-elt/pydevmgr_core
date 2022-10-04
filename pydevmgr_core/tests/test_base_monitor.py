@@ -4,8 +4,8 @@ from pydevmgr_core import BaseMonitor, BaseDevice, nodes, NodeVar, DataLink, sig
 
 class Device(BaseDevice):
 
-    node1 = nodes.Value.prop( value=10.0) 
-    node2 = nodes.Value.prop( value=20.0) 
+    node1 = nodes.Value.Config( value=10.0) 
+    node2 = nodes.Value.Config( value=20.0) 
 
 class Monitor(BaseMonitor):
      

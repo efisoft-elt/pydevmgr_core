@@ -1,7 +1,7 @@
 from .base import * 
-from .base import BaseObject
 from . import nodes
 from . import parsers
+from . import decorators
 try:
     import numpy
 except ModuleNotFoundError:

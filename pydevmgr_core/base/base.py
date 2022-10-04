@@ -1,10 +1,9 @@
 from os import path
+from warnings import warn 
 from typing import Any, Tuple, Optional, List,  Union, Type, TypeVar, Iterator, get_type_hints
-from pydantic import BaseModel, Extra,  create_model, root_validator
-from pydantic.class_validators import root_validator
+from pydantic import BaseModel, Extra,  create_model, Field
 
-from pydevmgr_core.base.com import BaseCom
-
+from .engine import BaseEngine
 
 from .class_recorder import get_class, KINDS
 from .model_var import StaticVar, NodeVar
@@ -23,6 +22,8 @@ log = logging.getLogger('pydevmgr')
 ObjVar = TypeVar('ObjVar')
 
 
+class __Decorator__: #  place holder for decorator base class (see base.decorators) 
+    pass
 
 
 class BaseFactory(BaseModel):
@@ -397,109 +398,13 @@ def new_key(config):
     return f'{k}{c:03d}'
 
 
-class _BaseProperty:    
-    """ A Property is basically calling a constructor with dynamical and static arguments """    
-    def __init__(self, cls, constructor, name, *args, config=None, config_path=None, frozen_parameters=None,  **kwargs):
-        
-        self._cls = cls 
-        self._constructor = constructor
-        self._name = name         
-        
-        self._config = config 
-        self._config_path = config_path
-        if frozen_parameters is None:
-            frozen_parameters = set()
-        self._frozen_parameters = frozen_parameters
-        self._args = args
-        self._kwargs = kwargs
-
-        for p in self._frozen_parameters:
-            try:
-                self._config.__dict__[p]
-            except KeyError:
-                ValueError(f"forzen parameter {p!r} does not exists in config")
-        
-    @property
-    def congig(self):
-        return self._config
-            
-    def _finalise(self, parent, obj):
-        pass
-    
-    
-    def __set_name__(self, owner, name):
-        if self._name is None:
-            self._name = name 
-
-
-    def __get__(self, parent, clp=None):
-        if parent is None:
-            return self 
-        # try to retrieve the node directly from the parent __dict__ where it should 
-        # be cached. If no boj cached create one and save it/ 
-        # if _name is the same than the attribute name in class, this should be called only ones
-        if self._name is None:
-            try:
-                obj = parent.__dict__[self]
-            except KeyError:
-                name, obj = self.new(parent)     
-                # store in parent with self
-                parent.__dict__[self] = obj   
-        else:
-            try:
-                obj = parent.__dict__[self._name]
-            except KeyError:
-                name, obj = self.new(parent)     
-                # store in parent with the name 
-                parent.__dict__[self._name] = obj   
-
-        return obj
-                
-    def get_config(self, parent):
-        """ return configuration from parent object """
-        # this has to be implemented for each kinds
-        if self._config_path:
-            config = getattr( parent.config, self._config_path )
-        elif self._name:
-            try:
-                config = getattr(parent.config, self._name)
-            except AttributeError:
-                config = self._config
-        else:
-            config = self._config
-        if config is not self._config:
-            if not isinstance( config, type(self._config) ):
-                log.warning( f"The configuration Class missmatch in property {self._name!r} " )
-            
-            for p in self._frozen_parameters:
-                if p in config.__fields_set__:
-                    if getattr(config, p) != getattr(self._config, p):
-                        raise ValueError("Cannot configure parameter {p!r}, frozen in property")
-                setattr(config, p, getattr(self._config, p)) 
-            _default_walk_set(self._config, config)
-                
-        return config    
-            
-                
-    def new(self, parent):     
-        config = self.get_config(parent)
-        if self._name is None:
-            name = new_key(config) 
-            #name = config.kind+str(id(config))
-        else:
-            name = self._name                            
-        obj = self._constructor(parent, name, *self._args, config=config, **self._kwargs)            
-        self._finalise(parent, obj)
-        return name, obj 
-        
-
 class BaseObject:
     __all_cashed__ = False
     Config = BaseConfig
-    Com = BaseCom
-    Property = _BaseProperty    
+    Engine = BaseEngine
+
     _config = None
-    _com = None
+    _engine = None
     
     def __init_subclass__(cls, **kwargs) -> None:
          # if kwargs:
@@ -526,7 +431,12 @@ class BaseObject:
                     kwargs[name] = (type_hints[name], val)
                 else:
                     kwargs[name] = val 
-            
+            for name, hint in type_hints.items():
+                if name.startswith("_"): continue
+                if name not in kwargs:
+                    kwargs[name] = (hint, Field(...))
+                    
+
             cls.Config = create_model(  cls.__name__+".Config",  __base__= parent_config, **kwargs)
         else:
             cls.Config = create_model(  cls.__name__+".Config",  __base__=cls.Config, **kwargs)
@@ -536,14 +446,14 @@ class BaseObject:
     def __init__(self, 
           key: Optional[str] = None,  
           config: Optional[Config] = None, 
-          com: Optional[BaseCom] = None, 
+          com: Optional[Any] = None, 
           *,          
           localdata: Optional[dict] = None, 
           **kwargs 
         ) -> None:
        
         self._config = self.parse_config(config, **kwargs)    
-        self._com = self.parse_com(com, self._config)
+        self._engine = self.new_engine(com, self._config)
         if key is None: 
             key = new_key(self._config)
         
@@ -584,14 +494,18 @@ class BaseObject:
         raise ValueError(f"got an unexpected object for config : {type(__config__)}")
     
     @classmethod
-    def parse_com(cls, com, config):
-        return cls.Com.new(com, config)
+    def new_engine(cls, com, config):
+        return cls.Engine.new(com, config)
+        
+    @classmethod
+    def new_config(cls):
+        return cls.Config()
     
-
+        
     @classmethod
     def new_args(cls, parent, name, config: Config) -> dict:
         """ build a dictionary of dynamical variables inerited from a parent """
-        return dict( localdata = getattr(parent, "localdata", None) )
+        return dict( localdata = getattr(parent, "localdata", None), com = parent.engine )
             
     @classmethod
     def new(cls, parent, name, config=None, **kwargs):
@@ -606,24 +520,23 @@ class BaseObject:
             name = new_key(config)                                
         return cls(kjoin(parent.key, name), config=config, **cls.new_args(parent, name, config))
     
+    @staticmethod
+    def _prop_deprecation(msg, name, config_path, frozen_parameters):
+        warn( msg, DeprecationWarning)
+
+        if name:
+            warn('name argument ignored', DeprecationWarning)
+        if config_path:
+            warn('config_path argument ignored', DeprecationWarning)
+        if frozen_parameters:
+            warn('frozen_parameters argument ignored', DeprecationWarning)
+
+            
+
     @classmethod
     def prop(cls, name: Optional[str] = None, config_path=None, frozen_parameters=None,  **kwargs):
-        """ Return an object  property  to be defined in a class 
-        
-        Exemple:
-           
-           ::
-                from pydevmgr_core import BaseDevice
-                from pydevmgr_core.nodes import Static
-                
-                def MyDevice(BaseDevice):
-                   ref_temperature = Static.prop(value=22.0)
-                
-                MyDevice().ref_temperature.get()   
-        """
-        # config = cls.Config.parse_obj(kwargs)
-        config = cls.parse_config(kwargs)
-        return cls.Property(cls, cls.new, name, config=config, config_path=config_path, frozen_parameters=frozen_parameters)
+        """ deprecated """
+        raise NotImplementedError('prop')
     
     @classmethod
     def from_cfgfile(cls, 
@@ -683,9 +596,14 @@ class BaseObject:
         return self._config
     
     @property
+    def engine(self):
+        """  config """
+        return self._engine
+    
+    @property
     def localdata(self):
         """ localdata dictionary """
-        return self._localdata
+        return self.engine.localdata
         
     @property
     def name(self):
@@ -733,7 +651,7 @@ class BaseParentObject(BaseObject):
         """
         for sub in self.__class__.__mro__:
             for k,v in sub.__dict__.items():
-                if isinstance(v, (_BaseProperty, BaseFactory)):
+                if isinstance(v, (BaseFactory, __Decorator__)):
                     obj = getattr(self, k)
                     if depth!=0 and isinstance(obj, (ObjectList, ObjectDict, BaseParentObject)):
                         obj.build_all(depth-1)

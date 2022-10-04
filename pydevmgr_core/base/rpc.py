@@ -1,16 +1,17 @@
+from warnings import warn 
 from pydevmgr_core.base.factory_dict import FactoryDict
 from pydevmgr_core.base.factory_list import FactoryList
 from .parser_engine import BaseParser, ParserFactory
+from .decorators import caller 
 
 from .class_recorder import  KINDS,  record_factory
-from .base import (BaseObject, _BaseProperty)
+from .base import BaseObject
 from .factory_object import ObjectFactory
 
 from typing import Dict, List, Callable,  Optional, Type, Any
 from pydantic import create_model
 from inspect import signature , _empty
 from enum import Enum 
-import weakref
 
 
 
@@ -92,33 +93,11 @@ class RpcError(RuntimeError):
     """
     rpc_error = 0
 
-class RpcProperty(_BaseProperty):    
-    fcall = None
-    
-    def caller(self, func):
-        """ decoraotr to define the fcall function """
-        self.fcall = func
-        return self # must return self
-    
- 
-    def _finalise(self, parent, rpc):
-        if self.fcall:
-            parent_wr = weakref.ref(parent)
-            def fcall(*args, **kwargs):
-                return self.fcall(parent_wr(), *args, **kwargs)
-            rpc.fcall = fcall
-    
-    def __call__(self, func):
-        """ The call is used has fcall decorator """
-        self.fcall = func
-        return self
-
 
 
 class BaseRpc(BaseObject):
     
     Config = BaseRpcConfig
-    Property = RpcProperty
     
     _arg_parsers = DummyArgParser()
     _kwarg_parsers = DummyArgParser()
@@ -145,6 +124,11 @@ class BaseRpc(BaseObject):
         The sid property shall be adujsted is the CallCollector
         """
         return 0
+    
+    @classmethod
+    def prop(cls,  name: Optional[str] = None, config_path=None, frozen_parameters=None,  **kwargs):
+        cls._prop_deprecation( 'Rpc: prop() method is deprecated, use instead the pydevmgr_core.decorators.caller to decorate the fcall method from a rpc factory', name, config_path, frozen_parameters)
+        return caller( cls.Config(**kwargs) )  
     
     
     def get_error_txt(self, rpc_error):
@@ -184,18 +168,6 @@ class BaseRpc(BaseObject):
     def fcall(self, *args, **kwargs):
         raise NotImplementedError('fcall')
         
-
-def rpcproperty(name, *args, **kwargs):
-    """ A decorator for a quick rpc creation 
-    
-    This shall be implemented in a parent interface or any class 
-    
-    Args:
-        cls (class, optional): default is :class:`BaseRpc` used to build the rpc  
-        **kwargs: All other arguments necessary for the node construction
-    """
-    return BaseRpc.prop(name, *args, **kwargs)
-
 
 def to_rpc_class(_func_: Callable = None, *, type: Optional[str] = None) -> Type[BaseRpc]:
     """ Create a Rpc Class from a function 

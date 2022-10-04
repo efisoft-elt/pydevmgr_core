@@ -1,7 +1,8 @@
+from warnings import warn
 from .class_recorder import get_class, KINDS, record_factory
-from .base import (BaseObject, _BaseProperty, BaseData)
+from .base import (BaseObject, BaseData)
 from .factory_object import ObjectFactory
-
+from .decorators import getter
 from .parser_engine import  ParserFactory, NoneParserFactory 
 
 import weakref
@@ -117,44 +118,6 @@ class DictWriteCollector:
             self._data[node.key] = val
 
 
-
-class NodeProperty(_BaseProperty):    
-    fget = None
-    fset = None
-    
-    def getter(self, func):
-        """ decoraotr to define the fget function """
-        self.fget = func
-        return self # must return self
-    
-    def setter(self, func):
-        """ decoraotr to define the fset function """
-        self.fset = func    
-        return self # must return self
-     
-    
-    def _finalise(self, parent, node):
-        # overwrite the fget, fset function to the node if defined 
-        parent_wr = weakref.ref(parent) # shall we keep weakref ? 
-        if self.fget:            
-            def fget(*args, **kwargs):
-                return self.fget(parent_wr(), *args, **kwargs)
-            node.fget = fget
-        if self.fset:
-            def fset(*args, **kwargs):
-                return self.fset(parent_wr(), *args, **kwargs)
-            node.fset = fset
-    
-    def __call__(self, func):
-        """ fget decorator """
-        #### This allows the feature:
-        #@ @BaseNode.prop('temp')
-        #@ def temp(self):
-        #@    return ...
-        self.fget = func
-        return self
-
-
 class BaseNode(BaseObject):
     """ This a base class defining the base methods for a node 
     
@@ -171,7 +134,6 @@ class BaseNode(BaseObject):
     To implement from BaseNode one need to implement the .fget and .fset method (they are called by .get and .set)
     """
     Config = BaseNodeConfig
-    Property = NodeProperty
 
 
     class Data(BaseData):
@@ -179,11 +141,12 @@ class BaseNode(BaseObject):
     _parser = None
     def __init__(self, 
            key: Optional[str] = None, 
-           config: Optional[Config] = None,           
+           config: Optional[Config] = None, 
+           com: Optional[Any] = None, 
            **kwargs
          ) -> None:
                                          
-        super().__init__(key, config=config, **kwargs)
+        super().__init__(key, config=config, com=com, **kwargs)
         if self._config.parser is not None:
             # !!! the parser builder can return None
             self._parser = self._config.parser.build(self) 
@@ -199,6 +162,11 @@ class BaseNode(BaseObject):
     @property
     def parser(self):
         return self._parser
+    
+    @classmethod
+    def prop(cls,  name: Optional[str] = None, config_path=None, frozen_parameters=None,  **kwargs):
+        cls._prop_deprecation( 'Node: prop() method is deprecated, use instead the pydevmgr_core.decorators.getter to decorate the fget method from a node factory', name, config_path, frozen_parameters)
+        return getter( cls.Config(**kwargs) )  
     
     def parse(self, value):
         """ Parse the value as it is done before being treated by the set method 
@@ -247,24 +215,23 @@ class BaseNode(BaseObject):
         """
         return BaseWriteCollector()
             
-    def get(self, data: Dict =None) -> Any:
+    def get(self) -> Any:
         """ get value of the data Node 
         
         If the optional data dictionary is given data[self] is return otherwise self.fget() is returned
         fget() will fetch the value from a distant server for instance (OPC-UA, Websocket, OLDB, etc ...)
         
         """
-        if data is None:
-            return self.fget()
-        return data[self]
-        
+        return self.fget()
+               
     def set(self, value, data=None):
         """ Set node value 
         
         If the optional data dictionary is given `data[self] = value`, otherwise  self.fset(value) is used 
         """
         value = self.parse(value)
-                
+        self.fset(value)
+
         if data is None:
             self.fset(value)
         else:
@@ -356,10 +323,12 @@ class NodesReader:
             for n in node:
                 self.add(n)
          
-        sid = getattr(node, 'sid', None)
+        sid = node.sid 
+
         if sid is None:
-            self._aliases.append( node )
-            for n in getattr(node, "nodes", []):            
+            nodes = list(node.nodes())
+            self._aliases.append( (node, nodes) )
+            for n in nodes:            
                 self.add(n)
             return         
         try:
@@ -390,10 +359,10 @@ class NodesReader:
         # of aliases with higher index
         aliases = self._aliases
         flags = [False]*len(aliases)
-        for i, alias in reversed(list(enumerate(aliases))):
+        for i, (alias, nodes) in reversed(list(enumerate(aliases))):
             if not flags[i]: 
-                data[alias] = alias.get(data)                       
-                flags[i]= True
+                data[alias] = alias.fget( *(data[n] for n in nodes) )                    
+                flags[i] = True
 
 class NodesWriter:
     def __init__(self, node_values):
@@ -403,13 +372,13 @@ class NodesWriter:
         # start with aliases, returned values are set inside 
         # the node_values dictionary
         for node, value in node_values.items():
-            sid = getattr(node, 'sid', None)
-            if sid is None:
-                node.set(value, node_values)
+            if node.sid is None:
+                for n,v in zip(node.nodes(), node.fset(value)):
+                    node_values[n] = v 
+        
         
         for node, value in node_values.items():
-            sid = getattr(node, 'sid', None)
-            if sid is not None:
+            if node.sid is not None:
                 self.add(node, value)
     
     def clear(self):

@@ -1,110 +1,51 @@
-from _pytest.outcomes import xfail
 from .node import BaseNode, NodesReader, NodesWriter
 from .base import kjoin, BaseObject, new_key 
 from .object_path import ObjPath
+from .decorators import getter 
 
 from typing import Union, List, Optional, Any, Dict, Callable
-from pydantic import create_model, validator
+from pydantic import create_model
 from inspect import signature , _empty
 
 
 class NodeAliasConfig(BaseNode.Config):
     type: str = "Alias"
-    nodes: Optional[Union[List[Union[str, tuple]], str]] = None
-    
+    # nodes: Optional[Union[List[Union[str, tuple, BaseNode.Config, BaseNode]], str, BaseNode.Config, BaseNode]] = None
+    nodes: Optional[Any] = None 
  
 class NodeAlias1Config(BaseNode.Config):
     type: str = "Alias1"
-    node: Optional[Union[str,tuple]] = None
-    
-
-
-class NodeAliasProperty(BaseNode.Property):
-    # redefine the node alias property to explicitly add the nodes argument
-    def __init__(self, cls, constructor, name, nodes, *args, **kwargs):
-        super().__init__( cls, constructor, name, *args, **kwargs)
-        self._nodes = nodes
-    
-    def new(self, parent):
-        config = self.get_config(parent)
-        if self._name is None:
-            name = new_key(config)
-        else:
-            name = self._name    
-        obj = self._constructor(parent, name, self._nodes, *self._args, config=config, **self._kwargs)            
-        self._finalise(parent, obj)
-        return name, obj 
-
-
+    # node: Optional[Union[str,tuple, BaseNode.Config, BaseNode]] = None
+    node: Optional[Any] = None 
 
 class BaseNodeAlias(BaseNode):
-    _n_nodes_required = None
-    _nodes_is_scalar = False
-    def __init__(self, 
-          key: Optional[str] = None, 
-          nodes: Union[List[BaseNode], BaseNode] = None,
-          config: Optional[BaseNode.Config] = None,
-          **kwargs
-         ):
-         
-        super().__init__(key, config=config, **kwargs)
-        if nodes is None:
-            nodes = []
-        
-        elif isinstance(nodes, BaseNode):
-            nodes = [nodes]
-            self._nodes_is_scalar = True
-        if self._n_nodes_required is not None:
-            if len(nodes)!=self._n_nodes_required:
-                raise ValueError(f"{type(self)} needs {self._n_nodes_required} got {len(nodes)}")
-        self._nodes = nodes
     
     @property
     def sid(self):
         """ sid of aliases must return None """ 
         return None
     
-    @property
     def nodes(self):
-        return self._nodes
+        raise NotImplementedError('nodes')
     
-    @classmethod
-    def new(cls, parent, name, config=None, **kwargs):
-        """ a base constructor for a NodeAlias within a parent context  
-        
-        The requirement for the parent :
-            - a .key attribute 
-            - attribute of the given name in the list shall return a node
-        """
-        config = cls.parse_config(config, **kwargs)
-                                       
-        nodes  = cls.new_target_nodes(parent, config) 
-        
-        return cls(kjoin(parent.key, name), nodes, config=config, localdata=parent.localdata)
-
-    def get(self, data: Optional[Dict] =None) -> Any:
+    def get(self) -> Any:
         """ get the node alias value from server or from data dictionary if given """
-        if data is None:
-            _n_data = {}
-            NodesReader(self._nodes).read(_n_data)
-            values = [_n_data[n] for n in self._nodes]
-            #values = [n.get() for n in self._nodes]
-        else:
-            values = [data[n] for n in self._nodes]
+
+        _n_data = {}
+        nodes = list(self.nodes())
+        NodesReader(nodes).read(_n_data)
+        values = [_n_data[n] for n in nodes]
+        
         return self.fget(*values)
     
-    def set(self, value: Any, data: Optional[Dict] =None) -> None:
+    def set(self, value: Any) -> None:
         """ set the node alias value to server or to data dictionary if given """
-        values = self.fset(value)
-        if len(values)!=len(self._nodes):
+        values = list(self.fset(value))
+        nodes = list(self.nodes())
+        if len(values)!=len(nodes):
             raise RuntimeError(f"fset method returned {len(values)} values while {len(self._nodes)} is on the node alias") 
-        if data is None:
-            NodesWriter(dict(zip(self._nodes, values))).write()                        
-            #for n,v in zip(self._nodes, values):
-            #    n.set(v)
-        else:
-            for n,v in zip(self._nodes, values):
-                data[n] = v        
+        NodesWriter(dict(zip(nodes, values))).write()                        
+            
     
     def fget(self, *args) -> Any:
         # Process all input value (taken from Nodes) and return a computed value 
@@ -115,16 +56,19 @@ class BaseNodeAlias(BaseNode):
         raise NotImplementedError('fset')    
 
 
-
+class BaseNodeAlias1(BaseNodeAlias):
+    def fget(self, value) -> Any:
+        return value 
+    def fset(self, value) -> Any:
+        yield value 
             
+
 class NodeAlias(BaseNodeAlias):
     """ NodeAlias mimic a real client Node. 
         
     The NodeAlias object does a little bit of computation to return a value with its `get()` method and 
     thanks to required input nodes.
      
-    The NodeAlias cannot be use as such without implementing a `fget` method. This can be done by 
-    implementing the fget method on an inerated class or with the `nodealias` decorator. 
     
     NodeAlias is an abstraction layer, it does not do anything complex but allows uniformity among ways to retrieve values. 
     
@@ -169,7 +113,7 @@ class NodeAlias(BaseNodeAlias):
         from pydevmgr_core import NodeAlias
         position = Value('position', value=10.3)
         
-        @nodealias('is_in_position')
+        @nodealias_maker(position)
         def is_in_position(pos):
             return abs(pos-4.56)<0.1
  
@@ -229,17 +173,39 @@ class NodeAlias(BaseNodeAlias):
 
     """
     Config = NodeAliasConfig
-    Property = NodeAliasProperty
     
-    
-    
+    _n_nodes_required = None
+    _nodes_is_scalar = False
+    def __init__(self, 
+          key: Optional[str] = None, 
+          nodes: Union[List[BaseNode], BaseNode] = None,
+          *args, **kwargs
+         ):
+         
+        super().__init__(key, *args, **kwargs)
+        if nodes is None:
+            nodes = []
+        
+        elif isinstance(nodes, BaseNode):
+            nodes = [nodes]
+            self._nodes_is_scalar = True
+        if self._n_nodes_required is not None:
+            if len(nodes)!=self._n_nodes_required:
+                raise ValueError(f"{type(self)} needs {self._n_nodes_required} got {len(nodes)}")
+        self._nodes = nodes
+  
+    def nodes(self):
+        return self._nodes
+
+      
+
     @classmethod
-    def prop(cls, name: Optional[str] = None, nodes=None, **kwargs):
-        nodes = [] if nodes is None else nodes
-        #config = cls.Config.parse_obj(kwargs)  
-        config = cls.parse_config(kwargs)
-        return cls.Property(cls, cls.new, name, nodes, config=config)
-                
+    def prop(cls,  name: str = None, nodes = None, config_path=None, frozen_parameters=None,  **kwargs):
+        cls._prop_deprecation( 'NodeAlias: prop() method is deprecated, use instead the pydevmgr_core.decorators.getter to decorate the fget method from a node factory or the nodealias decorator', name, config_path, frozen_parameters)
+        return getter( cls.Config(nodes=nodes, **kwargs) )  
+
+
+
     @classmethod
     def new(cls, parent, name, nodes=None, config=None, **kwargs):
         """ a base constructor for a NodeAlias within a parent context  
@@ -265,7 +231,7 @@ class NodeAlias(BaseNodeAlias):
                                 
         parsed_nodes  = [ cls._parse_node(parent, n, config) for n in nodes ]
         
-        return cls(kjoin(parent.key, name), parsed_nodes, config=config, localdata=parent.localdata)
+        return cls(kjoin(parent.key, name), parsed_nodes, config=config, localdata=parent.localdata, com=parent.engine)
     
     @classmethod
     def _parse_node(cls, parent: BaseObject, in_node: Union[tuple,str,BaseNode], config: Config) -> 'NodeAlias':
@@ -308,117 +274,7 @@ class NodeAlias(BaseNodeAlias):
         """ Process all input value (taken from Nodes) and return a computed value """
         raise NotImplementedError("fget")
 
-class BaseNodeAlias1(BaseNode):
-    """ BaseNodeAlias1 base classed  
-    
-    The ``_new_source_node(cls, parent, config)`` class method shall be implemented to this base node in order to 
-    retrieve the source node from the context of a parent object. 
-
-    Example:
-
-    ::
-
-        from pydevmgr_core import BaseInterface, BaseNodeAlias1
-        from pydevmgr_core.nodes import Value 
-        
-        class AiNode(BaseNodeAlias1, ai_number=(int,0)):
-            @classmethod
-            def _new_source_node(cls, parent, config):
-                return getattr(parent, f"ai_{config.ai_number}")
-
-        VC = Value.Config 
-        class MyInterface(BaseInterface):
-            class Config(BaseInterface.Config):
-                ai_0: VC = VC(value=1.0)
-                ai_1: VC = VC(value=2.0)
-                ai_3: VC = VC(value=3.0)
-                # etc ... 
-                
-                temperature : AiNode.Config = AiNode.Config(ai_number=1)
-
-        my_interface = MyInterface()
-        my_interface.temperature.get()
-        # -> 2.0
-                
-    """
-    # This class does not implement the engine to get the source node from a parent object 
-    # one has to implement the _new_source_node(cls, parent, config) class method 
-    
-    def __init__(self, 
-          key: Optional[str] = None, 
-          node: Optional[BaseNode] = None,
-          config: Optional[BaseNode.Config] = None, 
-          localdata: Optional[dict] = None, 
-          **kwargs
-         ):        
-        super().__init__(key, config=config, localdata=localdata, **kwargs)    
-        if node is None:            
-            raise ValueError("the node pointer is empty, alias node cannot work without")    
-                    
-        self._node = node
-    
-    @property
-    def sid(self):
-        """ sid of aliases must return None """ 
-        return None
-    
-    @property
-    def node(self):
-        return self._node
-    
-    # nodes property is mendatory for the NodeReader 
-    @property
-    def nodes(self):
-        return [self._node]
-    
-    
-    @classmethod
-    def new(cls, parent, name, config=None, **kwargs):
-        """ a base constructor for a NodeAlias within a parent context  
-        
-        The requirement for the parent :
-            - a .key attribute 
-            - attribute of the given name in the list shall return a node
-        """
-        config = cls.parse_config(config, **kwargs)
-                             
-        parsed_node  = cls._new_source_node(parent, config)    
-        
-        return cls(kjoin(parent.key, name), parsed_node, config=config, localdata=parent.localdata)
-    
-    @classmethod
-    def _new_source_node(cls, parent, config):
-        raise NotImplementedError('new_target_node')
-    
-    
-    
-    def get(self, data: Optional[Dict] =None) -> Any:
-        """ get the node alias value from server or from data dictionary if given """
-        if data is None:
-            _n_data = {}
-            NodesReader([self._node]).read(_n_data)
-            value = _n_data[self._node]
-        else:
-            value = data[self._node]
-        return self.fget(value)    
-        
-    def set(self, value: Any, data: Optional[Dict] =None) -> None:
-        """ set the node alias value to server or to data dictionary if given """
-        value = self.fset(value)
-        if data is None:
-            NodesWriter({self._node:value}).write()                        
-        else:
-            data[self._node] = value
-    
-    def fget(self,value) -> Any:
-        """ Process the input retrieved value and return a new computed on """
-        return value
-    
-    def fset(self, value) -> Any:
-        """ Process the value intended to be set """
-        return value
-
-
+   
 
 class NodeAlias1(BaseNodeAlias1):
     """ A Node Alias accepting one source node 
@@ -437,7 +293,7 @@ class NodeAlias1(BaseNodeAlias1):
             def fget(self, value):
                 return value* self.config.scale
             def fset(self, value):
-                return value/self.config.scale 
+                yield value/self.config.scale 
     
         raw = Value('raw_value', value=10.2)
         scaled = Scaler('scaled_value', node = raw, scale=10)
@@ -449,20 +305,28 @@ class NodeAlias1(BaseNodeAlias1):
 
     """
     Config = NodeAlias1Config
-    Property = NodeAliasProperty
     
-       
-       
+    def __init__(self, 
+          key: Optional[str] = None, 
+          node: Optional[BaseNode] = None,
+          *args, **kwargs
+         ):        
+        super().__init__(key, *args, **kwargs)    
+        if node is None:            
+            raise ValueError("the node pointer is empty, alias node cannot work without")    
+                    
+        self._node = node
+    
+    def nodes(self):
+        yield self._node
+  
+     
     @classmethod
-    def prop(cls, 
-          name: Optional[str] = None, 
-          node: Union[BaseNode,str] = None,  
-          **kwargs
-        ) -> NodeAliasProperty:
-        # config = cls.Config.parse_obj(kwargs)
-        config = cls.parse_config(kwargs)
-        return cls.Property(cls, cls.new, name, node, config=config)
-    
+    def prop(cls,  name: str = None, node = None, config_path=None, frozen_parameters=None,  **kwargs):
+        cls._prop_deprecation( 'NodeAlias: prop() method is deprecated, use instead the pydevmgr_core.decorators.getter to decorate the fget method from a node factory or the nodealias decorator', name, config_path, frozen_parameters)
+        return getter( cls.Config(node=node, **kwargs) )     
+
+
     @classmethod
     def new(cls, parent, name, node=None,  config=None, **kwargs):
         """ a base constructor for a NodeAlias within a parent context  
@@ -473,13 +337,25 @@ class NodeAlias1(BaseNodeAlias1):
         """
         config = cls.parse_config(config, **kwargs)
         if node is None:            
-            node = config.node 
+            node = config.node
+        elif hasattr(node, "__call__"):
+            node = node(parent)
+
         if node is None:
             raise ValueError("node origin pointer is not defined")                             
         parsed_node  = NodeAlias._parse_node(parent, node, config)    
         
-        return cls(kjoin(parent.key, name), parsed_node, config=config, localdata=parent.localdata)
+        return cls(kjoin(parent.key, name), parsed_node, config=config, localdata=parent.localdata, com=parent.engine)
+
+    def fget(self,value) -> Any:
+        """ Process the input retrieved value and return a new computed on """
+        return value
     
+    def fset(self, value) -> Any:
+        """ Process the value intended to be set """
+        yield value
+
+   
 
 def nodealias(key: Optional[str] =None, nodes: Optional[list] = None):
     """ This is a node alias decorator 
@@ -554,14 +430,14 @@ def nodealias1(key: Optional[str] = None, node: Optional[BaseNode] = None) -> Ca
     
     ::
         
-        from pydevmgr_core import nodealias1, node 
+        from pydevmgr_core.decorators import nodealias_maker , node_maker
         import numpy as np 
         
-        @node('temperature_volt')
+        @node_maker()
         def temperature_volt():
             return np.random.random()*3 + 20
         
-        @nodealias1('temperature_celcius', temperature_volt):
+        @nodealias_maker(temperature_volt)
         def temperature_celcius(temp_volt):
             return temp_volt*12.3 + 2.3
             

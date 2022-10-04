@@ -1,7 +1,6 @@
-from .base import (BaseParentObject, _BaseProperty,  ksplit, BaseData, kjoin,  open_object)
-
+from .base import (BaseParentObject,  BaseData,  open_object)
 from .factory_object import ObjectFactory
-
+from .decorators import finaliser
 from .device import BaseDevice 
 from .node import BaseNode
 from .rpc import BaseRpc  
@@ -29,23 +28,6 @@ class ManagerConfig(BaseParentObject.Config ):
     type: str = "Base"
      
 
-class ManagerProperty(_BaseProperty):    
-    fbuild = None    
-    def builder(self, func):
-
-        """ Decorator for the interface builder """
-        self.fbuild = func
-        return self
-    
-    def __call__(self, func):
-        """ The call is used has fget decorator """
-        self.fbuild = func
-        return self
-    
-    def _finalise(self, parent, device):
-        # overwrite the fget, fset function to the node if defined         
-        if self.fbuild:
-            self.fbuild(parent, device)
 
 def open_manager(cfgfile, path=None, prefix="", key=None, default_type=None, **kwargs):
     """ Open a manager from a configuration file 
@@ -73,7 +55,6 @@ def open_manager(cfgfile, path=None, prefix="", key=None, default_type=None, **k
 
 @record_class        
 class BaseManager(BaseParentObject):
-    Property  = ManagerProperty
     Config = ManagerConfig
     Data = BaseData
     Device = BaseDevice
@@ -121,4 +102,8 @@ class BaseManager(BaseParentObject):
             config = None
            
         return super().parse_config(config, **kwargs)
-        
+    
+    @classmethod
+    def prop(cls,  name: str = None, config_path=None, frozen_parameters=None,  **kwargs):
+        cls._prop_deprecation( 'Manager: prop() method is deprecated, use instead the pydevmgr_core.decorators.finaliser to decorate the object creation tunning', name, config_path, frozen_parameters)
+        return finaliser( cls.Config(**kwargs) )      
