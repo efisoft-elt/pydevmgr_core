@@ -5,8 +5,7 @@ from .parser_engine import BaseParser, ParserFactory
 from .decorators import caller 
 
 from .class_recorder import  KINDS,  record_factory
-from .base import BaseObject
-from .factory_object import ObjectFactory
+from .base import BaseObject, ObjectFactory
 
 from typing import Dict, List, Callable,  Optional, Type, Any
 from pydantic import create_model

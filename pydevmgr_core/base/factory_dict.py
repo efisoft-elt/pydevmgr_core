@@ -1,7 +1,7 @@
 from pydantic import BaseModel
-from pydevmgr_core.base.class_recorder import  get_class, get_default_factory, get_factory
+from .class_recorder import  get_class, get_default_factory, get_factory
 
-from pydevmgr_core.base.factory_object import ObjectFactory
+from .base import ObjectFactory
 from .base import ObjectDict, BaseFactory
 from .io import add_multi_constructor
 import yaml 

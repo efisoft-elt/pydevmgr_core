@@ -4,7 +4,7 @@ from .class_recorder import (get_class, record_class, KINDS,
 from .base import (kjoin, ksplit, reconfig, BaseData,
                         open_object, BaseObject, path_walk_item , path_walk_attr, path, 
                         BaseFactory, 
-                        ObjectList, ObjectDict
+                        ObjectList, ObjectDict, ObjectFactory
                 )    
 from .node import (NodeFactory, BaseNode, node, 
                    NodesReader, NodesWriter, 
@@ -37,7 +37,6 @@ from .datamodel import (DataLink, BaseData, NodeVar, NodeVar_R, NodeVar_W,
 from .monitor import BaseMonitor 
 from .factory_list import FactoryList
 from .factory_dict import FactoryDict
-from .factory_object import ObjectFactory 
 from . import decorators
 
 # from .decorators import getter, setter, finaliser, nodealias, nodealias_maker, node_maker

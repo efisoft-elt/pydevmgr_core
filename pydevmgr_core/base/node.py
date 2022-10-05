@@ -1,7 +1,6 @@
 from warnings import warn
 from .class_recorder import get_class, KINDS, record_factory
-from .base import (BaseObject, BaseData)
-from .factory_object import ObjectFactory
+from .base import (BaseObject, BaseData, ObjectFactory)
 from .decorators import getter
 from .parser_engine import  ParserFactory, NoneParserFactory 
 

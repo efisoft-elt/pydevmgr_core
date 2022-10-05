@@ -1,5 +1,4 @@
-from .base import (BaseParentObject,  BaseData,  open_object)
-from .factory_object import ObjectFactory
+from .base import (BaseParentObject,  BaseData,  open_object, ObjectFactory)
 from .decorators import finaliser
 from .device import BaseDevice 
 from .node import BaseNode
@@ -29,7 +28,7 @@ class ManagerConfig(BaseParentObject.Config ):
      
 
 
-def open_manager(cfgfile, path=None, prefix="", key=None, default_type=None, **kwargs):
+def open_manager(cfgfile, path=None, prefix="", key=None):
     """ Open a manager from a configuration file 
 
         
@@ -43,14 +42,12 @@ def open_manager(cfgfile, path=None, prefix="", key=None, default_type=None, **k
         Output:
             manager (BaseManager subclass) :tanciated Manager class     
     """
-    kwargs.setdefault("kind", KINDS.MANAGER)
     return open_object(
                 cfgfile, 
                 path=path, prefix=prefix, 
-                key=key, default_type=default_type, 
-                **kwargs
+                key=key, Factory=ManagerFactory     
             ) 
-
+    
 
 
 @record_class        
@@ -86,7 +83,7 @@ class BaseManager(BaseParentObject):
     def __enter__(self):
         try:
             self.disconnect()
-        except (ValueError, RuntimeError):
+        except (ValueError, RuntimeError, AttributeError):
             pass 
         self.connect()
         return self

@@ -1,5 +1,4 @@
-from .base import (BaseParentObject, BaseData, open_object)
-from .factory_object import ObjectFactory
+from .base import (BaseParentObject, BaseData, open_object, ObjectFactory)
 from .decorators import finaliser 
 from .class_recorder import  KINDS,  record_class,  record_factory
 from .node import BaseNode 
@@ -37,23 +36,23 @@ class BaseDeviceConfig(BaseParentObject.Config):
     
   
     
-def open_device(cfgfile, path=None, prefix="", key=None, default_type=None, **kwargs):
+def open_device(cfgfile, path=None, prefix="", key=None):
     """ Open a device from a configuration file 
 
         
         Args:
             cfgfile: relative path to one of the $CFGPATH or absolute path to the yaml config file 
-            key: Key of the created Manager 
+            key: Key of the created Device, if None one is taken from path 
             path (str, int, optional): 'a.b.c' will loock to cfg['a']['b']['c'] in the file. If int it will loock to the Nth
                                         element in the file
+                                        
             prefix (str, optional): additional prefix added to the name or key
 
         Output:
             device (BaseDevice subclass) :tanciated Device class     
     """
-    kwargs.setdefault("kind", KINDS.DEVICE)
-
-    return open_object(cfgfile, path=path, prefix=prefix, key=key, default_type=default_type, **kwargs) 
+    
+    return open_object(cfgfile, path=path, prefix=prefix, key=key, Factory=DeviceFactory) 
 
 
 @record_class
@@ -77,7 +76,7 @@ class BaseDevice(BaseParentObject):
     def __enter__(self):
         try:
             self.disconnect()
-        except (ValueError, RuntimeError):
+        except (ValueError, RuntimeError, AttributeError):
             pass 
         self.connect()
         return self

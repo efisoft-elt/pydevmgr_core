@@ -1,339 +1,310 @@
-from pydantic import BaseModel
-
-from .datamodel import DataLink 
-from .download import Downloader
-
-from typing import Any, Optional, Callable
-import math 
 import time
-import traceback
-from threading import Thread
-from enum import Enum 
+from typing import Callable, Optional,Any
+from dataclasses import dataclass
+from pydantic.main import BaseModel
+from pydevmgr_core.base.datamodel import DataLink
+
+from pydevmgr_core.base.download import Downloader
+from pydevmgr_core.base.base import BaseObject
 
 
-
-
-class MonitorError(RuntimeError):
+class EndMonitor(StopIteration):
     pass
 
+class BaseMonitor(BaseObject):
+    class Config(BaseObject.Config):
+        kind: str = "Monitor"
 
-class StopMonitor(RuntimeError):
-    pass
-
-class NextSetup(RuntimeError):
-    pass
-
-
-class BaseMonitor:
-    """ Base class for a monitoring or script system 
-    
-    A Monitor object define an update method in order to handle new data updated 
-    separatly from a distant server for instance.
-    
-    The update method returns an integer to whatever master is controling the monitor,
-    the rule is:
-        CONTININUE 0  -> continue the monitoring
-        NEXT -1 -> execute the next movement (for instance for a new hardware setup) then 
-                  continue monitoring 
-        END -2 -> Finish the monitoring 
-        All other positive integger are handled as error code
-    
-    The update method has the signature: ``monitor.update(device, data)``
-    
-    The start method,  signature ``monitor.start(device, data )`` is getting ready the Monitor 
-    The next method, signature ``monitor.next(device, data )`` is applying, if needed a new setup 
-                    before continuing the update
-    The end method, signature ``monitor.end(device, data, error=None)`` is closing properlly the Monitor. 
-                    It can be called with an Exception
-
-    The update_failure, signature( data, err), this function is called each time a data download failed with an
-             exception (``err`` argument). If a succesfull download follows a failure the function is called again 
-             one time with err=None. This can handle the cases when for instance the connection to a distant server
-             is lost for a laps of time. 
-
-    Two other classes are used to handle the monitor easely: 
-        - MonitorConnection 
-            It does the connect the Monitor to a :class:`pydevmgr_core.Downloader` object
-            The update is done at each downloader update
-        - MonitorRunner
-            It runs the monitor update in a loop 
-    
-    """
-    class STEP(int, Enum):
-        CONTINUE = 0 
-        NEXT = -1 
-        END  = -2
-        # other are ERROR code should be >0
-
-    class ERROR(int, Enum):
-        pass
-        
-    class Config(BaseModel):
-        pass   
-    
     class Data(BaseModel):
         pass
     
-    StopMonitor = StopMonitor
-    NextSetup = NextSetup
-    
+    def setup(self, container: Any, data: BaseModel, obj: Optional[BaseObject]):
+        pass 
 
-    def __init__(self, config=None, **kwargs):
-        self.config = self.parse_config(config, **kwargs)
-        
-
-    @classmethod
-    def parse_config(cls, __config__=None, **kwargs):
-        if __config__ is None:
-            return cls.Config(**kwargs)
-        if isinstance(__config__ , cls.Config):
-            return __config__
-        if isinstance(__config__, dict):
-            d = {**__config__, **kwargs} 
-            return cls.Config( **d )
-        raise ValueError(f"got an unexpected object for config : {type(__config__)}")
+    def start(self, container: Any, data: BaseModel) -> None:
+        raise NotImplementedError("start")
     
-    def runner(self, device, data=None):
-        return MonitorRunner(self, device, data)     
-    
-    def connector(self, device, data=None):
-        return MonitorConnection(self, device, data)
-     
-    def start(self, 
-          device: Any, 
-          data: Data, 
-         ) -> None:
-        pass
-    
-    def next(self, 
-          device: Any, 
-          data: Data, 
+    def update(self, 
+            container: Any, 
+            data: BaseModel, 
+            error: Optional[Exception] = None
         ) -> None:
+        raise EndMonitor
+    
+    def stop(self, conatainer):
+        raise NotImplementedError("stop")
+    
+    def resume(self):
         pass
 
-    def end(self, 
-          device: Any,
-          data: Data, 
-          error: Optional[Exception] = None
-        ) -> None:
-        return None 
-     
-    def update(self, data: Data):
-        raise NextSetup
-    
-    def update_failure(self, data: Data, err: Exception):
-        if err:
-            raise StopMonitor
+    def pause(self):
+        pass
 
-
-class MonitorConnection:
+class MonitorLinker:
     def __init__(self, 
-          monitor: BaseMonitor,
-          device: Any, 
-          data: BaseModel = None
+            monitor: BaseMonitor,
+            container: Any, 
+            obj: BaseObject,
+            data: BaseModel= None
         ) -> None:
         if data is None:
             data = monitor.Data()
-        
+        self.data = data 
+        self.obj = obj 
         self.monitor = monitor
-        self.device = device
-        self.data = data
+        self.container = container
         
-        self._connection = None
-        self._callback_thread = Thread()
-
-        self._is_alive_flag = False
-         
+        self.monitor.setup(self.container, self.data, self.obj)  
     
-    def _build_callback_function(self):
-        def _monitor_callback_function():
-            # The monitor.next method is beeing executed 
-            if self._callback_thread.is_alive():
-                return
-
-            try:
-                self.monitor.update( self.data )
-            except StopMonitor:
-                self.disconnect()
-            except NextSetup:
-                self._callback_thread = Thread(target=self.monitor.next, args=(self.device, self.data) )
-                self._callback_thread.start()
-            except Exception as er:
-                self.disconnect( er )
-
-
-        return _monitor_callback_function
+    def data_link(self):
+        return DataLink( self.obj, self.data)
     
+    def start(self) -> None:
+        self.monitor.start(self.container, self.data)
+
+    def update(self, error: Optional[Exception] = None):
+        self.monitor.update(self.container, self.data, error)
     
-    def _build_callback_failure_function(self):
-        def _callback_failure(failure_error):
-            if self._callback_thread.is_alive():
-                return
+    def stop(self):
+        self.monitor.stop(self.container)
 
-            try:
-                self.monitor.update_failure( self.data, failure_error )
-            except StopMonitor:
-                self.disconnect()
-            except NextSetup:
-                self._callback_thread = Thread(target=self.monitor.next, args=(self.device, self.data) )
-                self._callback_thread.start()
-            except Exception as er:
-                self.disconnect( er )
-   
-        return _callback_failure
-                
+    def resume(self):
+        self.monitor.resume()
+
+    def pause(self):
+        self.monitor.pause()
+
+
+class MonitorConnection:
+    """ Establish a connection between a downloader and a monitor linker """ 
+    _downloader = None  
+    _connection = None        
+    _data_link = None
+    _update_callback = None
+    _update_failure_callback = None
+
+    def __init__(self, linker):              
+        self.linker = linker 
     
+    def connect(self, downloader_or_connection):
+        """ Prepare a connection between the downloader and the monitor linker  
 
-    def is_alive(self):
-        return self._is_alive_flag 
-
-    def connect(self, downloader: Downloader,  link_failure=True):
+        The datalink is built as well as feedback methods. 
+        Connect does not do anything but shall be followed by start()  
+        """
         self.disconnect()
         
-            
-        self.monitor.start( self.device, self.data)
-        
-        data_link = DataLink( self.device, self.data)
-        
-        self._connection = downloader.new_connection()
-        self._connection.add_datalink( data_link )
-        
-        normal_callback = self._build_callback_function()
-        self._connection.add_callback( normal_callback )
-        
-        if link_failure:
-            failure_callback = self._build_callback_failure_function()
-            self._connection.add_failure_callback( failure_callback )    
-        self._is_alive_flag = True
-        
-        
-    def disconnect(self, error=None):
-        if self._connection:
-            self._connection.disconnect()
-        self._is_alive_flag = False
-        error_is_cleared_flag = self.monitor.end(self.device, self.data, error)
-        if error and not error_is_cleared_flag:
-            traceback.print_exc()
-            raise error
-
-
-
-class MonitorRunner:
-    def __init__(self, 
-         monitor: BaseMonitor, 
-         device: Any,         
-         data: Optional[BaseModel] = None
-        ) -> None:
-        if data is None:
-            data  = monitor.Data()
-            
-        self.monitor = monitor 
-        self.device = device
-        
-        self.data = data
-        self._is_alive_flag = False 
-    
-
-    def _download_and_update_with_failure(self, data_link: DataLink, download_failed_pointer):
-               
-        try:
-            data_link.download()
-        except Exception as e:
-            self.monitor.update_failure(self.data, e)
-            download_failed_pointer[0] = True
+        if isinstance( downloader_or_connection , Downloader):
+            self._downloader = downloader_or_connection
+            self._connection = downloader_or_connection.new_connection() 
         else:
-            if download_failed_pointer[0]:
-                download_failed_pointer[0] = False
-                self.monitor.update_failure(self.data, None)
-
-            self.monitor.update(self.data)
-
-    
-    def _download_and_update(self, data_link: DataLink, download_failed_pointer): 
-        data_link.download()
-        self.monitor.update(self.data)
-            
-    
-    def _end_with_error(self, error):
-        try:
-            error_is_cleared_flag = self.monitor.end(self.device, self.data, error)
-        finally:
-            self._is_alive_flag = False
-        if not error_is_cleared_flag:
-            traceback.print_exc()
-            raise error    
- 
-    def _end_without_error(self):
-        try:
-            self.monitor.end(self.device, self.data, None)
-        finally:
-            self._is_alive_flag = False
-
-
-    def run(self, 
-          period: float = 1, 
-          stop_signal: Callable = lambda: False , 
-          link_failure: bool = True
-        ) -> None:
-
-        data_link = DataLink( self.device, self.data )
-        data_link.download()
+            self._downloader = None
+            self._connection = downloader_or_connection 
         
-        self.monitor.start(self.device, self.data)
-        
-        download_failed_pointer = [False]
-        
-        if link_failure:
-            download_and_update = self._download_and_update_with_failure
-        else:
-            download_and_update = self._download_and_update
-
-        
-        self._is_alive_flag = True
-        while not stop_signal():
-                            
-            tic = time.time()
-                
+        def update():
             try:
-                download_and_update(data_link, download_failed_pointer)
-            except NextSetup:
-                self.monitor.next( self.device, self.data)
-            except StopMonitor:
-                break 
-            except Exception as er:
-                self._end_with_error(er)
-                return 
-            
-            toc = time.time()
-            time.sleep( max(period-(toc-tic), 1e-6) ) # This avoid negative sleepp time
+                self.linker.update()
+            except EndMonitor:
+                self.disconnect()
+                self.linker.stop()
+        def update_failure(err):
+            try:
+                self.linker.update(err)
+            except EndMonitor:
+                self.disconnect()
+                self.linker.stop()
+
+        self._data_link = self.linker.data_link()
+        self._update_callback = update 
+        self._update_failure_callback = update_failure
+
+    def _link_datalink_and_methods(self):
+        if self._downloader:
+            self._connection = self._downloader.new_connection()
         
-        self._end_without_error()
+        self._connection.add_datalink( self._data_link) 
+        self._connection.add_callback(self._update_callback)
+        self._connection.add_failure_callback(self._update_failure_callback)
 
 
-    def is_alive(self):
-        return self._is_alive_flag 
+    def start(self):
+        """ start the monitor and link update method to the downloader """
+        if not self._data_link:
+            raise ValueError("not connected")
+
+        self.linker.start()
+        self._link_datalink_and_methods()
     
-
-    def target_function(self, 
-            period: float = 1.0, 
-            stop_signal: Callable = lambda: False, 
-            link_failure: bool = True
-        ) -> Callable:
-
-        def target_function():
-            return self.run(period, stop_signal=stop_signal, link_failure=link_failure)
-        return target_function
-
-
-    def thread(self, 
-          period: float = 1.0, 
-          stop_signal: Callable = lambda: False, 
-          link_failure: bool = True
-        ) -> Callable:
-        return Thread( target = self.target_function(period, stop_signal, link_failure=link_failure) )
+    def stop(self):
+        """ disconnect to downloader end send stop to monitor """
+        self.disconnect() 
+        self.linker.stop()
         
-    def end(self):
-        return self.monitor.end(self.device, self.data, None)
-        
+    def disconnect(self):
+        """ disconnect method and datalink from the downloader """
+        if self._downloader:
+            self._connection.disconnect()
+            self._connection = None
+        else:
+            if self._data_link:
+                self._connection.remove_datalink(self._data_link)
+            if self._update_callback:
+                self._connection.remove_callback( self._update_callback)
+            if self._update_failure_callback:
+                self._connection.remove_failure_callback( self._update_failure_callback ) 
 
-         
+    def resume(self):
+        """ resume the monitor after it has been paused """
+        if not self.data_link:
+            raise ValueError("not connected")
+        self.linker.resume()
+        self._link_datalink_and_methods()
+    
+    def pause(self):
+        """ pause the monitor """
+        self.disconnect()
+        self.linker.pause()
+
+
+@dataclass 
+class MonitorDownloader:
+    """ from a MonitorLinker download its data and update the monitor """
+    def __init__(self, linker: MonitorLinker, catch_failure=True):
+        self.linker = linker
+        self.data_link = linker.data_link()
+        self.catch_failure = catch_failure 
+        
+    def start(self):
+        self.linker.start()
+        
+    def download(self):
+        if self.catch_failure:
+            try:
+                self.data_link.download()
+            except Exception as er:
+                self.linker.update(er)
+            else:
+                self.linker.update()
+        else:
+            self.linker.update()
+        
+    def stop(self):
+        self.linker.stop()
+
+    def resume(self):
+        self.linker.resume()
+
+    def pause(self):
+        self.linker.pause()
+
+@dataclass
+class MonitorRunner:
+    linker: MonitorLinker
+    period: float = 1.0 
+    max_iteration: int = 2**64
+
+    _running_flag = False
+    _paused_flag = False
+    
+    def start(self):
+        if self._running_flag:
+            raise RuntimeError("this runner is already running")
+    
+        period = self.period
+        max_iteration = self.max_iteration
+        linker = self.linker
+
+        self._running_flag = True
+
+        try:
+            linker.start()
+            i = 0    
+            while True:
+                if not self._running_flag:
+                    break 
+                if i>=max_iteration:
+                    break
+                if self._paused_flag:
+                    linker.pause()
+                    while self._paused_flag and self._running_flag:
+                        time.sleep(0.001)
+                    linker.resume()
+
+                tic = time.time()
+                
+                try:
+                    linker.update()
+                except EndMonitor:
+                    break
+                i += 1
+                toc = time.time()
+                time.sleep( max(period-(toc-tic), 1e-6) ) # This avoid negative sleep time
+        finally:
+            self._running_flag = False
+            linker.stop()
+    
+    def stop(self):
+        self._running_flag = False
+
+    def pause(self):
+        self._paused_flag = True
+
+    def resume(self):
+        self._paused_flag = False 
+        
+    
+if __name__ == "__main__":
+    
+    class M(BaseMonitor):
+        def __init__(self):
+            super().__init__()
+            self._counter = 0 
+        def setup(self, txts, data, obj):
+            txts.append(f"I am using {obj}")
+                    
+        def start(self, txts, data):
+            self._counter = 0
+            self._start_time = time.time()
+            txts.append("I am starting")
+
+        def update(self, txts, data, error=None):
+            if self._counter> 10:
+                raise EndMonitor
+                
+            clock =  time.time() - self._start_time 
+            txts.append(f"Iteration {self._counter} {clock}")
+            self._counter += 1 
+
+        def stop(self, txts):
+            txts.append( "I Have Finished")
+    
+    txts = []
+    runner = MonitorRunner(MonitorLinker( M(), txts, BaseObject()) , period=0.1, max_iteration=5)
+    runner.start() 
+    print( "\n".join(txts) )
+
+    from pydevmgr_core import Downloader
+    from pydevmgr_core.nodes import Value
+    v = Value(value=99)  
+    
+    downloader = Downloader()
+    txts = []
+    c = MonitorConnection( MonitorLinker( M(), txts, v, v.Data()) )
+    c.connect( downloader) 
+    c.start()
+    downloader.download()
+    downloader.download()
+    c.stop()
+    print( "\n".join(txts) )
+    txts.clear() 
+    
+    d = MonitorDownloader(   MonitorLinker( M(), txts, v, v.Data()) )
+    d.start()
+    d.download()
+    d.download()
+    d.stop()
+    
+    print( "\n".join(txts) )
+
+
+

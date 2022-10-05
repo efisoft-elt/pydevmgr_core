@@ -3,7 +3,7 @@ import pytest
 from pydevmgr_core.base.base import BaseFactory
 
 from pydevmgr_core.base.class_recorder import record_factory, get_factory
-from pydevmgr_core.base.factory_object import ObjectFactory
+from pydevmgr_core.base import ObjectFactory
 from pydevmgr_core.base.io import load_config, PydevmgrLoader
 import yaml
 

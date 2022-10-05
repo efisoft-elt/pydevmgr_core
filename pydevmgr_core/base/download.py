@@ -442,7 +442,7 @@ class Downloader:
         download queue of nodes.
         Also all callback associated with this connection will be removed from the downloader 
         
-        Note that the discnnected nodes will stay inside the downloader data but will not be updated
+        Note that the disconnected nodes will stay inside the downloader data but will not be updated
          
         Args:
             token : a Token returned by :func:`Downloader.new_token`

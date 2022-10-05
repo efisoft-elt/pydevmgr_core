@@ -1,7 +1,5 @@
 from .engine import BaseEngine
-from .base import ( BaseParentObject,  BaseData)
-
-from .factory_object import ObjectFactory
+from .base import ( BaseParentObject,  BaseData, ObjectFactory)
                          
 from .class_recorder import  record_class, KINDS, record_factory
 

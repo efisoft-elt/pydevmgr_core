@@ -241,7 +241,6 @@ def explore_config(filter: Optional[Callable] =None, ioconfig: IOConfig = ioconf
         >>> list(explore_config(  lambda d: d['kind']=='Device' ))
 
     """
-        
     path_list = os.environ.get(ioconfig.cfgpath, '.').split(':')
     found = set()
     

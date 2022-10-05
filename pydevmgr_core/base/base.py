@@ -1,16 +1,16 @@
 from os import path
 from warnings import warn 
 from typing import Any, Tuple, Optional, List,  Union, Type, TypeVar, Iterator, get_type_hints
-from pydantic import BaseModel, Extra,  create_model, Field
+from pydantic import BaseModel, Extra,  create_model, Field, validator
 
 from .engine import BaseEngine
 
-from .class_recorder import get_class, KINDS
+from .class_recorder import get_class, KINDS, get_factory
 from .model_var import StaticVar, NodeVar
 
 from .defaults_var import _default_walk_set
 import yaml
-from .io import ioconfig, load_yaml, load_config, parse_file_name, PydevmgrLoader
+from .io import  load_yaml, load_config, parse_file_name,  add_multi_constructor, Tags
 import io as _io
 import logging 
 import weakref
@@ -106,7 +106,76 @@ class BaseFactory(BaseModel):
     def parse_yaml(cls, payload: str):
         obj = load_yaml(payload)
         return cls.parse_obj(obj) 
+
+
+
+# #########################################################3##
+
+class ObjectFactory(BaseFactory):
+    """ Generic Factory used to build pydevmgr object """
+
+    kind: KINDS 
+    type: str 
+    class Config:
+        extra = Extra.allow 
     
+    @validator('type')
+    def _check_object_type(cls, type_, values):
+        get_class( values['kind'], type_)
+        return type_
+    
+    __pydevmgr_config__ = ( (None,None), None)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,  **kwargs)
+        # dry parse the config, let it fail in case of error
+        get_class(self.kind, self.type).Config.parse_obj( self )
+    
+    
+    def build_config(self):
+        Object = get_class(self.kind, self.type)
+        config = Object.Config.parse_obj( self )
+        return config
+
+    def build(self, parent: "BaseObject" = None, name: Optional[str]= None) -> "BaseObject":
+        config = self.build_config()
+        return config.build(parent, name) 
+
+
+def factory_constructor(loader, node):
+    if isinstance(node, yaml.MappingNode):
+        raw = loader.construct_mapping(node)
+        
+        new = ObjectFactory.parse_obj(raw) 
+        return new
+    else:
+        raise ValueError(f"Expecting a mapping for {Tags.FACTORY} tag")
+ 
+
+
+def _get_factory_from_tag_suffix(tag_suffix):
+   
+    if not tag_suffix:
+        return ObjectFactory
+    else:
+        return get_factory(tag_suffix)
+
+def object_constructor(loader, tag_suffix, node):
+    Factory = _get_factory_from_tag_suffix(tag_suffix)
+    if isinstance( node, yaml.MappingNode):
+        raw = loader.construct_mapping(node, deep=True)
+    else:
+        raise ValueError("object flag expecting a map or a string")
+    return Factory.parse_obj(raw)
+
+add_multi_constructor( "!Factory:" , object_constructor)
+add_multi_constructor( "!F:" , object_constructor)
+
+# #########################################################3##
+
+
+
+
+
 class ObjectList(UserList):
     """ Explicitly contain a list of pydevmgr objects 
 
@@ -186,7 +255,12 @@ class BaseConfig(BaseFactory):
             return self._get_parent_class()( name, config=self )
         else:
             return self._get_parent_class().new(parent, name, config=self)
-        
+    
+    def build_config(self):
+        """ config is the object itself """
+        return self 
+
+
     @classmethod
     def from_cfgfile(cls, cfgfile, path: str = ''):
         """ Create the config object from a yaml config file 
@@ -272,59 +346,12 @@ def _get_class_config( c, default_type: Optional[Union[str, Type]] = None):
   
 
 
-
-
-def open_class(
-        cfgfile: str, 
-        path: Optional[Union[str, int]] = None, 
-        default_type: Optional[str] = None,
-        **kwargs
-        ):
-    """ open a pydevmgr class and configuration object from a config file 
-
-    Args:
-        cfgfile: relative to on of the $CFPATH or absolute path to yaml config file 
-        kind (optional, str): object kind as enumerated in KINDS ('Manager', 'Device', 'Interface', 'Node', 'Rpc')
-            if None look inside the configuration file and raise error if not defined. 
-        
-        path (optional, str, int): an optional path to find the configuration inside the config file 
-             'a.b.c' will go to cfg['a']['b']['c']
-             If an integer N will get the Nth element of the cfgfile 
-
-        default_type (optional, str): A default type if no type is defined in the configuration file
-            If default_type is None and no type is found an error is raised 
-
-    Returns:
-        ObjClass :  An pydevmgr Object class (Manager, Device, Node, Rpc, Interface)
-        config : An instance of the config (BaseModel object)
-        pname (str, None) : The name of the object extracted from the path 
-    """
-    allconf = load_config(cfgfile)
-    
-    pname = _path_name(allconf, path)
-    allconf = path_walk_item(allconf, path)
-    
-    allconf.update( kwargs )
-    
-    try:
-        kind = allconf['kind']
-    except KeyError:
-        raise ValueError("Configuration has no 'kind' defined")
-
-    tpe = allconf.get('type', default_type)
-    if not tpe:
-        raise ValueError(f"Cannot resolve {kind} type")
-    Object = get_class(kind, tpe)
-    config = Object.Config.parse_obj(allconf)
-    return Object, config, pname 
-
 def open_object(
         cfgfile,
         key: Optional[str]= None, 
         path: Optional[Union[str, int]] = None, 
-        prefix: str = '', 
-        default_type: Optional[str] = None, 
-        **kwargs
+        prefix: str = '',
+        Factory: BaseFactory = ObjectFactory
     ):
     """ open an object from a configuration file 
     Args:
@@ -341,11 +368,22 @@ def open_object(
         obj : instanciatedpydevmgr object (Manager, Device, Node, Rpc, Interface)
 
     """
-    Object, config, pname = open_class(cfgfile, path=path, default_type=default_type, **kwargs)
-
-    if key is None and pname:
-        key = kjoin(prefix, pname)
-    return Object(key, config=config)
+    
+    _, p = parse_file_name(cfgfile)
+    if p and path:
+        raise ValueError("Path keyword given, but path is defined in filename")
+    elif path:
+        cfgfile = cfgfile + "(", path + ")"
+    
+    if key is None:
+        _, p = parse_file_name(cfgfile)
+        if p:
+            key = p[-1]
+            if prefix:
+                key = kjoin( prefix, key)
+    
+    factory = Factory(cfgfile) 
+    return factory.build(None, key) 
         
 class BaseData(BaseModel):
     # place holder for Data class 

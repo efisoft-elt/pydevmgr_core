@@ -236,4 +236,3 @@ class PickToValleyFilter(_Filter):
     def _func(data):
         return  np.max(data)-np.min(data)  
    
-del record_class, deque, Optional, List, Tuple, np, Enum         
