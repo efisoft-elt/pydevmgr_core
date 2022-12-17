@@ -5,7 +5,7 @@ from .upload import upload
 from .node import BaseNode
 from .model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
 from .base import BaseData, BaseFactory, path as to_path 
-from .object_path import ObjPath
+from .object_path import ObjPath, BasePath
 from typing import  Any, Iterable, Dict, List, Type
 
 class C:
@@ -85,9 +85,14 @@ def _extract_node(obj, name, field):
                 node = getattr(cobj, path[-1])
             except AttributeError:
                 raise MatchError(f'{path[-1]!r} is not a node in {obj.__class__.__name__!r} with path {path}')        
+        elif isinstance(node, BasePath):
+            node = node.resolve(obj)
+        
         elif not isinstance(node, BaseNode):
             raise MatchError(f'node set in the field is not a node')
-    
+        
+        
+
     elif C.ATTR in field.field_info.extra:
         if field.field_info.extra.get(C.ITEM, None) is not None:
             raise MatchError(f'attr={C.ATTR!r} and item={C.ITEM!r} cannot be both set, choose one.')

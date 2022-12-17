@@ -63,16 +63,6 @@ class BaseDevice(BaseParentObject):
     Node = BaseNode
     Rpc = BaseRpc    
     
-    def __init__(self, 
-           key: Optional[str] = None, 
-           config: Optional[Config] = None,
-           **kwargs
-        ) -> None:        
-        
-        super().__init__(key, config=config, **kwargs)  
-        if self._localdata is None:
-            self._localdata = {}
-    
     def __enter__(self):
         try:
             self.disconnect()
@@ -92,19 +82,6 @@ class BaseDevice(BaseParentObject):
             config = None
         return super().parse_config( config, **kwargs)
         
-    @classmethod
-    def new_com(cls, config: Config, com: Optional[Any] = None) -> Any:
-        """ Create a new communication object for the device 
-            
-        Args:
-           config: Config object of the Device Class to build a new com 
-           com : optional, A parent com object used to build a new com if applicable  
-           
-        Return:
-           com (Any): Any suitable communication object  
-        """
-        return com 
-    
                         
     def connect(self):
         """ Connect device to client """
@@ -117,12 +94,6 @@ class BaseDevice(BaseParentObject):
     def is_connected(self):
         """ True if device connected """
         raise NotImplementedError('is_connected method not implemented') 
-    
-    def rebuild(self):
-        """ rebuild will disconnect the device and create a new com """
-        self.disconnect()
-        self.clear()
-        self._com = self.new_com(self._config)
     
         
     @classmethod

@@ -59,11 +59,6 @@ class BaseManager(BaseParentObject):
     Node = BaseNode
     Rpc = BaseRpc
      
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self._localdata is None:
-            self._localdata = {}
-    
 
     @property
     def devices(self):

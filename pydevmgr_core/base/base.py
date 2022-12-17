@@ -32,7 +32,7 @@ class BaseFactory(BaseModel):
     This is used when a configuration is not enough to build a pydevmgr object and more heavy transformation 
     on the input parameters has to be done. 
     
-    Accept only one positional argument which is a config gile path to be loaded.
+    Accept only one positional argument which is a config file path to be loaded.
     If a file path is given no keyword argument are accepted 
     Otherwhise it works like a pydantic model, with keywords
     
@@ -124,7 +124,6 @@ class ObjectFactory(BaseFactory):
         get_class( values['kind'], type_)
         return type_
     
-    __pydevmgr_config__ = ( (None,None), None)
     def __init__(self, *args, **kwargs):
         super().__init__(*args,  **kwargs)
         # dry parse the config, let it fail in case of error
@@ -485,8 +484,6 @@ class BaseObject:
           key: Optional[str] = None,  
           config: Optional[Config] = None, 
           com: Optional[Any] = None, 
-          *,          
-          localdata: Optional[dict] = None, 
           **kwargs 
         ) -> None:
        
@@ -496,7 +493,6 @@ class BaseObject:
             key = new_key(self._config)
         
         self._key = key     
-        self._localdata = localdata
         
     def __repr__(self):
         return "<{} key={!r}>".format(self.__class__.__name__, self._key)

@@ -449,7 +449,6 @@ class Downloader:
         """
         if token is Ellipsis:
             raise ValueError('please provide a real token')
-        
         try:
             self._dict_nodes.pop(token)
             self._dict_datalinks.pop(token)
@@ -457,7 +456,7 @@ class Downloader:
             self._dict_failure_callbacks.pop(token)
         except KeyError:
             pass
-        
+ 
         self._rebuild_nodes()
         self._rebuild_callbacks()
         self._rebuild_failure_callbacks()

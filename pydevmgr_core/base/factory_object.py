@@ -19,14 +19,11 @@ class ObjectFactory(BaseFactory):
         get_class( values['kind'], type_)
         return type_
     
-    __pydevmgr_config__ = ( (None,None), None)
     def __init__(self, *args, **kwargs):
         super().__init__(*args,  **kwargs)
         # dry parse the config, let it fail in case of error
         get_class(self.kind, self.type).Config.parse_obj( self )
     
-
-
     def build(self, parent: BaseObject = None, name: Optional[str]= None) -> BaseObject:
         Object = get_class(self.kind, self.type)
         config = Object.Config.parse_obj( self )

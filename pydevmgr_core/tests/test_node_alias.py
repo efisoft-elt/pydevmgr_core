@@ -1,5 +1,5 @@
 import pytest
-from pydevmgr_core import BaseNode, BaseInterface, NodeAlias1, NodeAlias, nodealias1, BaseNodeAlias1
+from pydevmgr_core import BaseNode, BaseInterface, NodeAlias1, NodeAlias, BaseNodeAlias1
 from typing import Any
 from pydevmgr_core.base.device import BaseDevice
 from pydevmgr_core.base.factory_list import FactoryList

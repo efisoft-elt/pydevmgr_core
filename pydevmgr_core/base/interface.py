@@ -41,23 +41,12 @@ class BaseInterfaceConfig(BaseParentObject.Config):
 class BaseInterface(BaseParentObject):
     """ BaseInterface is holding a key, and is in charge of building nodes """    
     
-    _subclasses_loockup = {} # for the recorder 
-    
     Config = BaseInterfaceConfig
     Data = BaseData
     Node = BaseNode
     Rpc = BaseRpc   
     
-    def __init__(self, 
-           key: Optional[str] = None, 
-           config: Optional[Config] = None,            
-           **kwargs
-        ) -> None:        
-        
-        super().__init__(key, config=config, **kwargs)  
-        if self._localdata is None:
-            self._localdata = {}
-    
+
     @classmethod
     def prop(cls,  name: Optional[str] = None, config_path=None, frozen_parameters=None,  **kwargs):
         cls._prop_deprecation( 'Interface: prop() method is deprecated, use instead the pydevmgr_core.decorators.finaliser to decorate the object creation tunning', name, config_path, frozen_parameters)
