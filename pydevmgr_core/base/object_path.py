@@ -4,7 +4,7 @@ import operator as op
 
 
 
-_path_glv = {'open':None, '__nane__':None, '__file__':None, 'globals':None, 'locals':None, 'eval':None, 'exec':None,
+_path_glv = {'open':None, '__name__':None, '__file__':None, 'globals':None, 'locals':None, 'eval':None, 'exec':None,
         'compile':None}
 
 

@@ -23,7 +23,6 @@ from .manager import BaseManager, open_manager, ManagerFactory
 from .model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
 
 
-from .pydantic_tools import   GenConf
 from .defaults_var import Defaults
 
 from .parser_engine import BaseParser,ParserFactory, parser, conparser, create_parser_class
