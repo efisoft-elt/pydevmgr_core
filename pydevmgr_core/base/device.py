@@ -1,6 +1,5 @@
-from .base import (BaseParentObject, BaseData, open_object, ObjectFactory)
+from .base import (BaseObject, BaseData)
 from .decorators import finaliser 
-from .class_recorder import  KINDS,  record_class,  record_factory
 from .node import BaseNode 
 from .interface import BaseInterface
 from .rpc import BaseRpc
@@ -10,25 +9,8 @@ from enum import Enum
 from typing import  Optional, Any 
 
 
-# used to force kind to be a device
-class DEVICEKIND(str, Enum):
-    DEVICE = KINDS.DEVICE.value
 
-@record_factory("Device", kind="Device")
-class DeviceFactory(ObjectFactory):
-    """ A Factory for any type of device 
-    
-    The device is defined by the type string and must have been recorded before
-    """
-    kind: DEVICEKIND = DEVICEKIND.DEVICE
-
-
-
-class BaseDeviceConfig(BaseParentObject.Config):
-    kind: DEVICEKIND = DEVICEKIND.DEVICE
-    type: str = "Base"
-    
-    
+class BaseDeviceConfig(BaseObject.Config):
     def cfgdict(self, exclude=set()):
         all_exclude = {*{}, *exclude}
         d = super().cfgdict(exclude=all_exclude)       
@@ -36,27 +18,8 @@ class BaseDeviceConfig(BaseParentObject.Config):
     
   
     
-def open_device(cfgfile, path=None, prefix="", key=None):
-    """ Open a device from a configuration file 
 
-        
-        Args:
-            cfgfile: relative path to one of the $CFGPATH or absolute path to the yaml config file 
-            key: Key of the created Device, if None one is taken from path 
-            path (str, int, optional): 'a.b.c' will loock to cfg['a']['b']['c'] in the file. If int it will loock to the Nth
-                                        element in the file
-                                        
-            prefix (str, optional): additional prefix added to the name or key
-
-        Output:
-            device (BaseDevice subclass) :tanciated Device class     
-    """
-    
-    return open_object(cfgfile, path=path, prefix=prefix, key=key, Factory=DeviceFactory) 
-
-
-@record_class
-class BaseDevice(BaseParentObject):
+class BaseDevice(BaseObject):
     Config = BaseDeviceConfig
     Interface = BaseInterface
     Data = BaseData

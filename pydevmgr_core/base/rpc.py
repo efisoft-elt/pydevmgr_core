@@ -1,36 +1,19 @@
 from warnings import warn 
-from pydevmgr_core.base.factory_dict import FactoryDict
-from pydevmgr_core.base.factory_list import FactoryList
-from .parser_engine import BaseParser, ParserFactory
-from .decorators import caller 
+from valueparser import BaseParser, ParserFactory
 
-from .class_recorder import  KINDS,  record_factory
-from .base import BaseObject, ObjectFactory
+from .decorators import caller 
+from .base import BaseObject
 
 from typing import Dict, List, Callable,  Optional, Type, Any
 from pydantic import create_model
 from inspect import signature , _empty
-from enum import Enum 
 
-
-
-# used to force kind to be a rpc 
-class RPCKIND(str, Enum):
-    RPC = KINDS.RPC.value
-
-
-@record_factory("Rpc")
-class RpcFactory(ObjectFactory):
-    kind: RPCKIND = RPCKIND.RPC
 
 
 class BaseRpcConfig(BaseObject.Config):
-    kind: RPCKIND = RPCKIND.RPC
-    type: str = ""
     
-    arg_parsers: FactoryList[ParserFactory] = FactoryList(Factory=ParserFactory)
-    kwarg_parsers: FactoryDict[ParserFactory] = FactoryDict(Factory=ParserFactory)
-
+    arg_parsers: List[ParserFactory] = [] 
+    kwarg_parsers: Dict[str, ParserFactory] = {}
 
 class ArgParsers:
     """ responsable to parse a list of arguments """
@@ -109,11 +92,10 @@ class BaseRpc(BaseObject):
         super().__init__(key, config=config, **kwargs)
         
         
-        if self.config.arg_parsers is not None:
-            self._arg_parsers = ArgParsers( self.config.arg_parsers.build(self) )
-        if self.config.kwarg_parsers is not None:
-            self._kwarg_parsers = KwargParsers( self.config.kwarg_parsers.build(self) )
-        
+        if self.arg_parsers is not None:
+            self._arg_parsers = ArgParsers( self.arg_parsers  )
+        if self.kwarg_parsers is not None:
+            self._kwarg_parsers = KwargParsers( self.kwarg_parsers )
 
   
     @property

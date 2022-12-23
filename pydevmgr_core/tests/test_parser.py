@@ -1,4 +1,6 @@
-from pydevmgr_core import parsers, conparser
+from pydevmgr_core import parsers
+
+from valueparser import conparser
 import pytest 
 from enum import Enum 
 from pydantic import BaseModel
@@ -8,13 +10,10 @@ def test_conpraser():
     class Model(BaseModel):
         number: conparser(int) = 0
         pos : conparser( (float, parsers.Clipped), min=0.0, max=1.0) = 0.5
-        
+
     m = Model(pos=2.0, number=1.2)
     assert m.number == 1 
     assert m.pos == 1.0
-
-    
-
 
 
 def test_clipped():

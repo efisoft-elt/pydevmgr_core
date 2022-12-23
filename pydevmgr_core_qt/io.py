@@ -4,7 +4,7 @@ from pydevmgr_core.io import load_config, find_config
 
 pkg_name = 'pydevmgr_core_qt'
 
-def find_ui(resource):
+def find_ui(resource, pkg_name= pkg_name):
     try:
         return find_config(resource)
     except ValueError:

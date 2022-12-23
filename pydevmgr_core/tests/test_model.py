@@ -3,8 +3,7 @@ from pydevmgr_core import DataLink, BaseManager, BaseDevice, BaseNode, NodeAlias
 from pydevmgr_core.nodes import Static
 from pydantic import BaseModel, Field
 
-from pydevmgr_core.base.factory_list import FactoryList
-
+from systemy import FactoryList
 
 class Device(BaseDevice):
     class Config(BaseDevice.Config):

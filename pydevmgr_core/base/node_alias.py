@@ -12,7 +12,8 @@ class NodeAliasConfig(BaseNode.Config):
     type: str = "Alias"
     # nodes: Optional[Union[List[Union[str, tuple, BaseNode.Config, BaseNode]], str, BaseNode.Config, BaseNode]] = None
     nodes: Optional[Any] = None 
- 
+     
+
 class NodeAlias1Config(BaseNode.Config):
     type: str = "Alias1"
     # node: Optional[Union[str,tuple, BaseNode.Config, BaseNode]] = None
@@ -207,19 +208,19 @@ class NodeAlias(BaseNodeAlias):
 
 
     @classmethod
-    def new(cls, parent, name, nodes=None, config=None, **kwargs):
+    def new(cls, parent, name, config=None):
         """ a base constructor for a NodeAlias within a parent context  
         
         The requirement for the parent :
             - a .key attribute 
             - attribute of the given name in the list shall return a node
         """
-        config = cls.parse_config(config, **kwargs)
-        if nodes is None:
-            if config.nodes is None:
-                nodes = []
-            else:
-                nodes = config.nodes
+        if config is None: 
+            config = cls.Config()
+        if config.nodes is None:
+            nodes = []
+        else:
+            nodes = config.nodes
         # nodes = config.nodes                
         # handle the nodes now
         #if nodes is None:
@@ -231,7 +232,7 @@ class NodeAlias(BaseNodeAlias):
                                 
         parsed_nodes  = [ cls._parse_node(parent, n, config) for n in nodes ]
         
-        return cls(kjoin(parent.key, name), parsed_nodes, config=config, localdata=parent.localdata, com=parent.engine)
+        return cls(kjoin(parent.key, name), parsed_nodes, config=config, com=parent.engine)
     
     @classmethod
     def _parse_node(cls, parent: BaseObject, in_node: Union[tuple,str,BaseNode], config: Config) -> 'NodeAlias':
@@ -328,14 +329,16 @@ class NodeAlias1(BaseNodeAlias1):
 
 
     @classmethod
-    def new(cls, parent, name, node=None,  config=None, **kwargs):
+    def new(cls, parent, name, config=None ):
         """ a base constructor for a NodeAlias within a parent context  
         
         The requirement for the parent :
             - a .key attribute 
             - attribute of the given name in the list shall return a node
         """
-        config = cls.parse_config(config, **kwargs)
+        if config is None:
+            config = cls.Config()
+        node = config.node
         if node is None:            
             node = config.node
         elif hasattr(node, "__call__"):
@@ -345,7 +348,7 @@ class NodeAlias1(BaseNodeAlias1):
             raise ValueError("node origin pointer is not defined")                             
         parsed_node  = NodeAlias._parse_node(parent, node, config)    
         
-        return cls(kjoin(parent.key, name), parsed_node, config=config, localdata=parent.localdata, com=parent.engine)
+        return cls(kjoin(parent.key, name), parsed_node, config=config, com=parent.engine)
 
     def fget(self,value) -> Any:
         """ Process the input retrieved value and return a new computed on """

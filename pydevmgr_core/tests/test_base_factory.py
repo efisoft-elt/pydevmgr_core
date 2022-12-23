@@ -8,6 +8,8 @@ def test_update_a_factory():
     class F(BaseFactory, validate_assignment=False):
         a: int = 0
         b: float = 0.0
+        def build(self, parent=None, name=None):
+            pass
 
     f = F()
 
@@ -19,6 +21,9 @@ def test_update_factory_with_error():
     class F(BaseFactory, validate_assignment=False):
         a: int = 0
         b: float = 0.0
+        def build(self, parent=None, name=None):
+            pass
+
     
     f = F()
     with pytest.raises(ValueError):

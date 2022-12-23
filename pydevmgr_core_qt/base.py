@@ -11,11 +11,10 @@ class Action:
     """ An action object must be created from a pool of actions of class :class:`Actions` 
     
     Args:
-       - parent: :class:`Actions`
        - func (Callable): Command function must take len(inputs) arguments
        - inputs (List): list of static or callable arguments for func
                         if callable it will be called at run time 
-                        otherwhise they are static args, sent has is 
+                        otherwhise they are static args, sent as is 
        - feedback (Callable) : function of signature f(er, msg) called for feedback. 
                             In case of action this is called only on exception 
         - before (Callable): function without argument called before ``func`` 
@@ -61,7 +60,7 @@ class Action:
                     feedback(0, okay_msg)
                 finally:
                     if after: after()
-                    
+                     
         # overwrite the run method             
         self.run = func_call
             

@@ -4,7 +4,7 @@ from .download import download, BaseDataLink, reset
 from .upload import upload
 from .node import BaseNode
 from .model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
-from .base import BaseData, BaseFactory, path as to_path 
+from .base import BaseData, BaseFactory
 from .object_path import ObjPath, BasePath
 from typing import  Any, Iterable, Dict, List, Type
 
@@ -113,7 +113,7 @@ def _extract_node(obj, name, field):
             raise MatchError(f'path={C.PATH!r} and item={C.ITEM!r} cannot be both set, choose one.')
              
         path = field.field_info.extra[C.PATH]
-        path = to_path(path)    
+        # path = to_path(path)    
         if path:
             
             if isinstance(path, str):

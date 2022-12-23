@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QCheckBox, QComboBox, QFrame, QMainWindow, QWidget
 from pydantic.main import BaseModel
 from pydevmgr_core_ui import BaseContainerFeedback, BaseGetter, record_getter 
 
-from pydevmgr_core import BaseParser, parser
+from valueparser import BaseParser, parser
 from enum import Enum, EnumMeta
 
 from pydevmgr_core_ui.getter import WidgetDataGetter

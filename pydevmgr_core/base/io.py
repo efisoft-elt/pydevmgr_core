@@ -3,8 +3,8 @@ import os
 import re
 from pydantic import BaseModel
 from typing import Tuple, Optional, List, Dict, Optional, Callable, Any
-from ._yaml_loader import PydevmgrLoader
 from enum import Enum
+from systemy import SystemLoader, SystemIo
 
 from py_expression_eval import Parser 
 math_parser  = Parser()
@@ -23,80 +23,15 @@ class Tags(str, Enum):
     MATH = '!math'
     # some other tags tag constructor are defined in the object definition files 
 
-class PydevmgrLoader(yaml.CLoader):
-    """ yaml loader with the !include constructor 
-    
-    !include constructor can be built a scalar string (file path) or a mapping 
-    
-    - if a file path : it shall be a a yaml configuration file, it is loaded and included in place 
-    - if a mapping : the files to include shall be in a includes list of files path 
-    the contents of files (which shall be a mapping) are included inside the mapping a value  
-    inside the last file will erase the previous one. Ultimatly the values can be overwriten 
-    by in the current mapping 
-    
-    Exemple
-    -------
-
-    ---
-    name : test
-    config: !include path/to/config.yml
-    
-
-    --- 
-    name: test 
-    config: !include
-     include_files: [path/to/config1.yml, path/to/config2.yml]
-     overwriten_key: 34.5 
-    
-    """
-
-
+class PydevmgrLoader(SystemLoader):
+    io = SystemIo( path_env_name= 'CFGPATH')
+ 
 def add_multi_constructor(tag, constructor):
     return yaml.add_multi_constructor( tag, constructor, PydevmgrLoader)
 def add_constructor(tag, constructor):
     return yaml.add_constructor( tag, constructor, PydevmgrLoader)
 
 
-
-def include_constructor(loader, tag_suffix, node):
-    
-    if isinstance(node, yaml.MappingNode):
-        data = loader.construct_mapping(node)
-
-        _,_, path = tag_suffix.partition(":")
-
-        path, _, name = path.partition(":")
-        if name:
-            path = f"{path}[{name}]"
-
-        src = load_config( path) 
-        if not isinstance(src, dict):
-            raise ValueError("included file inside a mapping is expected to be a mapping")
-        _merge_dictionary(data, src)    
-        return data 
-
-add_multi_constructor( Tags.INCLUDE, include_constructor)
-
-
-def _merge_dictionary(dst, src):
-    stack = [(dst, src)]
-    while stack:
-        current_dst, current_src = stack.pop()
-        for key in current_src:
-            if key not in current_dst:
-                current_dst[key] = current_src[key]
-            else:
-                if isinstance(current_src[key], dict) and isinstance(current_dst[key], dict) :
-                    stack.append((current_dst[key], current_src[key]))
-                #else:
-                #    current_dst[key] = current_src[key]
-    
-
-
-def math_constructor(loader, node):
-    return math_parser.parse(loader.construct_scalar(node)).evaluate({})
-
-add_constructor( Tags.MATH, math_constructor)
 
 def factory_constructor(loader, node, Factory, def_type=None):
     if isinstance(node, yaml.MappingNode):

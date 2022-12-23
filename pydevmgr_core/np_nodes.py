@@ -1,6 +1,6 @@
 """ some nodes that required numpy to be executed if numpy is not installed theses nodes will not be loaded """
 
-from pydevmgr_core.base import  BaseNode, NodeAlias, NodeAlias1, record_class
+from pydevmgr_core.base import  BaseNode, NodeAlias, NodeAlias1, register
 from collections import deque
 from typing import Optional, List, Tuple
 import numpy as np
@@ -32,7 +32,7 @@ DISTRIBUTION.RANDOM.func = _random
 DISTRIBUTION.NORMAL.func = np.random.normal
 DISTRIBUTION.LOGNORMAL.func = np.random.lognormal
 
-@record_class
+@register
 class Noise(BaseNode):
     """ Node returning random value 
 
@@ -54,7 +54,7 @@ class Noise(BaseNode):
         c = self.config
         return DISTRIBUTION(c.distribution).func(c.mean, c.scale, c.size)
         
-@record_class
+@register
 class NoiseAdder(NodeAlias1):
     """ NodeAlias1, add anode to the original node value 
         
@@ -71,7 +71,7 @@ class NoiseAdder(NodeAlias1):
         c = self.config
         return DISTRIBUTION(c.distribution).func(value, c.scale)
         
-@record_class
+@register
 class Histogram(NodeAlias1):
     """ NodeAlias1, return an histogram from original node value 
 
@@ -123,7 +123,7 @@ class _Filter(NodeAlias1):
         self._data.append(value)
         return self._func(self._data)
 
-@record_class(overwrite=True)
+@register
 class MeanFilter(_Filter):
     """ NodeAlias1, Filter input Node by mean
     
@@ -137,7 +137,7 @@ class MeanFilter(_Filter):
         type = "MeanFilter"    
     _func = staticmethod(np.mean)    
 
-@record_class(overwrite=True)
+@register
 class MaxFilter(_Filter):
     """ NodeAlias1, Filter input Node by max
     
@@ -152,7 +152,7 @@ class MaxFilter(_Filter):
         type = "MaxFilter"    
     _func = staticmethod(np.max)  
       
-@record_class(overwrite=True)
+@register
 class MinFilter(_Filter):
     """ NodeAlias1, Filter input Node by min
     
@@ -166,7 +166,7 @@ class MinFilter(_Filter):
         type = "MinFilter"    
     _func = staticmethod(np.min)
 
-@record_class
+@register
 class VarianceFilter(_Filter):
     """ NodeAlias1, Filter input Node by vartiance
     
@@ -185,7 +185,7 @@ class VarianceFilter(_Filter):
         m = np.mean(data)
         return (data-m)**2/len(data)
 
-@record_class
+@register
 class RmsFilter(_Filter):
     """ NodeAlias1, Filter input Node by rms 
     
@@ -204,7 +204,7 @@ class RmsFilter(_Filter):
         m = np.mean(data)
         return np.sqrt(  (data-m)**2/len(data) )         
 
-@record_class
+@register
 class MedianFilter(_Filter):
     """ NodeAlias1, Filter input Node by maedian
     
@@ -219,7 +219,7 @@ class MedianFilter(_Filter):
         type = "MedianFilter"    
     _func = staticmethod(np.median)
 
-@record_class
+@register
 class PickToValleyFilter(_Filter):
     """ NodeAlias1, Filter input Node by pick to valley 
     

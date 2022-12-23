@@ -1,7 +1,6 @@
 from .engine import BaseEngine
-from .base import ( BaseParentObject,  BaseData, ObjectFactory)
+from .base import ( BaseObject,  BaseData )
                          
-from .class_recorder import  record_class, KINDS, record_factory
 
 from .node import BaseNode
 from .rpc import BaseRpc
@@ -16,29 +15,11 @@ from typing import Optional
 # 
 
 
-# used to force kind to be a interface
-class INTERFACEKIND(str, Enum):
-    INTERFACE = KINDS.INTERFACE.value
-
-
-@record_factory("Interface")
-class InterfaceFactory(ObjectFactory):
-    """ A factory for any kind of interface  
-
-    The interface is defined from the type keyword and must have been properly recorded before
-    """
-    kind: INTERFACEKIND = INTERFACEKIND.INTERFACE
-
-
-
-class BaseInterfaceConfig(BaseParentObject.Config):
+class BaseInterfaceConfig(BaseObject.Config):
     """ Config for a Interface """
-    kind: INTERFACEKIND = INTERFACEKIND.INTERFACE
-    type: str = "Base"     
+    ...
 
-
-@record_class # we can record this type because it should work as standalone        
-class BaseInterface(BaseParentObject):
+class BaseInterface(BaseObject):
     """ BaseInterface is holding a key, and is in charge of building nodes """    
     
     Config = BaseInterfaceConfig

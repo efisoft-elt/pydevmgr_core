@@ -35,8 +35,6 @@ def test_node_config():
     Config = BaseNode.Config
     
     config = Config() 
-    assert config.kind == KINDS.NODE
-    assert config.dict()['kind'] ==  'Node'
 
     with pytest.raises(ValueError):
         Config(kind="Device")
@@ -48,5 +46,5 @@ def test_node_config():
         Config( forbiden_extra_value = 8)
     
     
-    assert config._get_parent_class() is BaseNode
+    assert config.get_system_class() is BaseNode
 

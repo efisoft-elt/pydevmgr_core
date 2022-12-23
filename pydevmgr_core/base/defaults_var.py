@@ -114,10 +114,10 @@ class Defaults2(Defaults):
 
 if __name__ == "__main__":
     from pydantic import BaseModel
-    from pydevmgr_core import BaseDevice, record_class
+    from pydevmgr_core import BaseDevice, register
     from typing import Dict 
     
-    @record_class
+    @register
     class Toto(BaseDevice):
         class Config(BaseDevice.Config):
             type = "Toto"
@@ -139,10 +139,10 @@ if __name__ == "__main__":
         b1: Defaults[B] = B(y=9)
         b2: Defaults[B] = B(y=8, c1=C(n1=100))
         
-        devices: Dict[str,GenDevice] = {}
+        devices: Dict[str,BaseDevice.Config] = {}
 
     a =A(b1={'x':1.0, 'c1':{'n2':10},  'c2':{'n2':20}, 'c3':{'n2':30}},    b2={'c1':{}}, 
-            devices={ 'toto':{'type':'Toto'}, 'toto2':Toto.Config()}
+            devices={ 'toto':{}, 'toto2':Toto.Config()}
     
         )
 

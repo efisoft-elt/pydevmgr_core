@@ -8,7 +8,7 @@ from typing import Callable, Optional, Any, Type
 from PyQt5.QtWidgets import QCheckBox, QFrame, QMainWindow, QWidget
 from PyQt5 import QtWidgets
 
-from pydevmgr_core import BaseParser, parser
+from valueparser import BaseParser, parser
 from pydevmgr_core_qt2.getters import QtBoolTextGetter, QtTextGetter
 from pydevmgr_core_qt2.style import Style, get_style
 from pydevmgr_core_ui import BaseSetter, BaseContainerFeedback, record_setter

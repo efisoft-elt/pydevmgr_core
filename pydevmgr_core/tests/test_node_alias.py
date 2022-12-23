@@ -2,13 +2,12 @@ import pytest
 from pydevmgr_core import BaseNode, BaseInterface, NodeAlias1, NodeAlias, BaseNodeAlias1
 from typing import Any
 from pydevmgr_core.base.device import BaseDevice
-from pydevmgr_core.base.factory_list import FactoryList
 from pydevmgr_core.base.makers import nodealias_maker
 from pydevmgr_core.decorators import nodealias 
 
 from pydevmgr_core.base.manager import BaseManager
 from pydevmgr_core.nodes import Static  
-
+from systemy import FactoryList
 
 @pytest.fixture
 def MyNode():

@@ -1,4 +1,4 @@
-from pydevmgr_core.base.class_recorder import record_class
+from pydevmgr_core.base.class_recorder import register
 from pydevmgr_core.base.interface import BaseInterface
 from pydevmgr_core.base.monitor import MonitorLink
 from pydevmgr_core_qt2.base import QtMonitor
@@ -19,7 +19,7 @@ class MyWidget(QFrame):
         self.label = QLabel(text="Hellow")
         self.layout.addWidget( self.label ) 
 
-@record_class
+@register
 class M(QtMonitor):
     class Config:
         kind: str = "QtMonitor"

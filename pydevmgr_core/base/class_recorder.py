@@ -1,7 +1,18 @@
 from enum import Enum
 from typing import Union, List, Optional, Type, Callable
 
+from systemy.system import BaseFactory
+
 from pydevmgr_core.base.io import add_factory_constructor
+from systemy import register_factory, get_factory_class, get_system_class
+
+from pydevmgr_core.base.device import BaseDevice
+from pydevmgr_core.base.node import BaseNode 
+from pydevmgr_core.base.interface import BaseInterface
+from pydevmgr_core.base.manager import BaseManager
+from pydevmgr_core.base.rpc import BaseRpc
+from valueparser.engine import AbcParser, BaseParser
+
 class KINDS(str, Enum):
     PARSER = "Parser"
     NODE = "Node"
@@ -132,97 +143,57 @@ def get_factory(arg1, __arg2__=None):
 
 object_loockup = {}
 def get_class(kind: KINDS, type_: str, default=None) -> Type:
-    try:
-        return object_loockup[(kind, type_)]
-    except KeyError:
-        if default is None:
-            raise ValueError(f"Unknown {kind!r} of type {type_!r}")
-        else:
-            return default
+    return get_system_class(type_, kind=kind) 
 
-def record_class(
-         _cls_: Type =None, *, 
-         overwrite: Optional[bool] = False, 
-         type: Optional[str] =None, 
+
+def _get_string_kind(cls):
+    if issubclass(cls, BaseNode):
+        return KINDS.NODE
+    if issubclass(cls, BaseRpc):
+        return KINDS.RPC
+    if issubclass(cls, BaseInterface):
+        return KINDS.INTERFACE
+    if issubclass(cls, BaseDevice):
+        return KINDS.DEVICE
+    if issubclass(cls, BaseManager):
+        return KINDS.MANAGER
+    if issubclass(cls, (AbcParser, BaseParser)):
+        return KINDS.PARSER
+    return None
+
+def register(
+        name_or_cls : Optional[Union[Type,str]] = None, 
+         _cls_: Optional[Type] =None, *, 
+         namespace: Optional[str] = None,
          kind: Optional[Union[KINDS,str]] =None, 
-         yaml_tag: Optional[str] = None
+         yaml_tag: Optional[str] = None, 
      ) -> Callable:
     """ record a new class by its kind and type 
     
     This can be used as decorator or function 
-    """   
+    """
+    if isinstance(name_or_cls, type):
+        if _cls_ is not None:
+            raise ValueError("invalid pair of argument for register")
+        name, _cls_ = None, name_or_cls 
+    else:
+        name, _cls_ = name_or_cls, _cls_ 
+        
     if _cls_ is None:
         def obj_decorator(cls) -> Type:
-            return record_class(cls, overwrite=overwrite, type=type, kind=kind, yaml_tag=yaml_tag)
+            return register(name, cls, kind=kind, namespace=namespace, yaml_tag=yaml_tag)
         return obj_decorator
     else:
         cls = _cls_
-    try:
-        C = cls.Config
-    except AttributeError:
-        raise ValueError("Recorded class must have a Config class defined as attribute")
-    
-    if kind is None:        
-        try:
-            kind_field = C.__fields__['kind']    
-        except (KeyError, AttributeError):
-            raise ValueError("Config is missing 'kind' attribute or is not a BaseModel")
-        else:
-            kind = kind_field.default  
-    
-             
-    if type is None:
-        try:
-            type_field = C.__fields__['type']    
-        except (KeyError, AttributeError):
-            raise ValueError("Config is missing 'type' attribute")
-        else:
-            type = type_field.default
-    _record_factory_class(type, C, kind, yaml_tag)         
-    _record_class_as(kind_field.default, type, cls, overwrite=overwrite)
-    return cls
 
-def _record_class_as(kind, type, cls, overwrite=False):
-    if not hasattr(cls, "Config"):
-        raise ValueError("recorded class must have a Config attribute")
-    try:
-        recorded_cls = object_loockup[(kind, type)]
-    except KeyError:
-        pass
+    if not kind:
+        kind = _get_string_kind(cls)
+    
+    if name:
+        return register_factory( name, cls, kind=kind, namespace=namespace)
     else:
-        if cls is recorded_cls:
-            return
-        if not overwrite:
-            raise ValueError(f"{kind} {type} object is already recorded, use overwrite keyword to replace")
-    
-    object_loockup[(kind, type)] = cls
+        return register_factory( cls, kind=kind, namespace=namespace)
 
-    if kind == KINDS.PARSER:
-        setattr(Parsers, type, cls)
-    elif kind == KINDS.NODE:
-        setattr(Nodes, type, cls)
-    elif kind == KINDS.RPC:
-        setattr(Rpcs, type, cls)
-    elif kind == KINDS.INTERFACE:
-        setattr(Interfaces, type, cls)    
-    elif kind == KINDS.DEVICE:
-        setattr(Devices, type, cls)
-    elif kind == KINDS.MANAGER:
-        setattr(Managers, type, cls)
-    
+record_class = register
 
-def list_classes(kind: Optional[KINDS] = None)-> Union[List[tuple],List[str]]:
-    """ list all class names recorded class accessible with :func:`get_class` 
-    
-    Args:
-        kind (str, KINDS, optional) :  If None the returned list is a list of (kind,type) tuple 
-                                      Otherwise it musb a valid KINDS and the return list is a list 
-                                      of type name 
-    Return:
-        classe_names (list):  list of tuple if kind=None or list of str if kind is given 
-    """
-    if kind is None:
-        return list(object_loockup)
-    else:
-        return [t for k,t in object_loockup if k==kind]
-            
+ 

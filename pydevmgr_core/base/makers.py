@@ -42,7 +42,7 @@ def node_maker(name: Optional[str] = None, *, __base__=BaseNode, include_object=
             fget = func
 
         if not name and hasattr(func, "__name__"):
-            node._key = func.__name__
+            node.__path__ = func.__name__
             
 
         node.fget = fget
@@ -74,7 +74,7 @@ def nodealias_maker(*nodes, **kwargs):
             fget = func 
             
         if not name and hasattr(func, "__name__"):
-            node._key = func.__name__
+            node.__path__ = func.__name__
 
         node.fget = fget
         return node

@@ -4,6 +4,7 @@ import pytest
 from pydevmgr_core.decorators import finaliser 
 
 class MyNode(BaseNode):
+            
     def __init__(self, *args, data=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.data = data         

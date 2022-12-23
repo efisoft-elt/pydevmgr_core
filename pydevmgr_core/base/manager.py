@@ -1,57 +1,17 @@
-from .base import (BaseParentObject,  BaseData,  open_object, ObjectFactory)
+from .base import (BaseObject,  BaseData)
 from .decorators import finaliser
 from .device import BaseDevice 
 from .node import BaseNode
 from .rpc import BaseRpc  
 from .interface import BaseInterface  
-from .class_recorder import KINDS,  record_class, record_factory
 
 from enum import Enum 
 
-# used to force kind to be a manager
-class MANAGERKIND(str, Enum):
-    MANAGER = KINDS.MANAGER.value
-
-@record_factory("Manager")
-class ManagerFactory(ObjectFactory):
-    """ A Factory for any type of manager 
-    
-    The manager is defined by the type string and must have been recorded before
-    """
-    kind: MANAGERKIND = MANAGERKIND.MANAGER
+class ManagerConfig(BaseObject.Config ):
+    ... 
 
 
-
-class ManagerConfig(BaseParentObject.Config ):
-    kind: MANAGERKIND = MANAGERKIND.MANAGER
-    type: str = "Base"
-     
-
-
-def open_manager(cfgfile, path=None, prefix="", key=None):
-    """ Open a manager from a configuration file 
-
-        
-        Args:
-            cfgfile: relative path to one of the $CFGPATH or absolute path to the yaml config file 
-            key: Key of the created Manager 
-            path (str, int, optional): 'a.b.c' will loock to cfg['a']['b']['c'] in the file. If int it will loock to the Nth
-                                        element in the file
-            prefix (str, optional): additional prefix added to the name or key
-
-        Output:
-            manager (BaseManager subclass) :tanciated Manager class     
-    """
-    return open_object(
-                cfgfile, 
-                path=path, prefix=prefix, 
-                key=key, Factory=ManagerFactory     
-            ) 
-    
-
-
-@record_class        
-class BaseManager(BaseParentObject):
+class BaseManager(BaseObject):
     Config = ManagerConfig
     Data = BaseData
     Device = BaseDevice

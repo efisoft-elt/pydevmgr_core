@@ -1,4 +1,4 @@
-from pydevmgr_core.base import  BaseNode, NodeAlias, NodeAlias1, record_class
+from pydevmgr_core.base import  BaseNode, NodeAlias, NodeAlias1, register
 
 from collections import deque
 import time
@@ -48,7 +48,7 @@ __all__ = [
 ]
 
 
-@record_class
+@register
 class Local(BaseNode):
     """ The node is getting/setting values from the localdata dictionary 
 
@@ -72,7 +72,7 @@ class Local(BaseNode):
         self.localdata[self.key] = value
 
 
-@record_class
+@register
 class Static(BaseNode):
     """ Static node always returning the configured value and cannot be set 
 
@@ -86,7 +86,7 @@ class Static(BaseNode):
     def fget(self):        
         return self.config.value    
 
-@record_class
+@register
 class Value(BaseNode):
     """ A node storing its own value mostly for test or patch puposes 
 
@@ -127,7 +127,7 @@ class Time(BaseNode):
     def fget(self) -> float:
         return time.time()+self.config.delta 
 
-@record_class
+@register
 class DateTime(BaseNode):
     """ A basic node returning the float local time  
     
@@ -147,7 +147,7 @@ class DateTime(BaseNode):
         return datetime.now()+timedelta(seconds=self.config.delta)
         
 
-@record_class
+@register
 class UtcTime(BaseNode):
     """ A basic node returning the local UTC as string 
     
@@ -169,7 +169,7 @@ class UtcTime(BaseNode):
         return tc.strftime(self.config.format)
     
 
-@record_class
+@register
 class ElapsedTime(BaseNode):
     """ A basic node returning elapsed seconds since the first get 
 
@@ -197,7 +197,7 @@ class ElapsedTime(BaseNode):
 
        
 
-@record_class
+@register
 class Counter(BaseNode):
     """ A simple counter node at each get the counter is increased and returned 
     
@@ -235,7 +235,7 @@ class Counter(BaseNode):
 
 
 
-@record_class
+@register
 class AllTrue(NodeAlias):
     class Config(NodeAlias.Config):
         type = "AllTrue"
@@ -244,7 +244,7 @@ class AllTrue(NodeAlias):
         return all(nodes)
 All = AllTrue
 
-@record_class
+@register
 class AnyTrue(NodeAlias):
     class Config(NodeAlias.Config):
         type = "AnyTrue"
@@ -253,7 +253,7 @@ class AnyTrue(NodeAlias):
         return any(nodes)
 Any = AnyTrue
 
-@record_class        
+@register        
 class AllFalse(NodeAlias):
     class Config(NodeAlias.Config):
         type = "AllFalse"
@@ -261,7 +261,7 @@ class AllFalse(NodeAlias):
     def fget(*nodes):
         return not any(nodes)
 
-@record_class
+@register
 class AnyFalse(NodeAlias):
     class Config(NodeAlias.Config):
         type = "AnyFalse"
@@ -271,7 +271,7 @@ class AnyFalse(NodeAlias):
 
 
 
-@record_class
+@register
 class Opposite(NodeAlias1, type="Opposite"):
     """ rNodeAlias1, Return the "not value" of the aliased node """
     @staticmethod
@@ -280,7 +280,7 @@ class Opposite(NodeAlias1, type="Opposite"):
 
 
 
-@record_class
+@register
 class DequeList(NodeAlias):
     """ This is an :class:`NodeAlias` returning at each get a :class:`collections.deque` 
     
@@ -330,7 +330,7 @@ class DequeList(NodeAlias):
             raise ValueError("nodes cannot be None")    
         super().__init__(key, nodes, config, **kwargs)        
         
-        self._data = deque([], self._config.maxlen)
+        self._data = deque([], self.config.maxlen)
         self._scalar = not hasattr(nodes, "__iter__")
                 
         
@@ -357,17 +357,17 @@ class DequeList(NodeAlias):
         if maxlen is not None:
             self.config.maxlen = maxlen
                 
-        if self._maxlen != self._config.maxlen:             
+        if self._maxlen != self.config.maxlen:             
             # maxlen has been changed 
-            self._maxlen = self._config.maxlen        
-            self._data = deque([], self._config.maxlen)
+            self._maxlen = self.config.maxlen        
+            self._data = deque([], self.config.maxlen)
         else:
             self._data.clear()
 
 
 
 
-@record_class
+@register
 class Deque(NodeAlias1):
     """ This is an :class:`NodeAlias1` returning at each get a :class:`collections.deque` 
     
@@ -395,8 +395,8 @@ class Deque(NodeAlias1):
         ) -> None: 
         
         super().__init__(key, node, config, **kwargs)
-        self._maxlen = self._config.maxlen        
-        self._data = deque([], self._config.maxlen)                        
+        self._maxlen = self.config.maxlen        
+        self._data = deque([], self.config.maxlen)                        
         
     @property
     def data(self):
@@ -410,14 +410,14 @@ class Deque(NodeAlias1):
         if maxlen is not None:
             self.config.maxlen = maxlen
                 
-        if self._maxlen != self._config.maxlen:             
+        if self._maxlen != self.config.maxlen:             
             # maxlen has been changed 
-            self._maxlen = self._config.maxlen        
-            self._data = deque([], self._config.maxlen)
+            self._maxlen = self.config.maxlen        
+            self._data = deque([], self.config.maxlen)
         else:
             self._data.clear()
 
-@record_class
+@register
 class InsideInterval(NodeAlias1):
     """ Bool Node alias to check if a value is inside a given interval 
     
@@ -440,7 +440,7 @@ class InsideInterval(NodeAlias1):
             return False
         return True    
 
-@record_class
+@register
 class InsideCircle(NodeAlias):
     """ Bool Node alias to check if a 2d position is inside a circle 
     
@@ -463,7 +463,7 @@ class InsideCircle(NodeAlias):
         c = self.config
         return ((x-c.x0)**2 + (y-c.y0)**2) < (c.r*c.r)        
         
-@record_class    
+@register    
 class PosName(NodeAlias1):
     """ Node alias returning a position name thanks to a list of position and a tolerance 
     
@@ -495,7 +495,7 @@ class PosName(NodeAlias1):
                 return name
         return c.unknown
          
-@record_class    
+@register    
 class Formula(NodeAlias):
     """ Formula AliasNode computed from several nodes 
 
@@ -527,7 +527,7 @@ class Formula(NodeAlias):
             raise ValueError( f"Got {len(nodes)} nodes but configured varnames has size {len(self.config.varnames)}")
                     
         self._parser = _eval_parser.parse(self.config.formula)
-        self._inputs = {'nan': math.nan}
+        self._inputs = {'nan': math.nan, 'pi': math.pi}
         
         self._varnames = varnames
             
@@ -537,7 +537,7 @@ class Formula(NodeAlias):
         return self._parser.evaluate(v)
 
 
-@record_class    
+@register    
 class Formula1(NodeAlias1):
     """ AliasNode1 similar than Formula but for one single input Node 
 
@@ -555,14 +555,14 @@ class Formula1(NodeAlias1):
         super().__init__(*args, **kwargs)
                 
         self._parser = _eval_parser.parse(self.config.formula)
-        self._inputs = {'nan': math.nan}
+        self._inputs = {'nan': math.nan, 'pi': math.pi}
         
         self._varname = self.config.varname
                             
     def fget(self, value):          
         return self._parser.evaluate({self._varname:value})
 
-@record_class
+@register
 class Polynom(NodeAlias1):
     """ NodeAlias1, Apply a polynome into one single node value input
 
@@ -583,7 +583,7 @@ class Polynom(NodeAlias1):
 
 
 
-@record_class
+@register
 class Statistics(NodeAlias1):
     """ NodeAlias1, compute the statisitc of one single node value 
 
@@ -669,7 +669,7 @@ class _Stat(NodeAlias1):
         self.reset()
     
 
-@record_class
+@register
 class Sum(_Stat, type="Sum"):
     """ NodeAlias1, sum node values 
 
@@ -699,7 +699,7 @@ class Sum(_Stat, type="Sum"):
         self._sum += value 
         return self._sum    
         
-@record_class
+@register
 class Mean(_Stat, type="Mean"):
     """ NodeAlias1, mean node values 
 
@@ -730,7 +730,7 @@ class Mean(_Stat, type="Mean"):
         self._n += 1
         return self._sum / self._n
 
-@record_class
+@register
 class Min(_Stat, type="Min"):
     """ NodeAlias1, min for on single node input
     
@@ -760,7 +760,7 @@ class Min(_Stat, type="Min"):
             self._min = value
         return self._min
 
-@record_class
+@register
 class Max(_Stat, type="Max"):
     """ NodeAlias1,  max for one single node input
 
@@ -778,7 +778,7 @@ class Max(_Stat, type="Max"):
 
 
 
-@record_class
+@register
 class Format(NodeAlias):
     """ NodeAlias, format several incoming node values to strings 
 
@@ -793,7 +793,7 @@ class Format(NodeAlias):
 
 
 
-@record_class
+@register
 class Bits(NodeAlias, type="Bits"):
     """ from a list of boolean node build an integer number 
 
@@ -825,21 +825,18 @@ class Bits(NodeAlias, type="Bits"):
             yield bool(num & (1<<i))  
         
 
-@record_class
+@register
 class MaxOf(NodeAlias, type="MaxOf"):
     fget = staticmethod(max)
         
-@record_class
+@register
 class MinOf(NodeAlias, type="MinOf"):
     fget = staticmethod(min)
 
-@record_class
+@register
 class MeanOf(NodeAlias, type="MeanOf"):
     @staticmethod
     def fget(*values):
         return sum(values)/float(len(values))
 
 
-
-del record_class, Union, List, Dict, Optional
-del Parser, dataclass,  Any, _eval_parser 

@@ -1,36 +1,18 @@
 from warnings import warn
-from .class_recorder import get_class, KINDS, record_factory
-from .base import (BaseObject, BaseData, ObjectFactory)
+from .base import (BaseObject, BaseData)
 from .decorators import getter
-from .parser_engine import  ParserFactory, NoneParserFactory 
 
-import weakref
 from inspect import signature , _empty
 
 from pydantic import create_model,  validator
 from typing import Dict, Any, Optional,  Callable,  Dict
-from enum import Enum 
 
+from valueparser import ParserFactory
 
-
-# used to force kind to be a node 
-class NODEKIND(str, Enum):
-    NODE = KINDS.NODE.value
-
-
-@record_factory("Node")
-class NodeFactory(ObjectFactory):
-    """ A Factory for any type of node 
-    
-    The node is defined by the type string and must have been recorded before
-    """
-    kind: NODEKIND = NODEKIND.NODE
 
 class BaseNodeConfig(BaseObject.Config):
     """ Config for a Node """
-    kind: NODEKIND = NODEKIND.NODE
-    type: str = ""
-    parser: Optional[ParserFactory] = NoneParserFactory()
+    parser: Optional[ParserFactory] = None #NoneParserFactory()
     description: str = ""
     unit: str = ""
     
@@ -85,7 +67,7 @@ class BaseWriteCollector:
             node.set(val)
 
 class DictReadCollector:
-    """ A collector to read from a dictionary instead of getting node from server 
+    """ A collector to read from a dictionary instead of getting node from e.g. a server 
     
     E.g. to be used as simulator
     """
@@ -146,9 +128,9 @@ class BaseNode(BaseObject):
          ) -> None:
                                          
         super().__init__(key, config=config, com=com, **kwargs)
-        if self._config.parser is not None:
+        if self.__config__.parser is not None:
             # !!! the parser builder can return None
-            self._parser = self._config.parser.build(self) 
+            self._parser = self.__config__.parser.build(self) 
          
     @property
     def sid(self):
@@ -399,22 +381,6 @@ class NodesWriter:
         for collection in  self._dispatch.values():
             collection.write()
 
-
-def new_node(type_, *args, **kwargs):
-    """ Create a new node for a given type 
-    
-    ::
-        new_node( tpe, *args, **kwargs) 
-
-    Is just a short cut for
-
-    ::
-        get_class(KINDS.NODe, tpe)(*args, **kwargs)
-    
-    """
-    cls = get_class(KINDS.NODE, type_)
-    return cls(*args, **kwargs) 
-        
         
 def to_node_class(_func_: Callable =None, *, type: Optional[str] = None):
     if _func_ is None:

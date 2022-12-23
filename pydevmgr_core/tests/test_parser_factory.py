@@ -1,4 +1,7 @@
-from pydevmgr_core import ParserFactory, parser, nodes
+from pydevmgr_core import nodes
+from valueparser import ParserFactory, parser
+
+
 
 
 def test_various_parser_factory_inputs():
@@ -10,11 +13,11 @@ def test_various_parser_factory_inputs():
     assert p.parse(8) == "8"
     assert p.parse(12.0) == "10.0"
     
-    p = ParserFactory( dict(type="Clipped", min=0, max=10)).build(None)
-    assert p.parse(12) == 10
+    # p = ParserFactory( dict(type="Clipped", min=0, max=10)).build(None)
+    # assert p.parse(12) == 10
     
-    p = ParserFactory( parser("Clipped", min=0, max=10) ).build(None)
-    assert p.parse(12) == 10
+    # p = ParserFactory( parser("Clipped", min=0, max=10) ).build(None)
+    # assert p.parse(12) == 10
  
 def test_parse_obj_method_of_parser_factory():
 
@@ -34,7 +37,6 @@ def test_parser_factory_can_be_copied():
 
 
 def test_parser_in_node():
-    
     v = nodes.Value( parser=dict(type="Clipped", min=0, max=10), value=5)
     assert v.get() == 5
     v.set(16)
