@@ -1,2 +1,0 @@
-include pydevmgr_core/resources/*.yml
-include pydevmgr_core_qt/uis/*.ui
