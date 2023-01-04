@@ -20,7 +20,6 @@ setup(
     install_requires=['pyyaml',  'pydantic>=1.9',  'py_expression_eval'],
     
     extras_require={
-        "QT":  ["pyqt5"],
     },
     
     dependency_links=[],
@@ -29,7 +28,6 @@ setup(
     include_package_data=True, 
     package_data= {
         'pydevmgr_core':    ["resources/*.yml"], 
-        'pydevmgr_core_qt': ["uis/*.ui"]
     }, 
     entry_points = {
         'console_scripts': [],
