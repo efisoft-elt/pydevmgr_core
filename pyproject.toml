@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "pydevmgr_core"
+version = "0.6.a0"
+description = "Python package to handle distributed device handling"
+license = "Creative Commons Attribution-Noncommercial-Share Alike license"
+authors = ["Sylvain Guieu <sylvain.guieu@univ-grenoble-alpes.fr>"]
+readme = "README.md"
+packages = [{include = "pydevmgr_core"}, {include = "pydevmgr_core_ui"}]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+pydantic = "^1.9"
+systemy = "^0.1.1"
+valueparser = "^0.1.1"
+py-expression-eval = "^0.3.14"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
