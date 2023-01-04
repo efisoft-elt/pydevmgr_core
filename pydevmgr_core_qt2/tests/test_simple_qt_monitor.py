@@ -1,4 +1,4 @@
-from pydevmgr_core.base.class_recorder import register
+from pydevmgr_core.base.register import register
 from pydevmgr_core.base.interface import BaseInterface
 from pydevmgr_core.base.monitor import MonitorLink
 from pydevmgr_core_qt2.base import QtMonitor

@@ -1,16 +1,25 @@
-from .class_recorder import (get_class, record_class, register, KINDS)
-from .base import (kjoin, ksplit, reconfig, BaseData,
-                        BaseObject, 
-                        #path_walk_item , path_walk_attr, path, 
-                        BaseFactory, 
-                        ObjectList, ObjectDict
+from .register import (get_class, record_class, register, KINDS)
+from .base import (kjoin, 
+                  ksplit,  
+                  BaseData,
+                  BaseObject, 
+                  BaseFactory, 
+                  ObjectList, 
+                  ObjectDict
                 )    
-from .node import (BaseNode, node, 
-                   NodesReader, NodesWriter, 
+from .node import (BaseNode, 
+                   node, 
+                   NodesReader, 
+                   NodesWriter, 
                    DictReadCollector, DictWriteCollector, 
                    BaseReadCollector, BaseWriteCollector, 
                 )
-from .node_alias import (NodeAlias, NodeAlias1, BaseNodeAlias, BaseNodeAlias1) 
+from .node_alias import (
+        NodeAlias, 
+        NodeAlias1, 
+        BaseNodeAlias, 
+        BaseNodeAlias1
+    ) 
 from .engine import BaseEngine 
 
 from .rpc import RpcError, BaseRpc
@@ -18,20 +27,42 @@ from .interface import BaseInterface
 
 from .device import BaseDevice
 from .manager import BaseManager
-from .model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
+from .model_var import (
+        NodeVar, 
+        NodeVar_R, 
+        NodeVar_W, 
+        NodeVar_RW, 
+        StaticVar
+    )
 
-
+from .datamodel import DataLink, create_data_class
 from .defaults_var import Defaults
 
-from .download import  Downloader, download, DataView, reset
+from .download import  (
+        Downloader,
+        download, 
+        DataView, 
+        reset
+    )
 from .upload import upload, Uploader
 from .wait import wait, Waiter
-from .datamodel import (DataLink, BaseData, NodeVar, NodeVar_R, NodeVar_W,
-                        NodeVar_RW, StaticVar, model_subset)
 
-from .monitor import BaseMonitor , MonitorConnection, MonitorDownloader, MonitorRunner, EndMonitor, MonitorLink
-from .connector import (BaseConnector, ConnectorGroup, Connection, ConnectionGroup , 
-                        record_connector, get_connector_class)
+from .monitor import (
+        BaseMonitor, 
+        MonitorConnection, 
+        MonitorDownloader, 
+        MonitorRunner, 
+        EndMonitor, 
+        MonitorLink
+    )
+from .connector import (
+        BaseConnector, 
+        ConnectorGroup, 
+        Connection, 
+        ConnectionGroup, 
+        record_connector, 
+        get_connector_class
+    )
 
 
 from . import decorators

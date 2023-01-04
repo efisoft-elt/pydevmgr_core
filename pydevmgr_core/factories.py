@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional 
-from pydevmgr_core.base.class_recorder import KINDS, record_factory
+from pydevmgr_core.base.register import KINDS, record_factory
 from systemy import BaseFactory , get_factory_class
 from pydantic import Extra, validator
 from pydevmgr_core.base.base import BaseObject

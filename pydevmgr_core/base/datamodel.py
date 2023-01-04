@@ -1,12 +1,13 @@
 from pydantic import BaseModel, ValidationError, Field
 from pydantic.fields import ModelField
+from pydantic.main import create_model
 from .download import download, BaseDataLink, reset
 from .upload import upload
 from .node import BaseNode
 from .model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
-from .base import BaseData, BaseFactory
+from .base import BaseData, BaseFactory, BaseObject
 from .object_path import ObjPath, BasePath
-from typing import  Any, Iterable, Dict, List, Type
+from typing import  Any, Iterable, Dict, List, Optional, Type
 
 class C:
     ATTR = 'attr'
@@ -162,7 +163,8 @@ class DataLink(BaseDataLink):
     
     Args:
         input (Any):  Any object with attributes, expecting that the input contains some 
-                      :class:`BaseNode` attributes in its hierarchy
+                      :class:`BaseNode` attributes in its hierarchy and eventualy some other 
+                      pydevmgr object 
                          
         model (:class:`pydantic.BaseModel`): a data model. Is expecting that the data model structure 
             contains some :class:`NodeVar` type hint signature.
@@ -192,7 +194,12 @@ class DataLink(BaseDataLink):
                 vel: NodeVar[float] = Field(0.0, node='vel_actual')
                  
                 
-            class MotorData(BaseModel):    
+            class MotorData(BaseModel):   
+                class Stat(BaseModel):
+                    pos_actual:  NodeVar[float] = 0.0  
+                    vel_actual:  NodeVar[float] = 0.0  
+                    
+                stat = Stat()
                 num  : int =1 # other data which are not node related                
                 
                 # Add the stat Data Model 
@@ -212,21 +219,48 @@ class DataLink(BaseDataLink):
             4.566   
             >>> data.utc
             '2020-12-17T10:05:15.831726'
-            
-        :class:`DataLink` can be added to a :class:`Downloader`, at init or with the :meth:`Dwonloader.add_datalink` method
         
+        It is also possible to point to a node path with the ``node`` keyword in a field
+
         ::
-        
-            from pydevmgr_core import Downloader
+
+            class MotorData(BaseModel):
+                pos: NodeVar[float] = Field(0.0, node='stat.pos_actual')
+                vel: NodeVar[float] = Field(0.0, node='stat.vel_actual')
+                utc:         NodeVar[str]   = Field('1950-01-01T00:00:00.00000', node=UtcTime('utc'))
+
+
+        :class:`DataLink` can be added to a :class:`Downloader`, at init or with the :meth:`Dwonloader.add_datalink` method
+        typicaly, here after how it can be used in an application 
+
+        ::
             
-            >>> downloader = Downloader(link)
-            >>> downloader.download()
             
-            # Or
-            
-            >>> connection = downloader.new_connection()
-            >>> connection.add_datalink(link)                        
-            
+            from pydevmgr_core import Downloader, DataLink
+            form pydantic import BaseModel, Field 
+
+            class MyApp: 
+                class Data(BaseModel)
+                    pos: NodeVar[float] = Field(0.0, node='stat.pos_actual')
+                    vel: NodeVar[float] = Field(0.0, node='stat.vel_actual')
+                    utc: NodeVar[str]   = Field('1950-01-01T00:00:00.00000', node=UtcTime('utc'))
+
+                def __init__(self):
+                    self.data = Data()
+                    self._connection = None
+                
+                def update(self):
+                    print( f"{self.data.utc} Position is {self.data.pos:.3f} and velocity {self.data.vel:.2f}" )
+
+                def connect(self, downloader: Downloader, device)-> None:
+                    dl = DataLink( self.device, self.data)
+                    self._connection = downloader.new_connection()
+                    self._connection.add_datalink( dl ) 
+                    self._connection.add_callback( self.update) 
+
+                def disconnect(self):
+                    if self._connection:
+                        self._connection.disconnect()
     """
     def __init__(self, 
           input : Any, 
@@ -331,9 +365,9 @@ class DataLink(BaseDataLink):
                     self._collect_nodes( sub_model, sub_obj, strick_match)
     
     def download_from_nodes(self, nodevals: Dict[BaseNode,Any]) -> None:
-        """ Update the data from a dictionary of node/value pair 
+        """ Update the data from a dictionary of node/value pairs
         
-        If a node in the dictionary is currently not part of the data model link it is ignored silently 
+        If a node in the dictionary is currently not part of the data model it is ignored silently 
         """
         for node, val in nodevals.items():
             try:
@@ -377,7 +411,7 @@ class DataLink(BaseDataLink):
         self._upload_to(todata)
         upload(todata) 
 
-def model_subset(
+def _model_subset(
        class_name: str, 
        Model: Type[BaseModel], 
        fields: List[str], 
@@ -418,3 +452,40 @@ def model_subset(
     new_class = type(class_name, BaseClasses, new_fields)  
     new_class.__annotations__ = annotations
     return new_class
+
+
+
+def create_data_class(name: str, objects: Iterable, base_class: Optional[Type] = None, depth=-1)-> BaseModel:
+    """ Create a new data class for the object according to a list of objects 
+
+    the following rule is applied to childs:
+        - if a BaseNode it is added to the model as NodeVar with type Any and a default value None
+        - in case of an other object (e.g. Device, Manager, etc ...):
+            - if a Data class is defined (and not a BaseModel or a BaseData) it is instanciated in the model 
+            - otherwise create_data_class will build a new data model for the child object 
+
+    By default create_data_model is done recursively for anyking of object. However depth can be adjusted 
+    with the keyword depth (default depth=-1). ``depth=0`` will create the date model only for nodes find inside
+    the list of objects. 
+    
+    
+    .. warning::
+
+        Important note the data attribute is the object name. If two object have the same name this will create only 
+        one data field. 
+        
+    """       
+    data_obj = {}
+    for obj in objects:
+        if isinstance( obj, BaseNode):
+            data_obj[obj.name] = (NodeVar[Any], None)
+        elif depth and hasattr( obj, "Data") and obj.Data and obj.Data is not BaseData and obj.Data is not BaseModel:
+            data_obj[obj.name] = (obj.Data, obj.Data())
+        elif depth:
+            Data = create_data_class(obj.name.capitalize(),  obj.find( BaseObject ), depth=depth-1 ) 
+            data_obj[obj.name] = (Data, Data())
+    return create_model( name, __base__= base_class, **data_obj  )
+
+
+    
+

@@ -1,4 +1,4 @@
-from .base.class_recorder import register 
+from .base.register import register 
 # from .base.parser_engine import BaseParser, parser
 from valueparser import BaseParser, parser
 from systemy import register_factory 

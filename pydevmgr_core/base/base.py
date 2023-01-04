@@ -10,13 +10,6 @@ from .model_var import StaticVar, NodeVar
 from systemy import BaseSystem, BaseFactory, SystemDict, SystemList
 from systemy import get_factory_class
   
-class KINDS(str, Enum):
-    PARSER = "Parser"
-    NODE = "Node"
-    RPC = "Rpc"
-    DEVICE = "Device"
-    INTERFACE = "Interface"
-    MANAGER = "Manager"
 
 class __Decorator__: #  place holder for decorator base class (see base.decorators) 
     pass
@@ -36,18 +29,12 @@ def ksplit(key: str) -> Tuple[str,str]:
 
 _key_counter = {}
 def new_key(cls):
+    """ Build a new object key for a class """
     k = cls.__name__ 
     c = _key_counter.setdefault(k,0)
     c += 1
     _key_counter[k] = c
     return f'{k}{c:03d}'
-
-def reconfig(ConfigClass: Type, config: BaseSystem.Config, kwargs: dict) -> BaseSystem.Config:    
-    if config is None:
-        return ConfigClass.parse_obj(kwargs)
-    if isinstance(config, dict):
-        return ConfigClass.parse_obj(dict(config, **kwargs))    
-    return config
 
 
 class BaseData(BaseModel):
@@ -55,6 +42,7 @@ class BaseData(BaseModel):
     key: StaticVar[str] = ""
 
 class BaseConfig(BaseSystem.Config):
+    """ Configuration for pydevmgr objects """
     class Config:
         validate_assignment = True
 
@@ -72,7 +60,7 @@ class BaseConfig(BaseSystem.Config):
 
 
 class BaseObject(BaseSystem):
-    """ Base Class for all Pydevmgr Classes """
+    """ Pydevmgr object """
     Engine = BaseEngine
     Config = BaseConfig 
     
@@ -100,7 +88,7 @@ class BaseObject(BaseSystem):
 
     @classmethod
     def new(cls, parent, name, config):
-        """ create a new object within a parent pydevmgr gbject """
+        """ create a new object within a parent pydevmgr object """
         return cls( key=config._make_new_path(parent, name), 
                     com=parent.engine, 
                     __config__=config
@@ -108,7 +96,7 @@ class BaseObject(BaseSystem):
 
     @classmethod
     def new_engine(cls, com: Any, config: Config)-> Engine:
-        """ Create a new engine from a com and object config """
+        """ Create a new engine from a com object and object config """
         return cls.Engine.new(com, config)
         
     @property
@@ -135,12 +123,14 @@ class BaseObject(BaseSystem):
         return self.engine.localdata
 
 class ObjectDict(SystemDict):
+    """ Dictionary of pydevmgr objects """
     def __setitem__(self, key, system):
         if not isinstance(system, (BaseObject, ObjectDict, ObjectList)):
             raise KeyError(f"item {key} is not a valid item ")
         super().__setitem__(key, system)    
 
 class ObjectList(SystemList):
+    """ List of pydevmgr objects """
     def __setitem__(self, index, system):
         if not isinstance(system, (BaseObject, ObjectDict, ObjectList)):
             raise KeyError(f"item {index} is not a valid item ")
