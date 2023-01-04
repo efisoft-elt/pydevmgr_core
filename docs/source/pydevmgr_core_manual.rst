@@ -7,62 +7,78 @@ Manual
 
 pydevmgr_core module is the core library for pydevmgr it contains two modules : 
 
-- pydevmgr_core - pydevmgr_core_qt , base QT classes to build widget 
-
+- pydevmgr_core 
+- pydevmgr_core_ui  Some core object to handle User Interfaces (beta)  
+  
 :mod:`pydevmgr_core` contains only Base Classes to build so called, devices,
 interface, nodes, and communication protocol. It does not do much by itself. 
 
 The idea is to build a base framework to handle communication with distributed
-devices. Let us start with the main objects definition and usage.
+devices. 
+
+
+Install
+-------
+
+.. code-block:: shell
+
+   pip install pydevmgr_core  
+
+
+The sources can be found here : https://github.com/efisoft-elt/pydevmgr_core 
+
+
 
 Objects
 -------
 
-In pydevmgr several objects use a Config class to handle object parameters. 
-The user configuration parameters are not directly implemented into the object 
-but inside a ``.config`` structure attribute. However the config parameters can 
-be set directly into the init function of object class or by parsing a ``config`` 
-argument to the init object.
+Objects can be created directly in python as usual of from Factory classes and some arguments 
+to build the object properly. Each objects have however a default Factory which is named Config. 
+
+
+The config class handle object parameters exposed to user.
 
 The idea is to separate the engines and business logic to the user configuration 
 which can comme from external payload as a yaml configuration file for instance.
 
 The configuration are `PYDANTIC`_ objects which brings data validation for all 
-configuration.
+configuration. pydevmgr object are based on the :mod:`systemy`
 
-In pydevmgr all config parameters stays inside the config structure of Base objects
-except for :class:`pydevmgr_core.BaseDevice.Config`,  :class:`pydevmgr_core.BaseInterface.Config`,
-:class:`pydevmgr_core.BaseNode.Config`,  :class:`pydevmgr_core.BaseRpc.Config`.
+By default, a Config class declared inside any pydevmgr object will inerit from the master class 
 
-For instance if a Node ``Config`` is included inside a Device ``Config``
-it gives to the device class an attribute to build dynamically the node. 
-For instance:
-
-::
+.. code-block:: python
     
     from pydevmgr_core import BaseDevice
     from pydevmgr_core.np_nodes import Noise
     
     class MyDevice(BaseDevice):
-        class Config(BaseDevice.Config): 
-            temp: Noise.Config = Noise.Config( mean=22, scale=0.3 )
+        class Config: 
+            temp: Noise.Config( mean=22, scale=0.3 )
             model: str = "PT100"
 
 
     my_device = MyDevice()
     my_device.temp.get()
     
-The `temp` is part of my_device attribute (Because it is configured as a node) but not the `model` str 
-configuraiton parameter which stays in config: 
+The `temp` is part of my_device attribute (Because it is configured as a node),  the `model` str 
+configuraiton parameter is also accessible from `my_device` and is readonly : 
 
-::
+.. code-block:: python
 
-    assert my_device.config.model == "PT100"
+    assert my_device.model == "PT100"
+
+One can however change any configuration parameters thanks to the :met:`BaseObject.reconfigure` 
+
+.. code-block:: python 
+
+    my_device.reconfigure( model = "PT100") 
+
+    
 
 
 One can also build a config from a payload, with some caveat explained below: 
 
-::
+.. code-block:: python
 
     payload = {"model": "PT100", "temp": {"scale": 2.0} }
     config = MyDevice.Config( **payload)
@@ -73,7 +89,7 @@ Because the "temp" payload is not complete, the mean value get the default value
 and not the mean defined in the temp instance of ``MyDevice`` class. To avoid this pydevmgr has a 
 :class:`pydevmgr_core.Defaults` typing object. 
 
-::
+.. code-block:: python
 
     from pydevmgr_core import BaseDevice, Defaults
     from pydevmgr_core.np_nodes import Noise
@@ -90,10 +106,9 @@ and not the mean defined in the temp instance of ``MyDevice`` class. To avoid th
 
 
 If a node,  or any other child object, has no vocation to be configured by the user, it can be directly
-inserted to the parent class thanks also to the `.Config`  class:
+inserted to the parent class thanks to its Factory class (here  Config is the Factory) 
 
-
-::
+.. code-block:: python
 
     from pydevmgr_core import BaseDevice
     from pydevmgr_core.np_nodes import Noise
@@ -109,15 +124,13 @@ inserted to the parent class thanks also to the `.Config`  class:
     assert not hasattr( my_device.config, "temp")  # temp node is not part of config 
 
 
-
-Actually a ``Config`` class is a special  :class:`pydevmgr_core.BaseFactory` (in v>0.6) which is responsible from inputs
-argument to build the object from a parent object. The Factory class in this case is also use to hold configuration for
-the object. One can make any kind of factory 
+Below is an other exemple but using an Factory rather than the default Config. The Factory 
+is switching between to kind of objects function to user input.  
 
 ::
 
     from pydevmgr_core import BaseFactory, BaseDevice, BaseNode
-    from pydevmgr_core,np_nodes import Noise
+    from pydevmgr_core.np_nodes import Noise
     from pydevmgr_core.nodes import Static
     from typing import Optional 
 
@@ -130,13 +143,14 @@ the object. One can make any kind of factory
             if self.value is None:
                 return Noise.Config(scale=self.scale, mean=self.mean).build(parent, name)
             else:
-                return Static(value=self.value).build(parent, name)
+                return Static.Config(value=self.value).build(parent, name)
 
     class MyDevice(BaseDevice): 
         my_node = MyNodeFactory( value=-9.9 )
-
+        my_random_node = MyNodeFactory(scale=10) 
+        
     
-Therefore a ``Config`` object can be also used inside class declaration to build an object as `.prop` method does  : 
+Therefore a ``Config`` object can be also used inside class declaration: 
 
 ::
 
@@ -153,142 +167,19 @@ Therefore a ``Config`` object can be also used inside class declaration to build
 Parser
 ++++++
 
-The class  :class:`pydevmgr_core.BaseParser`: defines an callable object used to
-parse data. This parser is for instance used in a node to make sure that a user
-value is correct and is eventually changed to be acceptable by the client/server 
-communication.  
+Nodes are using parser by default. Since version 0.6 the parser engine is a separate package
+see :mod:`valueparser`
 
-The :class:`pydevmgr_core.BaseParser`: base parser class has a configuration (a
-`Pydantic`_  ``BaseModel`` as for all config objects in pydevmgr) to specify
-some parsing parameters. Example on the :class:`pydevmgr_core.parsers.Clipped` parser :
+e.g. 
 
-::
+.. code-block:: python 
 
-    from pydevmgr_core.parsers import Clipped
+    from valueparser import Clipped
     
     p = Clipped( min=0.0, max=1.0 )
     
-    assert p(0.5) == 0.5
-    assert p(3.4) == 1.0
- 
-::
-
-    >>> p.config
-    Config(kind='Parser', type='Clipped', min=0.0, max=1.0)
-
-
-One can combine Parser together for a chain of parsing, the only restriction is
-that their is only one name space for config parameters. So two parameters with
-the same name will enter in conflict.
-
-::
-
-    from pydevmgr_core import parser 
-    from pydevmgr_core.parsers import Bounded, Formula
-    
-    p = parser((Bounded, Formula, ToString), min=0, max=1.0, formula="x * 100", format="%.2f %%")
-
-
-::
-
-    >>> p(0.4)
-    '40.00 %'
-    
- 
-The above example will raise an ValueError if the input value is outside [0,1],
-apply the formula and then convert it to string with a given format.
-
-``min`` and ``max`` parameters are for the ``Bounded`` parser, ``formula``
-obviously for the ``Formula`` parser and ``format`` for the ``ToString`` parser.  
-
-As almost everything in pydevmgr, the parser can be embedded in a configuration
-file, following the above example : 
-
-::
-    
-    from pydevmgr_core.parsers import Bounded, Formula, ToString, parser
-    import yaml 
-
-    cfg = """
-    type: [Bounded, Formula, ToString]
-    min: 0.0 
-    max: 1.0 
-    formula: x * 100
-    format: "%.2f %%"
-    """
-
-    p = parser( yaml.load(cfg) )
-   
-
-::
-
-    >>> p.parse(0.4)
-    '40.00 %' 
-
-Normal function can also be used and combined inside a parser : 
-
-::
-    
-    from pydevmgr_core.parsers import Rounded, parser
-    p = parser( (float, Rounded), ndigits = 2 )
-
-::
-    
-    >>> p.parse("3.141592653589793")
-    3.14
-
-
-Also one can create a combined parser class easily using the create_parser_class method 
-
-
-::
-
-    from pydevmgr_core.parsers import Bounded, Rounded
-    from pydevmgr_core import create_parser_class
-    
-    BoundedNumber = create_parser_class( (Bounded, Rounded) )
-    BoundedNumber.Config()
-
-    #  BoundedRoundedConfig(kind=<KINDS.PARSER: 'Parser'>, type='BoundedRounded', ndigits=0, min=-inf, max=inf)
-
-    
-    parse_motor_efficiency = BoundedNumber( ndigits=2, min=0, max=1.0)    
-    
-A parser class can also be created with new default config parameters:
-
-
-::
-
-    from pydevmgr_core.parsers import Bounded, Rounded
-    from pydevmgr_core import create_parser_class
-    
-    class Efficiency( create_parser_class((Bounded, Rounded)), min=0.0, max=1.0):
-        pass
-
-    parse_motor_efficiency = Efficiency( ndigits= 3) 
-
-To create a costom parser class one can inerit from :class:`pydevmgr_core.BaseParser` and implement 
-the ``fparse`` method as a static or classmethod  
-
-::
-
-    from pydevmgr_core import BaseParser
-    
-    class Prefixed(BaseParser):
-        class Config(BaseParser.Config): 
-            prefix: str # mendatory 
-
-        @staticmethod
-        def fparse( value, config): 
-            if value.startswith(config.prefix): 
-                return value
-            return config.prefix+value 
-
-    
-    p = Prefixed( prefix="[WARNING] ")
-    p.parse( "Something went wrong") 
-        
-
+    assert p.parse(0.5) == 0.5
+    assert p.parse(3.4) == 1.0
 
 
 Node 
@@ -302,12 +193,14 @@ the :class:`pydevmgr_core.BaseNode` which cannot do much by itself but is the
 base brick for Node implementation. See for instance the `pydevmgr_ua:UaNode` to
 retrieve a node value from an OPC-UA server. 
 
-Each Node type has its own `__init__` signature, most likely one will want to add to the `__init__` a 
-socket, a serial com, or any open communication object used to retrieve the value, somewhere. But the ``new``
-method has a fix signature and is used to create nodes in the context of a parent object. 
-(:class:`pydevmgr_core.BaseDevice`, :class:`pydevmgr_core.BaseInterface`, ...).
+Like other pydevmgr nodes have a config attribute (instance of its Config factory) and an ``engine`` atribute. 
+The engine attribute is created at object creation function to what is configured and function to the parent object
+engine. For instance for a node in an OPC-UA server attached to a Device will use the opc-ua client connection
+information defined inside the parent device engine. 
 
-::
+Nodes have a `get()` to retrieve value and a `set()` method 
+
+.. code-block:: python
     
     # get the value (where ever it is, e.g. an OPC-UA server)
     value = my_node.get()
@@ -317,32 +210,20 @@ method has a fix signature and is used to create nodes in the context of a paren
     value = my_node.get(data) 
 
 
-::
-
     # set a value somehwere 
     my_node.set(value)
     
-    # also 
+    # also set value inside a dictionary  
     my_node.set(value, data)
         
 
 Node are mostly used by a parent object like a :class:`pydevmgr_core.BaseDevice` or
 :class:`pydevmgr_core.BaseInterface`. The `classmethod` :meth:`pydevmgr_core.BaseNode.new` is used to build the node
-within the context of its parent. The ``new`` method must have a fixed signature. 
-In other word when doing this for the first time ::
-
-    my_device.my_node 
-
-The::
-
-    MyNode.new( name, my_device )   
-
-Is called and the node instance is cashed inside ``my_device``. 
-
+within the context of its parent. The ``new`` method must have a fixed signature and is used by the Config factory. 
 
 
 For this documentation, let us build a simple dummy Node that read/write global variables. For a more complete
-development tutorial see code of ``pydevmgr_ua``
+development tutorial see code of :mod:`pydevmgr_ua`
 
 ::
 
@@ -355,14 +236,14 @@ development tutorial see code of ``pydevmgr_ua``
 
 
     class GlNode(BaseNode):
-        class Config(BaseNode.Config):
+        class Config:
             var: str
         
         def fget(self):
-            return globals()[self.config.var]
+            return globals()[self.var]
         
         def fset(self, value):
-            globals()[self.config.var] = value
+            globals()[self.var] = value
 
 The node is used as follow
 
@@ -384,7 +265,7 @@ is possible)
     10 
 
 
-Each Node as a key to identify then, which can be handy in some context and make
+Each Node as a key to identify them, which can be handy in some context and make
 sens when the node is built from a ``Device`` or a ``Interface``. If not given a
 unique key is build. 
 
