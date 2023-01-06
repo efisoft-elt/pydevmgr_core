@@ -5,7 +5,8 @@ from .base import (kjoin,
                   BaseObject, 
                   BaseFactory, 
                   ObjectList, 
-                  ObjectDict
+                  ObjectDict, 
+                  ParentWeakRef
                 )    
 from .node import (BaseNode, 
                    node, 

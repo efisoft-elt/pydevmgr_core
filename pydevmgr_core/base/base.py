@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Any, Optional, Tuple, Type
+import weakref
 
 from pydantic import BaseModel, Extra, validator
 
@@ -137,6 +138,12 @@ class ObjectList(SystemList):
         super().__setitem__(index, system)    
   
 
+class ParentWeakRef:
+    def get_parent(self):
+        return None
 
-
-
+    @classmethod
+    def new(cls, parent, name, config):
+        obj = super().new(parent, name, config)
+        obj.get_parent = weakref.ref(parent)
+        return obj

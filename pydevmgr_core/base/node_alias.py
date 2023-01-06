@@ -9,13 +9,11 @@ from inspect import signature , _empty
 
 
 class NodeAliasConfig(BaseNode.Config):
-    type: str = "Alias"
     # nodes: Optional[Union[List[Union[str, tuple, BaseNode.Config, BaseNode]], str, BaseNode.Config, BaseNode]] = None
     nodes: Optional[Any] = None 
      
 
 class NodeAlias1Config(BaseNode.Config):
-    type: str = "Alias1"
     # node: Optional[Union[str,tuple, BaseNode.Config, BaseNode]] = None
     node: Optional[Any] = None 
 
@@ -26,8 +24,6 @@ class BaseNodeAlias(BaseNode):
         """ sid of aliases must return None """ 
         return None
     
-    def nodes(self):
-        raise NotImplementedError('nodes')
     
     def get(self) -> Any:
         """ get the node alias value from server or from data dictionary if given """
@@ -46,8 +42,10 @@ class BaseNodeAlias(BaseNode):
         if len(values)!=len(nodes):
             raise RuntimeError(f"fset method returned {len(values)} values while {len(self._nodes)} is on the node alias") 
         NodesWriter(dict(zip(nodes, values))).write()                        
-            
     
+    def nodes(self):
+        raise NotImplementedError('nodes')
+          
     def fget(self, *args) -> Any:
         # Process all input value (taken from Nodes) and return a computed value 
         return args 
@@ -198,15 +196,7 @@ class NodeAlias(BaseNodeAlias):
     def nodes(self):
         return self._nodes
 
-      
-
-    @classmethod
-    def prop(cls,  name: str = None, nodes = None, config_path=None, frozen_parameters=None,  **kwargs):
-        cls._prop_deprecation( 'NodeAlias: prop() method is deprecated, use instead the pydevmgr_core.decorators.getter to decorate the fget method from a node factory or the nodealias decorator', name, config_path, frozen_parameters)
-        return getter( cls.Config(nodes=nodes, **kwargs) )  
-
-
-
+    
     @classmethod
     def new(cls, parent, name, config=None):
         """ a base constructor for a NodeAlias within a parent context  
@@ -311,22 +301,17 @@ class NodeAlias1(BaseNodeAlias1):
           key: Optional[str] = None, 
           node: Optional[BaseNode] = None,
           *args, **kwargs
-         ):        
-        super().__init__(key, *args, **kwargs)    
+         ):
         if node is None:            
-            raise ValueError("the node pointer is empty, alias node cannot work without")    
-                    
+            raise ValueError("the node pointer is empty, alias node cannot work without node")    
+          
+        super().__init__(key, *args, **kwargs)    
+                  
         self._node = node
     
     def nodes(self):
         yield self._node
   
-     
-    @classmethod
-    def prop(cls,  name: str = None, node = None, config_path=None, frozen_parameters=None,  **kwargs):
-        cls._prop_deprecation( 'NodeAlias: prop() method is deprecated, use instead the pydevmgr_core.decorators.getter to decorate the fget method from a node factory or the nodealias decorator', name, config_path, frozen_parameters)
-        return getter( cls.Config(node=node, **kwargs) )     
-
 
     @classmethod
     def new(cls, parent, name, config=None ):

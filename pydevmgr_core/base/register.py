@@ -21,22 +21,6 @@ class KINDS(str, Enum):
     INTERFACE = "Interface"
     MANAGER = "Manager"
 
-
-class Parsers:
-    pass
-class Nodes:
-    pass
-class Rpcs:
-    pass
-class Devices:
-    pass
-class Interfaces:
-    pass
-class Managers:
-    pass
-
-
-
 default_factory_loockup = {}
 def record_default_factory(Factory):
     try:
