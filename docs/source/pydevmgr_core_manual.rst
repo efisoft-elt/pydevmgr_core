@@ -278,6 +278,160 @@ unique key is build.
 Node Aliases 
 ++++++++++++
 
+NodeAlias mimic a real client Node. 
+    
+The NodeAlias object does a little bit of computation to return a value with its ``get()`` method and 
+thanks to required input nodes. It can also implement a ``set()`` method. 
+ 
+
+NodeAlias is an abstraction layer, it does not do anything complex but allows uniformity among ways to retrieve node values. 
+
+NodeAlias object can be easely created with the @nodealias() decorator
+
+..note::
+
+    :class:`pydevmgr_core.NodeAlias` can accept one or several input node from the unique ``nodes`` argument. 
+    To remove any embiguity NodeAlias1 is iddentical but use only one node as input from the ``node`` argument.  
+
+
+
+Example: 
+
+.. code-block:: python
+    
+    from pydevmgr_core import NodeAlias
+    from pydevmgr_core.nodes import Value # static value for demo
+    class Rescale(NodeAlias):
+        """ Rescale a value """
+        class Config:
+            scale = 1.0
+        def fget(self, value):
+            return value * self.scale
+     
+    
+    raw_node = Value( value=2.0 )
+    scaled_node = Rescale( nodes=raw_node, scale=100.0)
+    assert scaled_node.get() == 200.0
+
+        
+
+Of course it makes more sens when inserted inside a parent object: 
+
+.. code-block:: python
+
+    from pydevmgr_core import NodeAlias, BaseDevice
+    from pydevmgr_core.nodes import Value # static value for demo
+    
+    class Rescale(NodeAlias):
+        """ Rescale a value """
+        class Config:
+            scale = 1.0
+        def fget(self, value):
+            return value * self.scale
+    
+    class MyDevice(BaseDevice):
+        class Config:
+            rescaled = Rescale.Config( scale= 100.0, nodes="raw")
+        raw = Value.Config( value=2.0 )
+    
+    device = MyDevice()
+    assert device.rescaled.get() == 200.0
+    device.raw.set(4.0)
+    assert device.rescaled.get() == 400.0
+
+On the example above the node is the string that lead to the input node from the parent object. 
+Note that, on the exemple above the scaled node is configurable but not the raw node. 
+
+
+
+Node alias can have several node at input
+
+.. code-block:: python
+
+    from pydevmgr_core import NodeAlias, BaseDevice
+    from pydevmgr_core.nodes import Value # static value for demo
+    from typing import Tuple
+    class InTarget(NodeAlias):
+        class Config:
+            position: Tuple[float,float] = (0.0, 0.0)
+            radius: float = 1.0
+            pos_name: str = ""
+        def fget(self, x, y):
+            x0,y0 = self.position 
+            return  ((x-x0)**2 + (y-y0)**2) <= self.radius**2
+    
+    
+    class MyDevice(BaseDevice):
+        class Config:
+            is_in_position_a = InTarget.Config(nodes=["posx", "posy"], position=(2.3, 1.2), radius=0.4, pos_name="A")
+        posx = Value.Config( value=2.22)
+        posy = Value.Config( value=1.3)
+            
+    device = MyDevice(  )
+    assert device.is_in_position_a.get() 
+    device.posy.set( 4.5)
+    assert not device.is_in_position_a.get() 
+
+
+A node alias can be quickly created with the :func:`pydevmgr_core.nodealias` decorator, following above exemple:
+
+.. code-block:: python
+
+    from pydevmgr_core import nodealias, BaseDevice
+    from pydevmgr_core.nodes import Value 
+    from typing import Tuple
+
+
+    class MyDevice(BaseDevice):
+        class Config:
+            pos_a: Tuple[float, float] = (0.0, 0.0)
+            radius = 1.0  
+        posx = Value.Config( value=2.22)
+        posy = Value.Config( value=1.3)
+        
+        @nodealias("posx", "posy")
+        def is_in_position_a(self, x, y):
+            x0, y0 = self.pos_a
+            return ((x-x0)**2 + (y-y0)**2) <= self.radius**2
+    
+    device = MyDevice( pos_a=(2.3, 1.2), radius=0.2)
+    assert device.is_in_position_a.get() 
+    device.posy.set( 4.5)
+    assert not device.is_in_position_a.get() 
+
+
+:func:`nodealias` accept an argument list of node input name  or instantiated nodes. 
+
+
+If the input nodes are not know in advance one should instantiate the :class:`pydevmgr_core.BaseNodeAlias` instead and 
+define the :meth:`pydevmgr_core.BaseNodeAlias.nodes`:
+
+.. code-block:: python
+    
+    from pydevmgr_core import ParentWeakRef, BaseNodeAlias, BaseDevice
+    from pydevmgr_core.nodes import Value 
+    
+    class Switcher(ParentWeakRef, BaseNodeAlias):
+        def nodes(self):
+            parent = self.get_parent()
+            yield getattr(parent, parent.use)
+        def fget(self, value):
+            return value
+
+    class MyDevice(BaseDevice):
+        class Config:
+            use = "value_a"
+        value_a = Value.Config( value="a")
+        value_b = Value.Config( value="b")
+        value = Switcher.Config()
+
+    device = MyDevice()
+    assert device.value.get() == "a"
+    device.reconfigure( use="value_b") 
+    assert device.value.get() == "b"
+
+
+
 
 Rpc
 +++

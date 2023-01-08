@@ -5,7 +5,7 @@ from .decorators import getter
 
 from typing import Union, List, Optional, Any, Dict, Callable
 from pydantic import create_model
-from inspect import signature , _empty
+from inspect import signature , _empty, _ParameterKind, getattr_static
 
 
 class NodeAliasConfig(BaseNode.Config):
@@ -61,116 +61,36 @@ class BaseNodeAlias1(BaseNodeAlias):
     def fset(self, value) -> Any:
         yield value 
             
+class UNDEFINED:
+    pass
+
+def _guess_number_of_nodes(cls):
+    meth = getattr_static(cls, 'fget')
+    if isinstance( meth, (staticmethod, classmethod)):
+        offset = 0
+    else:
+        offset = 1
+    
+    try:
+        args = signature(cls.fget).parameters
+    except ValueError:
+        return None
+    if not args:
+        return 0 
+    n = -offset
+    for a in args.values():
+        if a.kind == _ParameterKind.VAR_POSITIONAL:
+            return None
+        if a.kind == _ParameterKind.VAR_KEYWORD:
+            continue
+        if a.kind == _ParameterKind.KEYWORD_ONLY:
+            continue
+        n+=1
+    return n
+    
 
 class NodeAlias(BaseNodeAlias):
-    """ NodeAlias mimic a real client Node. 
-        
-    The NodeAlias object does a little bit of computation to return a value with its `get()` method and 
-    thanks to required input nodes.
-     
-    
-    NodeAlias is an abstraction layer, it does not do anything complex but allows uniformity among ways to retrieve values. 
-    
-    NodeAlias object can be easely created with the @nodealias() decorator
-    
-    ..note::
-    
-        :class:`pydevmgr_core.NodeAlias` can accept one or several input node from the unique ``nodes`` argument. 
-        To remove any embiguity NodeAlias1 is iddentical but use only one node as input from the ``node`` argument.  
-            
-
-
-    Args:
-        key (str): Key of the node
-        nodes (list, class:`BaseNode`): list of nodes necessary for the alias node. When the 
-                     node alias is used in a :class:`pydevmgr_core.Downloader` object, the Downloader will automaticaly fetch 
-                     those required nodes from server (or other node aliases).
-                     
-    Example: 
-    
-    Using a dummy node as imput (for illustration purpose).
-    
-    
-
-    ::
-        
-        from pydevmgr_core.nodes import Value 
-        from pydevmgr_core import NodeAlias
-        position = Value('position', value=10.3)
-        
-        is_in_position = NodeAlias( nodes=[position])
-        is_in_position.fget =  lambda pos: abs(pos-4.56)<0.1
-        is_in_position.get()
-        # False
-        
-    
-    Using the nodealias decorator
-
-    ::
-
-        from pydevmgr_core.nodes import Value 
-        from pydevmgr_core import NodeAlias
-        position = Value('position', value=10.3)
-        
-        @nodealias_maker(position)
-        def is_in_position(pos):
-            return abs(pos-4.56)<0.1
- 
-    Derive the NodeAlias Class and add target position and precision  in configuration
-
-    ::
- 
-
-        from pydevmgr_core.nodes import Value 
-        from pydevmgr_core import NodeAlias
-        position = Value('position', value=10.3)
-
-        
-        class InPosition(NodeAlias):
-            class Config(NodeAlias.Config):
-                target_position: float = 0.0 
-                precision : float = 1.0 
-            
-            def fget(self, position):
-                return abs( position - self.config.target_position) < self.config.precision 
-        
-        is_in_position = InPosition('is_in_position', nodes=[position],  target_position=4.56, precision=0.1)
-        
-        is_in_position.get()
-        # False
-        position.set(4.59)
-        is_in_position.get()
-        # True 
-            
-    NodeAlias can accept several nodes as input: 
-    
-    ::
-
-        from pydevmgr_core.nodes import Value 
-        from pydevmgr_core import NodeAlias
-        
-        class InsideCircle(NodeAlias):
-            class Config(NodeAlias.Config):
-                x: float = 0.0 
-                y: float = 0.0
-                radius: float = 1.0 
-            
-            def fget(self, x, y):
-                return  ( (x-self.config.x)**2 + (y-self.config.y)**2 ) < self.config.radius**2
-                
-        position_x = Value('position_x', value=2.3)
-        position_y = Value('position_y', value=1.4)
-        is_in_target = InsideCircle( 'is_in_target', nodes=[position_x, position_y], x=2.0, y=1.0, radius=0.5 )
-        is_in_target.get()
-        # True
-
-
-       
-    .. seealso::  
-        :func:`nodealias`
-        :class:`NodeAlias1`            
-
-    """
+    """ NodeAlias mimic a real client Node. """
     Config = NodeAliasConfig
     
     _n_nodes_required = None
@@ -180,7 +100,6 @@ class NodeAlias(BaseNodeAlias):
           nodes: Union[List[BaseNode], BaseNode] = None,
           *args, **kwargs
          ):
-         
         super().__init__(key, *args, **kwargs)
         if nodes is None:
             nodes = []
@@ -188,11 +107,19 @@ class NodeAlias(BaseNodeAlias):
         elif isinstance(nodes, BaseNode):
             nodes = [nodes]
             self._nodes_is_scalar = True
-        if self._n_nodes_required is not None:
+            
+        if isinstance(self._n_nodes_required, int) and self._n_nodes_required>-1:
             if len(nodes)!=self._n_nodes_required:
                 raise ValueError(f"{type(self)} needs {self._n_nodes_required} got {len(nodes)}")
         self._nodes = nodes
-  
+    
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if cls._n_nodes_required is None:
+            cls._n_nodes_required = _guess_number_of_nodes(cls)
+        elif cls.__mro__ and "fget" in cls.__mro__[0].__dict__ and cls.__mro__[0].__dict__.get("_n_nodes_required", None) is None:
+            cls._n_nodes_required = _guess_number_of_nodes(cls)
+
     def nodes(self):
         return self._nodes
 

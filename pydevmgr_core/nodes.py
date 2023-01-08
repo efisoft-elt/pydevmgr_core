@@ -61,7 +61,6 @@ class Local(BaseNode):
     """
     class Config(BaseNode.Config):
         default: Any = None
-        type = "Local"
         
     def fget(self):
         if self.localdata is None:
@@ -80,7 +79,6 @@ class Static(BaseNode):
         value (any) 
     """
     class Config(BaseNode.Config):    
-        type = "Static"
         value: Any
 
     def fget(self):        
@@ -94,7 +92,6 @@ class Value(BaseNode):
         value (any) : default is None, a value starting point 
     """
     class Config(BaseNode.Config):    
-        type = "Value"
         value: Any
     
     def __init__(self, *args, **kwargs):
@@ -118,7 +115,6 @@ class Time(BaseNode):
     
     """
     class Config(BaseNode.Config):
-        type = "Time"
         delta: float = 0.0
     
     def __init__(self, key: str = 'time', config=None, **kwargs):
@@ -137,7 +133,6 @@ class DateTime(BaseNode):
         
     """
     class Config(BaseNode.Config):
-        type = "DateTime"
         delta: float = 0.0 # delta in seconds 
         
     def __init__(self, key: str = 'datetime', config=None, **kwargs):
@@ -157,7 +152,6 @@ class UtcTime(BaseNode):
         format (str, optional): Returned format, default is iso 8601 '%Y-%m-%dT%H:%M:%S.%f%z'
     """
     class Config(BaseNode.Config):
-        type = "UtcTime"
         delta: float = 0.0
         format: str = '%Y-%m-%dT%H:%M:%S.%f%z'
         
@@ -178,7 +172,6 @@ class ElapsedTime(BaseNode):
         scale (float, optional): scale the time to an other unit than second  
     """
     class Config(BaseNode.Config):
-        type = "ElapsedTime"  
         scale: float = 1.0
     
     def __init__(self, key : str ='elapsed_time', config=None, **kwargs):
@@ -218,7 +211,6 @@ class Counter(BaseNode):
        1
     """
     class Config(BaseNode.Config):
-        type: str = "Counter"
         start: int  = 0
         step: int = 1
     
@@ -237,8 +229,6 @@ class Counter(BaseNode):
 
 @register
 class AllTrue(NodeAlias):
-    class Config(NodeAlias.Config):
-        type = "AllTrue"
     @staticmethod
     def fget(*nodes):
         return all(nodes)
@@ -246,8 +236,6 @@ All = AllTrue
 
 @register
 class AnyTrue(NodeAlias):
-    class Config(NodeAlias.Config):
-        type = "AnyTrue"
     @staticmethod
     def fget(*nodes):
         return any(nodes)
@@ -255,16 +243,12 @@ Any = AnyTrue
 
 @register        
 class AllFalse(NodeAlias):
-    class Config(NodeAlias.Config):
-        type = "AllFalse"
     @staticmethod 
     def fget(*nodes):
         return not any(nodes)
 
 @register
 class AnyFalse(NodeAlias):
-    class Config(NodeAlias.Config):
-        type = "AnyFalse"
     @staticmethod
     def fget(*nodes):
         return not all(nodes)
@@ -272,7 +256,7 @@ class AnyFalse(NodeAlias):
 
 
 @register
-class Opposite(NodeAlias1, type="Opposite"):
+class Opposite(NodeAlias1):
     """ rNodeAlias1, Return the "not value" of the aliased node """
     @staticmethod
     def fget(value):
@@ -315,7 +299,6 @@ class DequeList(NodeAlias):
         
     """
     class Config(NodeAlias.Config):
-        type = "DequeList"
         maxlen: int = 10000
         trigger_index: Optional[int] = None
     
@@ -384,7 +367,6 @@ class Deque(NodeAlias1):
         
     """
     class Config(NodeAlias1.Config):
-        type = "Deque"
         maxlen: int = 10000        
     
     def __init__(self, 
@@ -428,7 +410,6 @@ class InsideInterval(NodeAlias1):
         max (float, optional): max value of the interval
     """
     class Config(NodeAlias1.Config):
-        type = "InsideInterval"
         min : Optional[float] = None
         max : Optional[float] = None
             
@@ -452,7 +433,6 @@ class InsideCircle(NodeAlias):
     
     """
     class Config(NodeAlias.Config):
-        type = "InsideCircle"
         x0 : float = 0.0
         y0 : float = 0.0 
         r  : float = 1.0
@@ -483,7 +463,6 @@ class PosName(NodeAlias1):
 
     """
     class Config(NodeAlias1.Config):
-        type = "PosName"
         poses: Dict[str,float] = None
         tol: float = 0.0 
         unknown: str = ""
@@ -506,7 +485,6 @@ class Formula(NodeAlias):
         varnames (str or list): Alternative var names for the formula  
     """
     class Config(NodeAlias.Config):
-        type: str = "Formula"
         formula : str = "-99.99"
         varnames: Optional[Union[List[str],str]] = None  
     
@@ -547,7 +525,6 @@ class Formula1(NodeAlias1):
         varname (str): alternative varname for the formulae (default is 'x') 
     """
     class Config(NodeAlias1.Config):
-        type: str = "Formula1"
         formula : str = "-99.99"
         varname: str = 'x' 
     
@@ -606,7 +583,6 @@ class Statistics(NodeAlias1):
     """
     class Config(NodeAlias1.Config):
         mean: float = 0.0 # expected mean for Variance and rms computation
-        type: str = "Statistics"
         
     @dataclass
     class Stat:
@@ -670,7 +646,7 @@ class _Stat(NodeAlias1):
     
 
 @register
-class Sum(_Stat, type="Sum"):
+class Sum(_Stat):
     """ NodeAlias1, sum node values 
 
     reset() method is reseting to zero
@@ -700,7 +676,7 @@ class Sum(_Stat, type="Sum"):
         return self._sum    
         
 @register
-class Mean(_Stat, type="Mean"):
+class Mean(_Stat):
     """ NodeAlias1, mean node values 
 
     reset() method is reseting to zero
@@ -731,7 +707,7 @@ class Mean(_Stat, type="Mean"):
         return self._sum / self._n
 
 @register
-class Min(_Stat, type="Min"):
+class Min(_Stat):
     """ NodeAlias1, min for on single node input
     
     reset() method is resetting to +inf 
@@ -761,7 +737,7 @@ class Min(_Stat, type="Min"):
         return self._min
 
 @register
-class Max(_Stat, type="Max"):
+class Max(_Stat):
     """ NodeAlias1,  max for one single node input
 
     reset() method is resetting to -inf 
@@ -786,7 +762,6 @@ class Format(NodeAlias):
         format (str): on the form e.g. : "{0:2.3f} {1!r} ..." 
     """
     class Config(NodeAlias.Config):
-        type: str = "Format"
         format: str = "{0}"
     def fget(self, *values):
         return self.config.format.format(*values)
@@ -794,7 +769,7 @@ class Format(NodeAlias):
 
 
 @register
-class Bits(NodeAlias, type="Bits"):
+class Bits(NodeAlias):
     """ from a list of boolean node build an integer number 
 
     the node alias works in both way, change a number to switch boolean nodes as bits 
@@ -826,15 +801,15 @@ class Bits(NodeAlias, type="Bits"):
         
 
 @register
-class MaxOf(NodeAlias, type="MaxOf"):
+class MaxOf(NodeAlias):
     fget = staticmethod(max)
         
 @register
-class MinOf(NodeAlias, type="MinOf"):
+class MinOf(NodeAlias):
     fget = staticmethod(min)
 
 @register
-class MeanOf(NodeAlias, type="MeanOf"):
+class MeanOf(NodeAlias):
     @staticmethod
     def fget(*values):
         return sum(values)/float(len(values))

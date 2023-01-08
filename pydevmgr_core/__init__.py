@@ -3,7 +3,7 @@ from .factories import *
 from . import nodes
 from . import parsers
 from . import decorators
-from .io import open_device, open_manager
+from .io import open_device, open_manager, PydevmgrLoader
 from .decorators import nodealias 
 try:
     import numpy

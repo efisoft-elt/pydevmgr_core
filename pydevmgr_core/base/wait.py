@@ -39,7 +39,7 @@ class Waiter:
         lag (float) : lag is a time in second corresponding to a sleep time before starting the wait process
                       This can be usefull to make sure that an action as started on the server before checking
                       the nodes
-        
+        callback (optional, callable): A function to be called at the end of each cycles 
     Example:
         
     ::
@@ -72,7 +72,8 @@ class Waiter:
             stop_signal = lambda: False,
             stop_function = lambda: None, 
             data=None,
-            lag=0.0
+            lag=0.0, 
+            callback: Optional[Callable] = None
           ) -> None:        
         
         nodes = []
@@ -111,7 +112,8 @@ class Waiter:
         self.stop_signal = stop_signal
         self.stop_function = stop_function
         self.lag = lag 
-        
+        self.callback = callback 
+
     def wait(self):
         """ run the wait condition """
         check_nodes     = self.check_nodes
@@ -138,13 +140,16 @@ class Waiter:
         
         # do the function first 
         while not check():
+            tic = time.time()
             if stop_signal():
                 self.stop_function()
                 raise RuntimeError(f"Wait interupted by stop_signal: {stop_signal}")
             if (time.time()-s_time)>timeout:
                 raise RuntimeError('wait timeout')
-            time.sleep(period)
-        
+            if self.callback:
+                self.callback()
+            tac = time.time()
+            time.sleep( max( period-(tac-tic), 0.00001)  )
         return True
     
 
@@ -155,7 +160,8 @@ def wait(
      timeout: float = 60, 
      stop_signal: Callable = lambda: False, 
      stop_function: Callable = lambda: None,  
-     lag: float =0.0,  
+     lag: float =0.0, 
+     callback: Optional[Callable] = None, 
      data: Optional[Dict[BaseNode, Any]]=None
     ) -> None:
     """ wait until a list of function return True
@@ -218,8 +224,12 @@ def wait(
             > wait( [is_arrived, camera_ready])
 
     """
-    Waiter(node_or_func_list, logic=logic, period=period, timeout=timeout,  stop_signal = stop_signal, 
-            stop_function = stop_function, data=data, lag=lag).wait()
+    Waiter(node_or_func_list, logic=logic, 
+            period=period, timeout=timeout, stop_signal = stop_signal, 
+            stop_function = stop_function, 
+            data=data, lag=lag, 
+            callback = callback
+        ).wait()
 
 def _all_true(functions):
     """ all_true(lst) -> return True if all function  list return True """
