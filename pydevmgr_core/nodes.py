@@ -44,7 +44,9 @@ __all__ = [
 "Bits", 
 "MaxOf", 
 "MinOf", 
-"MeanOf", 
+"MeanOf",
+"Rad2Degree", 
+"Degree2Rad"
 ]
 
 
@@ -815,3 +817,31 @@ class MeanOf(NodeAlias):
         return sum(values)/float(len(values))
 
 
+_r2d =  180.0/math.pi 
+_d2r =  math.pi / 180.0
+@register
+class Rad2Degree(NodeAlias1):
+    """ tranform a node with radiant to degree 
+
+    The node also transform degree to radiant at ``.set``
+    """
+    def fget(self, angle: float)-> float :
+        return angle * _r2d 
+    def fset(self, angle_deg: float)-> float:
+        yield angle_deg * _d2r
+
+        
+@register
+class Degree2Rad(NodeAlias1):
+    """ tranform a node with degree to radiant
+
+    The node also transform radiant to degree at ``.set``
+    """
+
+    def fget(self, angle_deg: float)-> float:
+        return angle_deg * _d2r 
+    def fset(self, angle: float)-> float:
+        yield angle * _r2d 
+    
+    
+     

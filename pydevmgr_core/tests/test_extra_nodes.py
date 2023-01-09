@@ -1,3 +1,4 @@
+import math
 from pydevmgr_core import  BaseNode
 from pydevmgr_core.nodes import AllTrue, AnyTrue, AnyFalse, AllFalse
 
@@ -129,3 +130,23 @@ def test_elapsed_time():
     t.get()
     time.sleep(1.0)
     assert t.get()>1.0 
+
+def test_rad2degree():
+    a = nodes.Value(value=math.pi/2)
+    a_deg = nodes.Rad2Degree( node=a )
+    assert abs(a_deg.get() -  90.0) < 1e-20 
+    
+    a_deg.set( 180.0) 
+    assert abs( a.get() - math.pi) < 1e-20
+
+def test_degree2ra():
+
+    a_deg = nodes.Value(value=90.0)
+    a = nodes.Degree2Rad( node=a_deg)
+    
+    assert abs( a.get() - math.pi/2.0) < 1e-20
+    a.set( math.pi)
+    assert abs(a_deg.get() - 180) < 1e-20 
+
+
+
