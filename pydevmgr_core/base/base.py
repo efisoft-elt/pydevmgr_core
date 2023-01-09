@@ -91,7 +91,7 @@ class BaseObject(BaseSystem):
     def new(cls, parent, name, config):
         """ create a new object within a parent pydevmgr object """
         return cls( key=config._make_new_path(parent, name), 
-                    com=parent.engine, 
+                    com= getattr( parent, "engine", None), # getattr needed is parent is a systemy object  
                     __config__=config
                 )
 
