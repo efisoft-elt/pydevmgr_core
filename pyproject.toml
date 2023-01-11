@@ -5,7 +5,7 @@ description = "Python package to handle distributed device handling"
 license = "Creative Commons Attribution-Noncommercial-Share Alike license"
 authors = ["Sylvain Guieu <sylvain.guieu@univ-grenoble-alpes.fr>"]
 readme = "README.md"
-packages = [{include = "pydevmgr_core"}, {include = "pydevmgr_core_ui"}]
+packages = [{include = "pydevmgr_core"}]
 
 [tool.poetry.dependencies]
 python = "^3.7"
