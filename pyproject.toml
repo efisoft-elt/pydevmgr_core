@@ -11,7 +11,7 @@ packages = [{include = "pydevmgr_core"}, {include = "pydevmgr_core_ui"}]
 python = "^3.7"
 pydantic = "^1.9"
 systemy = "^0.1.1"
-valueparser = "^0.1.1"
+valueparser = "^0.1.2"
 py-expression-eval = "^0.3.14"
 
 [tool.poetry.group.dev.dependencies]

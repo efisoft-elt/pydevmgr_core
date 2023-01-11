@@ -1,3 +1,4 @@
+import valueparser
 from pydevmgr_core.base import  BaseNode, NodeAlias, NodeAlias1, register
 
 from collections import deque
@@ -46,7 +47,12 @@ __all__ = [
 "MinOf", 
 "MeanOf",
 "Rad2Degree", 
-"Degree2Rad"
+"Degree2Rad", 
+"Tempo", 
+"NoError", 
+"Tempo",
+"ElapsedTime", 
+"Timeout"
 ]
 
 
@@ -165,32 +171,97 @@ class UtcTime(BaseNode):
         return tc.strftime(self.config.format)
     
 
+TimeStamp = valueparser.conparser( valueparser.Timestamp)   
 @register
 class ElapsedTime(BaseNode):
-    """ A basic node returning elapsed seconds since the first get 
+    """ A basic node returning elapsed seconds since 
+
+    by default the time reference is set at first get unless given 
 
     Args:
         key (str, optional): default is 'elapsed_time'
         scale (float, optional): scale the time to an other unit than second  
+        time_ref (optional, datetime, str iso, float): the time reference. If not given 
+            it will be set the first time get is called 
     """
     class Config(BaseNode.Config):
         scale: float = 1.0
-    
+        time_ref:  Optional[TimeStamp] = None
+
     def __init__(self, key : str ='elapsed_time', config=None, **kwargs):
         super().__init__(key, config=config, **kwargs)
-        self.reset()
         
     def fget(self) -> float:
-        if self._time_reference is None:
-            self._time_reference = time.time()
+        tr = self.time_ref
+        if tr is None:
+            self.config.time_ref = time.time()
             return 0.0
-        return (time.time()-self._time_reference)*self.config.scale
+        return (time.time()-tr)*self.config.scale
 
     def reset(self):
-        self._time_reference = None
+        self.config.time_ref = None
 
 
-       
+@register
+class Tempo(BaseNode):
+    """ A node return False until delay seconds occured since the first get 
+    
+    Parameters:
+        time: (float) delay time in seconds
+        time_ref (optional, datetime, str iso, float): the time reference. If not given 
+            it will be set the first time get is called 
+
+    """
+
+    class Config:
+        time: float = 0
+        time_ref: Optional[TimeStamp] = None
+
+    def __init__(self, key : str ='tempo', config=None, **kwargs):
+        super().__init__(key, config=config, **kwargs)
+
+    def fget(self) -> float:
+        time_ref = self.time_ref
+        if time_ref is None:
+            self.config.time_ref = time.time()
+            return False
+        return (time.time()-time_ref)>=self.time
+    def reset(self):
+        self.config.time_ref = None
+
+@register
+class Timeout(BaseNode):
+    """ A node return False until delay seconds occured then raise RuntimeError
+    
+    Parameters:
+        time: (float) delay time in seconds
+        time_ref (optional, datetime, str iso, float): the time reference. If not given 
+            it will be set the first time get is called 
+
+    """
+
+    class Config:
+        time: float = 0
+        time_ref: Optional[TimeStamp] = None
+
+    def __init__(self, key : str ='tempo', config=None, **kwargs):
+        super().__init__(key, config=config, **kwargs)
+
+    def fget(self) -> float:
+        time_ref = self.time_ref
+        if time_ref is None:
+            self.config.time_ref = time.time()
+            return False
+
+        if  (time.time()-time_ref)>=self.time:
+            raise RuntimeError(f"timeout ({self.time} sec)") 
+        return False 
+
+    def reset(self):
+        self.config.time_ref = None
+
+
+
 
 @register
 class Counter(BaseNode):
@@ -560,6 +631,14 @@ class Polynom(NodeAlias1):
             x += c*value**i
         return x
 
+
+@register
+class NoError(NodeAlias):
+    """ NodeAlias, Return True is all nodes return False or 0 or "" else raise ValueError """
+    def fget(self, *error_codes):
+        for i,err in enumerate(error_codes):
+            if err: raise ValueError(f"Node {i} has return error {err}")
+        return True
 
 
 @register
