@@ -3,12 +3,6 @@ Manual
 
 .. warning:: Documentation In progress
 
-
-
-pydevmgr_core module is the core library for pydevmgr it contains two modules : 
-
-- pydevmgr_core 
-- pydevmgr_core_ui  Some core object to handle User Interfaces (beta)  
   
 :mod:`pydevmgr_core` contains only Base Classes to build so called, devices,
 interface, nodes, and communication protocol. It does not do much by itself. 
