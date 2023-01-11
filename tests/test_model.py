@@ -1,5 +1,4 @@
 import pytest
-from build.lib.pydevmgr_core.base.base import BaseData 
 from pydevmgr_core import DataLink, BaseManager, BaseDevice, BaseNode, NodeAlias1, NodeVar
 from pydevmgr_core.base.base import BaseObject
 from pydevmgr_core.base.datamodel import create_data_class

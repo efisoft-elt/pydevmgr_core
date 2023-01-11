@@ -6,6 +6,125 @@ from typing import Union, Optional, Callable, Any, Dict
 import time 
 
 
+
+class UploaderConnection:
+    """ Hold a connection to a :class:`Uploader` 
+    
+    Most likely created by :meth:`Uploader.new_connection` 
+    
+    Args:
+       uploader (:class:`Uploader`) :  parent Uploader instance
+       token (Any): Connection token 
+    """
+    def __init__(self, uploader, token):
+        self._uploader = uploader 
+        self._token = token 
+    
+    def _check_connection(self):
+        if not self._token:
+            raise RuntimeError("DownloaderConnection has been disconnected from its Downloader")
+           
+    def disconnect(self) -> None:
+        """ disconnect connection from the uploader 
+        
+        All nodes related to this connection (and not used by other connection) are removed from the
+        the downloader queue. 
+        Also all callback associated with this connection will be removed from the uploader
+        
+        """
+        self._uploader.disconnect(self._token)
+        self._token = None
+        
+    def add_node(self, node: BaseNode, value: Any) -> None:
+        """ Register nodes to be uploaded,  associated to this connection 
+        
+        Args:
+            *nodes :  nodes to be added to the upload queue
+        """ 
+        self._check_connection() 
+        self._uploader.add_node(self._token, node, value)
+    
+    def add_nodes(self, nodes: Dict[BaseNode,Any]) -> None:
+        """ Register nodes to be uploaded associated to this connection 
+        
+        Args:
+            nodes (dict) :  nodes to be added to the upload queue. 
+                     A dictionary of node/value pairs
+        """
+        self._check_connection() 
+        self._uploader.add_nodes(self._token, nodes)
+    
+    def remove_node(self, *nodes) -> None:
+        """ remove  any nodes to the downloader associated to this connection 
+        
+        Note that the node will stay inside the downloader data but will not be updated 
+        
+        Args:
+            *nodes :  nodes to be removed from the download queue
+        """ 
+        self._check_connection() 
+        self._uploader.remove_node(self._token, *nodes)
+    
+    def add_datalink(self, *datalinks) -> None:
+        """ Register datalinks to the downloader associated to this connection 
+        
+        Args:
+            *datalinks :  :class:`DataLink` to be added to the download queue on the associated downloader
+        """
+        self._check_connection() 
+        self._uploader.add_datalink(self._token, *datalinks)        
+    
+    def remove_datalink(self, *datalinks) -> None:
+        """ Remove any given datalinks to the downloader associated to this connection 
+        
+        Args:
+            *datalinks :  :class:`DataLink` to be removed 
+        """
+        self._check_connection() 
+        self._uploader.remove_datalink(self._token, *datalinks)        
+    
+    def add_callback(self, *callbacks) -> None:
+        """ Register callbacks to be executed after each download of the associated downloader 
+        
+        Args:            
+            *callbacks :  callbacks to be added to the queue of callbacks on the associated downloader       
+        """
+        self._check_connection() 
+        self._uploader.add_callback(self._token, *callbacks)
+    
+    def remove_callback(self, *callbacks) -> None:
+        """ Remove any of given callbacks of the associated downloader 
+        
+        Args:            
+            *callbacks :  callbacks to be remove 
+        """
+        self._check_connection() 
+        self._uploader.remove_callback(self._token, *callbacks)
+    
+    def add_failure_callback(self, *callbacks) -> None:
+        """ Register callbacks to be executed after each download of the associated downloader 
+        
+        Args:            
+            *callbacks :  failure callbacks to be added to the queue of callbacks on the associated downloader       
+        """
+        self._check_connection() 
+        self._uploader.add_failure_callback(self._token, *callbacks)
+        
+    def remove_failure_callback(self, *callbacks) -> None:
+        """ Remove any given callbacks of the associated downloader 
+        
+        Args:            
+            *callbacks :  failure callbacks to be removed 
+        """
+        self._check_connection() 
+        self._uploader.remove_failure_callback(self._token, *callbacks)
+
+
+
+
+
+
+
 class Uploader:
     """ An uploader object to upload data to the PLC 
     
@@ -50,7 +169,7 @@ class Uploader:
     _did_failed_flag = False
 
     def __init__(self, 
-          node_dict_or_datalink: Union[Dict[BaseNode,Any], BaseDataLink], 
+          node_dict_or_datalink: Union[Dict[BaseNode,Any], BaseDataLink, None] = None, 
           callback: Optional[Callable] = None
         ) -> None:
         
@@ -73,7 +192,7 @@ class Uploader:
         self._dict_failure_callbacks = OrderedDict([(Ellipsis,failure_callbacks)])
 
         self._rebuild_nodes()
-        self._rebuild_data_links()
+        self._rebuild_datalinks()
         self._rebuild_callbacks()
         self._rebuild_failure_callbacks()
         # self.node_values = node_values 
@@ -93,7 +212,7 @@ class Uploader:
         #         nodes.update(dl.wnodes)
                                 
         self.node_values = nodes
-    def _rebuild_data_links(self):
+    def _rebuild_datalinks(self):
         datalinks = set()
         for dls in self._dict_datalinks.values():
             datalinks.update(dls)
@@ -121,6 +240,10 @@ class Uploader:
         self._next_token += 1
         return token 
     
+    def new_connection(self) -> UploaderConnection:
+        """ return an :class:`UploaderConnection` to handle uploader connection """
+        return UploaderConnection(self, self.new_token() )
+
     def disconnect(self, token: tuple) -> None:
         """ Disconnect the iddentified connection 
         
@@ -141,9 +264,15 @@ class Uploader:
             pass
  
         self._rebuild_nodes()
+        self._rebuild_datalinks()
         self._rebuild_callbacks()
         self._rebuild_failure_callbacks()
     
+    def add_node(self, token: tuple, node: BaseNode, value: Any)-> None:
+        """ register a single node/value pair to the uploader """
+        self.add_nodes( token , {node:value})
+
+
     def add_nodes(self, token: tuple, nodes: Dict[BaseNode, Any]) -> None:
         """ Register nodes to be uploader for an iddentified app
         
@@ -156,6 +285,23 @@ class Uploader:
                
         self._dict_nodes[token].update(nodes)
         self._rebuild_nodes()
+    
+    def remove_node(self, token: tuple, *nodes) -> None:
+        """ Remove node from the upload queue
+    
+        if the node is not in the queueu nothing is done or raised
+        
+        
+        Args:
+            token: a Token returned by :func:`Downloader.new_token`                  
+            *nodes :  nodes to be removed 
+        """   
+        for node in nodes:
+            try:
+                self._dict_nodes[token].pop(node)
+            except KeyError:
+                pass 
+        self._rebuild_nodes()
 
     def add_datalink(self, token: tuple, *datalinks) -> None:
         """ Register a new datalink
@@ -167,7 +313,7 @@ class Uploader:
             *datalinks :  :class:`DataLink` to be added to the download queue, associated to the token 
         """             
         self._dict_datalinks[token].update(datalinks)
-        self._rebuild_data_links()
+        self._rebuild_datalinks()
     
     
     def remove_datalink(self, token: tuple, *datalinks) -> None:
@@ -184,7 +330,7 @@ class Uploader:
                 self._dict_datalinks[token].remove(dl)
             except KeyError:
                 pass 
-        self._rebuild_data_links()
+        self._rebuild_datalinks()
     
     def add_callback(self, token: tuple, *callbacks) -> None:   
         """ Register callbacks to be executed after each upload 

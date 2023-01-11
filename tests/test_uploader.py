@@ -109,3 +109,66 @@ def test_upload_failure_callback():
     with pytest.raises(ValueError):
         uploader.upload() 
 
+
+def test_remove_node():
+    dev = Device()
+
+    uploader = Uploader( {dev.v1:10} )
+
+    uploader.remove_node(..., dev.v1)
+    uploader.upload()
+    assert dev.v1.get() == 1
+
+
+def test_disconnect():
+    dev = Device()
+
+    uploader = Uploader({})
+    token  = uploader.new_token()
+    uploader.add_node(token, dev.v1, 10)
+    uploader.upload()
+    assert dev.v1.get() == 10
+    dev.v1.set(20)
+    uploader.upload()
+    assert dev.v1.get() == 10 
+    uploader.disconnect( token ) 
+    dev.v1.set(20)
+    uploader.upload()
+    assert dev.v1.get() == 20 
+
+def test_connection():
+    dev = Device()
+    class Data(BaseModel):
+        v1: NodeVar[float] = 0.0 
+        v2: NodeVar[float] = 0.0 
+    data = Data(v1=10.0, v2=20.0)
+
+    uploader = Uploader()
+    connection = uploader.new_connection()
+    
+    dl = DataLink( dev, data)
+
+    connection.add_datalink(dl)
+    uploader.upload()
+    assert dev.v1.get() == 10.0 
+    assert dev.v2.get() == 20.0 
+    
+    data.v1 = 100.0
+    data.v2 = 200.0
+    
+    uploader.upload()
+    assert dev.v1.get() == 100.0 
+    assert dev.v2.get() == 200.0 
+
+    connection.disconnect()
+    data.v1 = 1.0
+    data.v2 = 2.0 
+    uploader.upload()
+    assert dev.v1.get() == 100.0 
+    assert dev.v2.get() == 200.0 
+
+
+    
+
+
+
