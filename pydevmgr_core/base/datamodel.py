@@ -24,13 +24,16 @@ def _extract_static(obj, name, field):
             raise ValueError(f'{C.ATTR!r} and {C.ITEM!r} cannot be both set, choose one.')                    
         
         attribute = field.field_info.extra[C.ATTR]
-        if attribute:
-            try:
-                val = getattr(obj, attribute)
-            except AttributeError:
-                raise MatchError(f'{attribute!r} is not an attribute of {obj.__class__.__name__!r}')
+        if attribute == ".":
+            val = obj 
         else:
-            val = obj
+            if attribute:
+                try:
+                    val = getattr(obj, attribute)
+                except AttributeError:
+                    raise MatchError(f'{attribute!r} is not an attribute of {obj.__class__.__name__!r}')
+            else:
+                val = obj
     
     elif C.ITEM in field.field_info.extra:             
         item = field.field_info.extra[C.ITEM]
@@ -134,7 +137,7 @@ def _extract_node(obj, name, field):
             node = obj
              
         if not isinstance(node, BaseNode):
-            raise MatchError(f'node attribute  {attr!r} is not a node in {obj.__class__.__name__!r}')
+            raise MatchError(f'node attribute  {C.attr!r} is not a node in {obj.__class__.__name__!r}')
     
     elif C.ITEM in field.field_info.extra:
          
@@ -167,7 +170,7 @@ class DataLink(BaseDataLink):
                       pydevmgr object 
                          
         model (:class:`pydantic.BaseModel`): a data model. Is expecting that the data model structure 
-            contains some :class:`NodeVar` type hint signature.
+            contains some :class:`NodeVar` type hint signature and eventually some sub models.
             
     Example: 
     

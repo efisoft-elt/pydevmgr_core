@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from .node import NodesWriter, BaseNode
 from .download import BaseDataLink
 
@@ -46,6 +47,8 @@ class Uploader:
        
        
     """
+    _did_failed_flag = False
+
     def __init__(self, 
           node_dict_or_datalink: Union[Dict[BaseNode,Any], BaseDataLink], 
           callback: Optional[Callable] = None
@@ -53,31 +56,226 @@ class Uploader:
         
         if node_dict_or_datalink is None:
             node_values = {}
-            datalink = None
+            datalinks = [] 
         elif isinstance(node_dict_or_datalink, BaseDataLink):
-            datalink = node_dict_or_datalink
+            datalinks = [node_dict_or_datalink]
             node_values = {}
-            datalink._upload_to(node_values)
         else:
             node_values = node_dict_or_datalink
-            datalink = None    
+            datalinks = []
             
         
-        self.node_values = node_values 
-        self.datalink = datalink
+        self._dict_nodes =OrderedDict([(Ellipsis,node_values)])
+        self._dict_datalinks = OrderedDict([(Ellipsis, datalinks)])
+            
+        callbacks, failure_callbacks = [], [] # !TODO implement
+        self._dict_callbacks = OrderedDict([(Ellipsis,callbacks)])
+        self._dict_failure_callbacks = OrderedDict([(Ellipsis,failure_callbacks)])
+
+        self._rebuild_nodes()
+        self._rebuild_data_links()
+        self._rebuild_callbacks()
+        self._rebuild_failure_callbacks()
+        # self.node_values = node_values 
+
+        self.datalink = datalinks[0] if datalinks else None
         self.callback = callback
+        self._next_token = 1
+
+    def _rebuild_nodes(self):
+        nodes: Dict[BaseNode,Any] = {}
+        for nds in self._dict_nodes.values():
+            nodes.update(nds)
+
+        # for dls in self._dict_datalinks.values():
+        #     for dl in dls:
+        #         dl._upload_to( nodes )
+        #         nodes.update(dl.wnodes)
+                                
+        self.node_values = nodes
+    def _rebuild_data_links(self):
+        datalinks = set()
+        for dls in self._dict_datalinks.values():
+            datalinks.update(dls)
+        self.datalinks = datalinks 
+
+    def _rebuild_callbacks(self):
+        callbacks = set()
+        for clbc in self._dict_callbacks.values():
+            callbacks.update(clbc)
+        self._callbacks = callbacks
     
+    def _rebuild_failure_callbacks(self):
+        callbacks = set()
+        for clbc in self._dict_failure_callbacks.values():
+            callbacks.update(clbc)
+        self._failure_callbacks = callbacks
+
+    def new_token(self) -> tuple:
+        token = id(self), self._next_token
+        self._dict_nodes[token] =  {}
+        self._dict_datalinks[token] = set()
+        self._dict_callbacks[token] = set()
+        self._dict_failure_callbacks[token] = set()
+
+        self._next_token += 1
+        return token 
+    
+    def disconnect(self, token: tuple) -> None:
+        """ Disconnect the iddentified connection 
+        
+        All the nodes used by the connection (and not by other connected app) will be removed from the upload queue of nodes.
+        Also all callback associated with this connection will be removed from the uploader 
+                 
+        Args:
+            token : a Token returned by :func:`Uploader.new_token`
+        """
+        if token is Ellipsis:
+            raise ValueError('please provide a real token')
+        try:
+            self._dict_nodes.pop(token)
+            self._dict_datalinks.pop(token)
+            self._dict_callbacks.pop(token)
+            self._dict_failure_callbacks.pop(token)
+        except KeyError:
+            pass
+ 
+        self._rebuild_nodes()
+        self._rebuild_callbacks()
+        self._rebuild_failure_callbacks()
+    
+    def add_nodes(self, token: tuple, nodes: Dict[BaseNode, Any]) -> None:
+        """ Register nodes to be uploader for an iddentified app
+        
+        Args:
+            token: a Token returned by :func:`Uploader.new_token` 
+                   ``add_node(...,node1, node2)`` can also be used, in this case nodes will be added
+                   to the main pool of nodes and cannot be removed from the uploader 
+            nodes (Dict): dictionary of node/value pairs to be uploaded
+        """
+               
+        self._dict_nodes[token].update(nodes)
+        self._rebuild_nodes()
+
+    def add_datalink(self, token: tuple, *datalinks) -> None:
+        """ Register a new datalink
+        
+        Args:
+            token: a Token returned by :func:`Uploader.new_token`
+                ``add_datalink(...,dl1, dl2)`` can also be used, in this case they will be added
+                to the main pool of datalinks and cannot be remove from the downloader   
+            *datalinks :  :class:`DataLink` to be added to the download queue, associated to the token 
+        """             
+        self._dict_datalinks[token].update(datalinks)
+        self._rebuild_data_links()
+    
+    
+    def remove_datalink(self, token: tuple, *datalinks) -> None:
+        """ Remove a datalink from a established connection
+        
+        If the datalink is not in the queueu nothing is done or raised
+        
+        Args:
+            token: a Token returned by :func:`Uploader.new_token`
+            *datalinks :  :class:`DataLink` objects to be removed         
+        """
+        for dl in  datalinks:
+            try:
+                self._dict_datalinks[token].remove(dl)
+            except KeyError:
+                pass 
+        self._rebuild_data_links()
+    
+    def add_callback(self, token: tuple, *callbacks) -> None:   
+        """ Register callbacks to be executed after each upload 
+        
+        The callback must have the signature f(), no arguments.
+        
+        Args:
+            token: a Token returned by :func:`Uploader.new_connection`
+            *callbacks :  callbacks to be added to the queue of callbacks, associated to the app
+        
+        """ 
+        self._dict_callbacks[token].update(callbacks)
+        self._rebuild_callbacks()
+    
+    def remove_callback(self, token: tuple, *callbacks) -> None:   
+        """ Remove callbacks 
+        
+        If the callback  is not in the queueu nothing is done or raised
+        
+        Args:
+            token: a Token returned by :func:`Uploader.new_token`
+            *callbacks :  callbacks to be removed 
+        
+        """
+        for c in callbacks:
+            try:
+                self._dict_callbacks[token].remove(c)
+            except KeyError:
+                pass 
+        self._rebuild_callbacks()
+    
+    
+    def add_failure_callback(self, token: tuple, *callbacks) -> None:  
+        """ Add one or several callbacks to be executed when a download failed 
+        
+        When ever occur a failure (Exception during upload) ``f(e)`` is called with ``e`` the exception. 
+        If a upload is successfull **after** a failure ``f(None)`` is called one time only, this allow 
+        to clear an error state in the app.
+                
+        Args:
+            token: a Token returned by :func:`Uploader.new_token`
+            *callbacks: callbacks to be added to the queue of failure callbacks, associated to the app
+        
+        """ 
+        self._dict_failure_callbacks[token].update(callbacks)
+        self._rebuild_failure_callbacks()
+    
+    def remove_failure_callback(self, token: tuple, *callbacks) -> None:  
+        """ remove  one or several failure callbacks 
+        
+        If the callback  is not in the queue nothing is done or raised
+        
+        Args:
+            token: a Token returned by :func:`Uploader.new_token`
+            *callbacks :  callbacks to be removed         
+        """ 
+        for c in callbacks:
+            try:
+                self._dict_failure_callbacks[token].remove(c)
+            except KeyError:
+                pass         
+        self._rebuild_failure_callbacks()
+    
+
     def __has__(self, node):
         return node in self._node_values
         
     def upload(self) -> None:
         """ upload the linked node/value dictionaries """
-        if self.datalink:
-            self.datalink._upload_to(self.node_values)
-        
-        NodesWriter(self.node_values).write() 
-        if self.callback:
-            self.callback()
+        for dl in self.datalinks:
+            dl._upload_to(self.node_values)
+        # if self.datalink:
+        #     self.datalink._upload_to(self.node_values)
+        try: 
+            NodesWriter(self.node_values).write() 
+        except Exception as e:
+            self._did_failed_flag = True
+
+            if self._failure_callbacks:
+                for func in self._failure_callbacks:
+                    func(e)
+            else:
+                raise e 
+        else:
+            if self._did_failed_flag:
+                self._did_failed_flag = False
+                for func in self._failure_callbacks:                    
+                    func(None)
+                
+            for func in self._callbacks:
+                func()
                   
     def run(self, 
           period: float = 1.0, 

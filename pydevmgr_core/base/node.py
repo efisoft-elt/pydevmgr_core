@@ -144,10 +144,6 @@ class BaseNode(BaseObject):
     def parser(self):
         return self._parser
     
-    @classmethod
-    def prop(cls,  name: Optional[str] = None, config_path=None, frozen_parameters=None,  **kwargs):
-        cls._prop_deprecation( 'Node: prop() method is deprecated, use instead the pydevmgr_core.decorators.getter to decorate the fget method from a node factory', name, config_path, frozen_parameters)
-        return getter( cls.Config(**kwargs) )  
     
     def parse(self, value):
         """ Parse the value as it is done before being treated by the set method 

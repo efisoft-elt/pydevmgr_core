@@ -47,15 +47,3 @@ class BaseManager(BaseObject):
         self.disconnect()
         return False # False-> If exception it will be raised
     
-    @classmethod
-    def parse_config(cls, config, **kwargs):
-        if isinstance(config, dict):
-            kwargs = {**config, **kwargs}
-            config = None
-           
-        return super().parse_config(config, **kwargs)
-    
-    @classmethod
-    def prop(cls,  name: str = None, config_path=None, frozen_parameters=None,  **kwargs):
-        cls._prop_deprecation( 'Manager: prop() method is deprecated, use instead the pydevmgr_core.decorators.finaliser to decorate the object creation tunning', name, config_path, frozen_parameters)
-        return finaliser( cls.Config(**kwargs) )      

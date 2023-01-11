@@ -106,11 +106,6 @@ class BaseRpc(BaseObject):
         """
         return 0
     
-    @classmethod
-    def prop(cls,  name: Optional[str] = None, config_path=None, frozen_parameters=None,  **kwargs):
-        cls._prop_deprecation( 'Rpc: prop() method is deprecated, use instead the pydevmgr_core.decorators.caller to decorate the fcall method from a rpc factory', name, config_path, frozen_parameters)
-        return caller( cls.Config(**kwargs) )  
-    
     
     def get_error_txt(self, rpc_error):
         """ Return Error text from an rpc_error code """

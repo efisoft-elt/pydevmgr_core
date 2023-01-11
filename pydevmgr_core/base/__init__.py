@@ -56,14 +56,6 @@ from .monitor import (
         EndMonitor, 
         MonitorLink
     )
-from .connector import (
-        BaseConnector, 
-        ConnectorGroup, 
-        Connection, 
-        ConnectionGroup, 
-        record_connector, 
-        get_connector_class
-    )
 
 
 from . import decorators
