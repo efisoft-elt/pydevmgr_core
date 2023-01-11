@@ -13,6 +13,7 @@ pydantic = "^1.9"
 systemy = "^0.1.1"
 valueparser = "^0.1.2"
 py-expression-eval = "^0.3.14"
+get-annotations = "^0.1.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.0"

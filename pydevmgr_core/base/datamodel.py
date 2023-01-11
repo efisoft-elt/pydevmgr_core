@@ -8,6 +8,16 @@ from .model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
 from .base import BaseData, BaseFactory, BaseObject
 from .object_path import ObjPath, BasePath
 from typing import  Any, Iterable, Dict, List, Optional, Type
+import inspect
+try:
+    get_annotations = inspect.get_annotations
+except AttributeError:
+    try:
+        from get_annotations import get_annotations
+    except ImportError:
+        # patch if get_annotations id not here 
+        def get_annotations(obj):
+            return obj.__annotations__
 
 class C:
     ATTR = 'attr'
@@ -160,7 +170,20 @@ def _extract_node(obj, name, field):
             raise MatchError(f'node attribute {attr!r} is not a node in {obj.__class__.__name__!r}')
          
     return node                                
+
+
+def _get_node_var_annotation(annotations, name):
     
+    annotation = annotations[name]
+    try:
+        return annotation.__origin__ # warning can be broken on other python version !!! ?? 
+    except AttributeError:
+        if issubclass(annotation, (NodeVar, StaticVar)): 
+            return annotation
+        raise ValueError()    
+    
+
+
 class DataLink(BaseDataLink):
     """ Link an object containing nodes, to a :class:`pydantic.BaseModel` 
     
@@ -171,6 +194,7 @@ class DataLink(BaseDataLink):
                          
         model (:class:`pydantic.BaseModel`): a data model. Is expecting that the data model structure 
             contains some :class:`NodeVar` type hint signature and eventually some sub models.
+            DataLink accept also basic classes with annotations when complicate link is not needed  
             
     Example: 
     
@@ -278,12 +302,21 @@ class DataLink(BaseDataLink):
                 model.value 
             except AttributeError:
                 raise ValueError("To link a Node, the data model must have the 'value' attribute")
-            self._collect_single_node(model, input)
+            if isinstance(model, BaseModel):
+                self._collect_single_node(model, input)
+            else:
+                self._collect_single_node_from_normal_class(model, input)
+                
             self._rnode_fields[input] = [('value', model)]
             self._wnode_fields[input] = [('value', model)]
             
         else:
-            self._collect_nodes(model, input, strick_match)
+            if isinstance(model, BaseModel):
+                self._collect_nodes(model, input, strick_match)
+            else:
+                if not hasattr( model, "__annotations__"):
+                    raise ValueError("Invalid model object ")
+                self._collect_nodes_on_normal_class(model, input, strick_match)
         self._input = input 
         self._model = model
     
@@ -313,6 +346,23 @@ class DataLink(BaseDataLink):
             elif issubclass(field.type_, (NodeVar_R,NodeVar,NodeVar_W, NodeVar_RW)):
                 raise ValueError("Linking a single node. Data model should not contain NodeVar fields")
     
+    def _collect_single_node_from_normal_class(self, model, input_obj):
+        annotations = get_annotations(type(model))
+
+        for name  in dir(model):
+            if name.startswith("__"): continue
+
+            try:
+                origin = _get_node_var_annotation( annotations, name) 
+            except (AttributeError, KeyError, ValueError):
+                pass
+            else:
+                if issubclass( origin, NodeVar):
+                    raise ValueError("Linking a single node. Data model should not contain NodeVar fields")
+                elif issubclass(origin, StaticVar):
+                    setattr(model, name, getattr(input_obj, name))
+ 
+
     def _collect_nodes(self, model, input_obj, strick_match):
         for name, field in model.__fields__.items():
             if not isinstance(field.type_, type):
@@ -367,6 +417,51 @@ class DataLink(BaseDataLink):
                 else:                    
                     self._collect_nodes( sub_model, sub_obj, strick_match)
     
+    def _collect_nodes_on_normal_class(self, model, input_obj, strick_match):
+        annotations = get_annotations(type(model))
+        for name in dir(model):
+            if name.startswith("__"): continue
+            try:
+
+                origin = _get_node_var_annotation( annotations , name) 
+            except (AttributeError, KeyError, ValueError):
+                pass
+            else:
+                if issubclass( origin, NodeVar):
+                    node = getattr(input_obj, name)
+                    if not isinstance(node, BaseNode):
+                        raise ValueError(f"{name} attribute is not a node")
+                    if issubclass( origin, NodeVar_R):
+                        self._rnode_fields.setdefault(node, []).append((name, model))
+                    elif issubclass(origin, (NodeVar, NodeVar_RW)):
+                        self._rnode_fields.setdefault(node, []).append((name, model))
+                        self._wnode_fields.setdefault(node, []).append((name, model))
+                    elif issubclass(origin, (NodeVar_R,)):
+                        self._wnode_fields.setdefault(node, []).append((name, model)) 
+                    continue
+                elif issubclass(origin, StaticVar):
+                    setattr(model, name, getattr(input_obj, name))
+                    continue
+                
+            try:
+                sub_model = getattr( model, name)
+            except AttributeError:
+                pass
+            else:
+                try:
+                    sub_obj = getattr(input_obj, name)  
+                except AttributeError as e:
+                    pass
+                else:
+
+                    if isinstance(sub_model, type): continue # avoid classes 
+                    if isinstance(sub_model, BaseModel):
+                        self._collect_nodes(sub_model, sub_obj, strick_match)
+                    elif getattr( sub_model, "__annotations__", None):
+                        self._collect_nodes_on_normal_class(sub_model, sub_obj, strick_match)
+
+    
+
     def download_from_nodes(self, nodevals: Dict[BaseNode,Any]) -> None:
         """ Update the data from a dictionary of node/value pairs
         

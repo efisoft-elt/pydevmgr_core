@@ -47,6 +47,18 @@ files = [
 test = ["pytest (>=6)"]
 
 [[package]]
+name = "get-annotations"
+version = "0.1.2"
+description = "A backport of Python 3.10's inspect.get_annotation() function"
+category = "main"
+optional = false
+python-versions = ">=3.6,<4.0"
+files = [
+    {file = "get-annotations-0.1.2.tar.gz", hash = "sha256:da7b69b8043237cc7f7ce5919e9cc59bd18fc4e2704b43eb34e3ba4fa9374bab"},
+    {file = "get_annotations-0.1.2-py3-none-any.whl", hash = "sha256:788ba8aa2434ee34ffb985c4aea2f9e575204c884c0e0dd0f969be846470e527"},
+]
+
+[[package]]
 name = "importlib-metadata"
 version = "6.0.0"
 description = "Read metadata from Python packages"
@@ -294,14 +306,14 @@ files = [
 
 [[package]]
 name = "valueparser"
-version = "0.1.1"
+version = "0.1.2"
 description = "Python package for quick creation of tools to parse a value"
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "valueparser-0.1.1-py3-none-any.whl", hash = "sha256:d55e9613b2f2e598279be53f5a7bfe39470775c6e76518c8dfc76ef4c5e84bfa"},
-    {file = "valueparser-0.1.1.tar.gz", hash = "sha256:67158319271a660dcbdbd17a55e4588adc7b083d0865c3aae4925abf67c20f3f"},
+    {file = "valueparser-0.1.2-py3-none-any.whl", hash = "sha256:29aa88387703a110d5b411564bf1bf3b01a64f2772ba01ee0590f9cab170da66"},
+    {file = "valueparser-0.1.2.tar.gz", hash = "sha256:425bbf3e57f67979bff7db9de26f3815e929a535a9f118abca5ece0f9fef8273"},
 ]
 
 [package.dependencies]
@@ -326,4 +338,4 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7"
-content-hash = "94fbfd0ab2493e7a64fb5e758ab955843837f256d190dd48ee07a3f8ee3d88f8"
+content-hash = "1078d590821abbccdbc45283be68a9ee83663b1ac91c98581a75a1b4d2e0a392"
