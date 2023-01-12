@@ -22,6 +22,10 @@ def test_basic():
     assert m.dev_dict['d1'].config.toto ==  ObjPath("dev_dict['d1'].config.toto").resolve(m) 
  
 
+def test_dot_shall_return_parent():
+    m = M()
+    assert m == ObjPath(".").resolve(m)
+
 def test_hac():
     m = M() 
     with pytest.raises(ValueError):

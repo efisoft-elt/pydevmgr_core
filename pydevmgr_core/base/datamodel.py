@@ -1,3 +1,5 @@
+from dataclasses import dataclass, field
+from enum import Enum, auto
 from pydantic import BaseModel, ValidationError, Field
 from pydantic.fields import ModelField
 from pydantic.main import create_model
@@ -6,8 +8,9 @@ from .upload import upload
 from .node import BaseNode
 from .model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
 from .base import BaseData, BaseFactory, BaseObject
-from .object_path import ObjPath, BasePath
-from typing import  Any, Iterable, Dict, List, Optional, Type
+from .object_path import AttrPath, ObjPath, BasePath, TuplePath, objpath
+from typing import  Any, Iterable, Dict, List, Optional,  Tuple, Type, Union
+from warnings import warn
 import inspect
 try:
     get_annotations = inspect.get_annotations
@@ -19,6 +22,10 @@ except AttributeError:
         def get_annotations(obj):
             return obj.__annotations__
 
+def get_fields(model: BaseModel):
+    return model.__fields__
+
+
 class C:
     ATTR = 'attr'
     ITEM = 'item'
@@ -28,148 +35,298 @@ class C:
 class MatchError(ValueError):
     ...
 
-def _extract_static(obj, name, field):        
-    if C.ATTR in field.field_info.extra:
-        if field.field_info.extra.get(C.ITEM, None) is not None:
-            raise ValueError(f'{C.ATTR!r} and {C.ITEM!r} cannot be both set, choose one.')                    
-        
-        attribute = field.field_info.extra[C.ATTR]
-        if attribute == ".":
-            val = obj 
-        else:
-            if attribute:
-                try:
-                    val = getattr(obj, attribute)
-                except AttributeError:
-                    raise MatchError(f'{attribute!r} is not an attribute of {obj.__class__.__name__!r}')
-            else:
-                val = obj
+class NodeMode(str, Enum):
+    RW = "rw"
+    R = "r"
+    W = "w"
+
+def _node_var2mode(node_var):
+    if issubclass(node_var, NodeVar_W):
+        return  NodeMode.W 
+    if issubclass( node_var, NodeVar_R):
+        return NodeMode.R 
     
-    elif C.ITEM in field.field_info.extra:             
-        item = field.field_info.extra[C.ITEM]
-        try:
-            val = obj[item]
-        except KeyError:
-            raise MatchError(f'{item!r} is not an item of {obj.__class__.__name__!r}')
-    else:
-        try:
-            val = getattr(obj, name)
-        except AttributeError:
-            raise MatchError(f'{name!r} is not an attribute of {obj.__class__.__name__!r}')        
+    return NodeMode.RW
     
-    return val
-        
-def _extract_node(obj, name, field):
-    """ called when a NodeVar is detected in datamodel """
-    if C.NODE in field.field_info.extra:
-         
-        node = field.field_info.extra[C.NODE]
-        #node = to_path(node)  
-        if field.field_info.extra.get(C.ATTR, None) is not None:
-            raise MatchError(f'node={C.NODE!r} and attr={C.ATTR!r} cannot be both set, choose one.')
-        
-        if field.field_info.extra.get(C.PATH, None) is not None:
-            raise MatchError(f'node={C.NODE!r} and path={C.PATH!r} cannot be both set, choose one.')
-        
-        if field.field_info.extra.get(C.ITEM, None) is not None:
-            raise MatchError(f'node={C.NODE!r} and item={C.ITEM!r} cannot be both set, choose one.')
-                                        
-        if isinstance( node, BaseFactory):
-            node = node.build(obj, name)
+
+
+@dataclass
+class NodeField:
+    node: Union[ObjPath, BaseNode, BaseFactory] 
+    name: str
+    mode: NodeMode = NodeMode.RW 
+    
+
+    def resolve(self, obj):
+        if isinstance(self.node, BasePath):
+            return self.node.resolve(obj)
+        elif isinstance(self.node, BaseFactory):
+            node = self.node.build(obj, self.name)
             if not isinstance(node, BaseNode):
-                raise ValueError(f'factory {name} does not resolve to a node object')
-    
-        elif isinstance(node, str):
-            try:
-                attr = node
-                node = getattr(obj, attr)
-            except AttributeError:
-                try:
-                    node = ObjPath(attr).resolve(obj)
-                except:
-                    raise MatchError(f'{attr!r} is not a node in {obj.__class__.__name__!r}')
-        elif hasattr(node, "__iter__"):
-            
-            attr = node
-            cobj = obj
-            path = tuple(attr)
-            for a in path[:-1]:
-                cobj = getattr(cobj, a)
-            try:
-                node = getattr(cobj, path[-1])
-            except AttributeError:
-                raise MatchError(f'{path[-1]!r} is not a node in {obj.__class__.__name__!r} with path {path}')        
-        elif isinstance(node, BasePath):
-            node = node.resolve(obj)
+                raise ValueError(f'factory {self.name} does not resolve to a node object')
+            return node 
+        return self.node         
+
+    def is_readable(self):
+        return self.mode == NodeMode.R or self.mode == NodeMode.RW 
+
+    def is_writable(self):
+        return self.mode == NodeMode.W or self.mode == NodeMode.RW 
+
+
+    @classmethod
+    def from_field(cls, name, field):
+        if C.NODE in field.field_info.extra:
+            node = field.field_info.extra[C.NODE]
+        else:
+            if "." in name:
+                node = ObjPath(name)
+            else:
+                node = AttrPath(name)
         
+        if isinstance( node, (BasePath, str, tuple, list)):
+            node = objpath(node)
         elif not isinstance(node, BaseNode):
-            raise MatchError(f'node set in the field is not a node')
+            if not isinstance(node, BaseFactory):
+                raise ValueError( f"Invalid node argument expecting a BaseNode, a Factory or string got {node}")
+    
+        node_var = field.type_
+        mode = _node_var2mode(node_var) 
+        return cls(node, name, mode=mode)
+    
+    @classmethod
+    def from_member(cls, name, type_):
+        mode=_node_var2mode(type_)
+        return cls( AttrPath(name), name, mode=mode)
+  
+@dataclass
+class SingleNodeField(NodeField):
+    node: Union[ObjPath, BaseNode, BaseFactory] = ObjPath(".")
+    name: str = "value"
+    mode: NodeMode = NodeMode.RW
+    def resolve(self, obj):
+        if not isinstance(obj, BaseNode):
+            return ValueError("Expecting a node object")
+        return obj
+
+    @classmethod
+    def from_field(cls, name, field):
+        return cls( )
+    @classmethod
+    def from_member(cls, name, type_):
+        return cls()
+
+
+@dataclass
+class StaticField:
+    path: BasePath
+    name: str
+    value: Optional[Any] = None
+    def resolve(self, obj):
+        return self.path.resolve(obj)
+
+    @classmethod
+    def from_field(cls, name, field):
+        if C.PATH in field.field_info.extra:
+            path = objpath(field.field_info.extra[C.PATH] )
+        elif C.ATTR in field.field_info.extra:
+            warn( f"{C.ATTR} var in field is deprecated, use {C.PATH!r}" , DeprecationWarning)
+            path = ObjPath(field.field_info.extra[C.ATTR] )
+        elif C.ITEM in field.field_info.extra:
+            warn( f"{C.ITEM} var in field is deprecated, use {C.PATH!r}" , DeprecationWarning)
+            item = field.field_info.extra[C.ITEM] 
+            path = ObjPath(f"['{item}']")
+        else:
+            if "." in name:
+                path = ObjPath(name)
+            else:
+                path = AttrPath(name)
+        return cls(path, name)
+    
+    @classmethod
+    def from_member(cls, name, type_):
+        return cls(AttrPath(name), name) 
+
+@dataclass
+class ObjField:
+    path: BasePath
+    name: str
+    
+    def resolve(self, obj):
+        child = self.path.resolve(obj)
+        if not hasattr( child, "__dict__"):
+            raise ValueError(f"{self.name!r} member is not an object")
+        return child 
+
+    @classmethod
+    def from_field(cls, name, field):
+        if C.PATH in field.field_info.extra:
+            path = objpath(field.field_info.extra[C.PATH] )
+        elif C.ATTR in field.field_info.extra:
+            warn( f"{C.ATTR} var in field is deprecated, use {C.PATH!r}" , DeprecationWarning)
+            path = ObjPath(field.field_info.extra[C.ATTR] )
+        elif C.ITEM in field.field_info.extra:
+            warn( f"{C.ITEM} var in field is deprecated, use {C.PATH!r}" , DeprecationWarning)
+            item = field.field_info.extra[C.ITEM] 
+            path = ObjPath(f"['{item}']")
+        else:
+            if "." in name:
+                path = ObjPath(name)
+            else:
+                path = AttrPath(name)
+
+        return cls(path, name)   
+    
+    @classmethod
+    def from_member(cls, name, type_):
+        return cls(AttrPath(name), name) 
+    
+
+@dataclass
+class DataFields:
+    nodes: List[NodeField] = field( default_factory=list)
+    objects: List[ObjField] = field(default_factory=list)
+    statics: List[StaticField] = field(default_factory=list)
+
+class BaseExtractor:
+    def extract(self, model)-> DataFields:
+        raise NotImplementedError()
+    
+class PydanticModelExtractor(BaseExtractor):
+    def extract(self, model) -> DataFields:
+        output = DataFields()
+        fields = get_fields(model)
         
+        for name, field in fields.items():
+            if not isinstance(field.type_, type):
+                continue 
+            if issubclass(field.type_, StaticVar):
+                output.statics.append( StaticField.from_field(name, field)  )
+            elif issubclass(field.type_, NodeVar):
+                output.nodes.append( NodeField.from_field( name, field) )
+            else:
+                output.objects.append( ObjField.from_field( name, field))
+        return output
+
+class NormalClassExtractor(BaseExtractor):
+    def extract(self, cls: Type) -> DataFields:
+        output = DataFields()
+        if not hasattr( cls, "__dict__"):
+            pass 
+            
+        annotations = get_annotations(cls)
+        for name in dir (cls):
+            if name.startswith("__"): continue 
+            try:
+                origin = _get_node_var_annotation( annotations, name)
+            except (AttributeError, KeyError, ValueError):
+                pass 
+            else:
+                if issubclass(origin, NodeVar):
+                    output.nodes.append( NodeField.from_member(name, origin) )
+                    continue
+                elif issubclass(origin, StaticVar):
+                    output.statics.append( StaticField.from_member(name, origin))
+                    continue 
+            
+            obj = getattr(cls, name)
+            if isinstance( obj, type): continue 
+            if hasattr(obj, "__dict__"):
+                output.objects.append( ObjField.from_member( name, annotations.get(name, None)))
+        return output
+
+
+class SingleNodeModelExtractor(BaseExtractor):
+    def extract(self, model):
+        output = DataFields()
+        fields = get_fields(model)
+        
+        if not "value" in fields:
+            raise ValueError("expecting a .value attribute for single node link")
+        
+        for name, field in fields.items():
+            if not isinstance(field.type_, type):
+                continue 
+            if issubclass(field.type_, StaticVar):
+                output.statics.append( StaticField.from_field(name, field)  )
+            elif issubclass(field.type_, NodeVar):
+                if name != "value":
+                    raise ValueError("NodeVar is not allowed for single node link")
+        
+        output.nodes.append( SingleNodeField.from_field( "value", fields["value"] ) )
+        return output
+
+class SingleNodeNormalClassExtractor(BaseExtractor):
+    def extract(self, cls):
+        output = DataFields()
+        annotations = get_annotations(cls)
+
+        if not "value" in dir(cls):
+            raise ValueError("expecting a .value attribute for single node link")
+        for name in dir(cls):
+            if name.startswith("__"): 
+                continue 
+            try:
+                origin = _get_node_var_annotation( annotations, name)
+            except (AttributeError, KeyError, ValueError):
+                pass 
+            else:
+                if issubclass(origin, StaticVar):
+                    output.statics.append( StaticField.from_member(name, origin))
+                    continue 
+                if issubclass(origin, NodeVar):
+                    if name != "value":
+                        raise ValueError("NodeVar is not allowed for single node link")
+        output.nodes.append( SingleNodeField.from_member( "value", annotations.get(name, None) ))
+        return output  
+
         
 
-    elif C.ATTR in field.field_info.extra:
-        if field.field_info.extra.get(C.ITEM, None) is not None:
-            raise MatchError(f'attr={C.ATTR!r} and item={C.ITEM!r} cannot be both set, choose one.')
-        if field.field_info.extra.get(C.PATH, None) is not None:
-            raise MatchError(f'attr={C.ATTR!r} and path={C.PATH!r} cannot be both set, choose one.') 
-            
-        attr = field.field_info.extra[C.ATTR]  
-        if attr:            
+@dataclass
+class NodeDataLinks:
+    nodes_info: Dict[BaseNode,NodeField] = field(default_factory=dict)
+    readable_nodes: Dict[BaseNode, List[Tuple[str,Any]]] = field(default_factory=dict)
+    writable_nodes: Dict[BaseNode, List[Tuple[str,Any]]] = field(default_factory=dict)
+
+
+@dataclass
+class NodeResolver:
+    extractor:  BaseExtractor
+    def resolve(self, fields: DataFields, obj:Any, data:Any, output=None):
+        if output is None: 
+            output = NodeDataLinks()
+
+        for static in fields.statics:
+            setattr( data, static.name , static.resolve(obj) )
+
+        for node_field in fields.nodes:
+            node = node_field.resolve(obj)
+            pairs =  (node_field.name, data)
+
             try:
-                node = getattr(obj, attr)
+                getattr(data,  node_field.name).value 
             except AttributeError:
-                raise MatchError(f'{attr!r} is not a node in {obj.__class__.__name__!r}')
-        else:
-            node = obj        
-            
-    elif C.PATH in field.field_info.extra:
-        if field.field_info.extra.get(C.ITEM, None) is not None:
-            raise MatchError(f'path={C.PATH!r} and item={C.ITEM!r} cannot be both set, choose one.')
-             
-        path = field.field_info.extra[C.PATH]
-        # path = to_path(path)    
-        if path:
-            
-            if isinstance(path, str):
-                path = path.split('.')                
-            elif not hasattr(path, "__iter__"):
-                raise MatchError(f"expecting string or iterable for path parameter got {path!r}")
-                
-            cobj = obj
-            path = tuple(path)
+                pass
+            else:
+                pairs = ("value",  getattr( data, node_field.name))
+
+            if node_field.is_readable():
+                output.readable_nodes.setdefault( node, []).append(  pairs) 
+            if node_field.is_writable():
+                output.writable_nodes.setdefault( node, []).append(  pairs) 
+            output.nodes_info[node] = node_field
+
+        for obj_field in fields.objects:
             try:
-                for a in path[:-1]:
-                    cobj = getattr(cobj, a)
-                node = getattr(cobj, path[-1])
-            except AttributeError:
-                raise MatchError(f'{path!r} is not a valid in {obj.__class__.__name__!r} with path {path}')                                    
-        else:
-            node = obj
-             
-        if not isinstance(node, BaseNode):
-            raise MatchError(f'node attribute  {C.attr!r} is not a node in {obj.__class__.__name__!r}')
-    
-    elif C.ITEM in field.field_info.extra:
-         
-        item = field.field_info.extra[C.ITEM]
-        try:
-            node = obj[item]
-        except (KeyError, TypeError):
-            raise MatchError(f'{item!r} is not an item in {obj.__class__.__name__!r}')
-                             
-        if not isinstance(node, BaseNode):
-            raise MatchError(f'node item {item!r} is not a node in {obj.__class__.__name__!r}')    
-                                            
-    else:
-        attr = name
-        try:
-            node = getattr(obj, attr)
-        except AttributeError as e:
-            raise MatchError(f'{attr!r} is not a node in {obj.__class__.__name__!r}')         
-        if not isinstance(node, BaseNode):
-            raise MatchError(f'node attribute {attr!r} is not a node in {obj.__class__.__name__!r}')
-         
-    return node                                
+                sub_obj = obj_field.resolve(obj)
+            except (KeyError, AttributeError) as e:
+                pass
+            else:
+                if hasattr(sub_obj, "__dict__"):
+                    sub_data =  getattr(data, obj_field.name)
+                    sub_fields = self.extractor.extract(type(sub_data)) 
+                    self.resolve( sub_fields, sub_obj, sub_data, output) 
+        return output
 
 
 def _get_node_var_annotation(annotations, name):
@@ -182,144 +339,149 @@ def _get_node_var_annotation(annotations, name):
             return annotation
         raise ValueError()    
     
+def collect_nodes( input, model, output: Optional[NodeDataLinks] = None) -> Union[None, NodeDataLinks]:
+    """ return a :class:`NodeDataLinks` object from the match of an object and a data model instance 
+
+    Function mainly used by :class:`DataLink` to build the depences between nodes and data
+    """
+    return_output = False
+    if output is None:
+        output = NodeDataLinks() 
+        return_output = True 
+    if isinstance(input, BaseNode):
+        if isinstance( model, BaseModel):
+            extractor = SingleNodeModelExtractor()
+        else:
+            extractor = SingleNodeNormalClassExtractor()
+    else:
+        if isinstance( model, BaseModel):
+            extractor = PydanticModelExtractor()
+        else:
+            extractor = NormalClassExtractor()
+    resolver = NodeResolver(extractor)
+
+    fields = extractor.extract( type(model))
+    resolver.resolve(fields, input, model, output)
+    
+    if return_output:
+        return output
 
 
 class DataLink(BaseDataLink):
     """ Link an object containing nodes, to a :class:`pydantic.BaseModel` 
     
+    
+    
+
     Args:
         input (Any):  Any object with attributes, expecting that the input contains some 
                       :class:`BaseNode` attributes in its hierarchy and eventualy some other 
-                      pydevmgr object 
+                      pydevmgr object to be linked with the data 
                          
-        model (:class:`pydantic.BaseModel`): a data model. Is expecting that the data model structure 
+        model (:class:`pydantic.BaseModel`, Any): a data model or a normal class (e.i. dataclass). 
+            Is expecting that the data structure 
             contains some :class:`NodeVar` type hint signature and eventually some sub models.
-            DataLink accept also basic classes with annotations when complicate link is not needed  
-            
-    Example: 
+            DataLink accept also basic classes with annotations when complicate links are not needed  
+        *other_models : if you have more model to linkd with the input object   
+
+    Example of valid data (assuming pos_actual and pos_error are nodes of ``device.stat``):
+
+    Before 
+
+    ::
+
+        from pydevmgr_core import NodeVar 
+         
+        class Data:
+            pos_actual: NodeVal = 0.0 
+            pos_error: NodeVar = 0.0
+        
     
-        In the following, it is assumed that the motor1 object has a .stat attribute and the .stat
-        object have nodes as `pos_actual`, `vel_actual`, etc ... 
+    :: 
         
-        ::
+        from pydevmgr_core import NodeVar 
+        from dataclasses import dataclass 
         
-            from pydevmgr_core import NodeVar, DataLink
-            from pydevmgr_core.nodes import UtcTime
-            from pydantic import BaseModel, Field
-            
-            class MotorStatData(BaseModel):
-                # the following nodes will be retrieve from the input object, the name here is the 
-                # the attribute of the input object                
-                pos_actual:  NodeVar[float] = 0.0  
-                vel_actual:  NodeVar[float] = 0.0  
-                
-                
-                
-                # also the input object attribute pointing to a node can be changed 
-                # with the no de keyword in Field (from pydantic import Field)
-                pos: NodeVar[float] = Field(0.0, node='pos_actual')
-                vel: NodeVar[float] = Field(0.0, node='vel_actual')
-                 
-                
-            class MotorData(BaseModel):   
-                class Stat(BaseModel):
-                    pos_actual:  NodeVar[float] = 0.0  
-                    vel_actual:  NodeVar[float] = 0.0  
-                    
-                stat = Stat()
-                num  : int =1 # other data which are not node related                
-                
-                # Add the stat Data Model 
-                stat : MotorStatData = MotorStatData()
-                
-                # This node is standalone, not linked to input object, 
-                # it must be specified in Field with the node keyword 
-                utc:         NodeVar[str]   = Field('1950-01-01T00:00:00.00000', node=UtcTime('utc'))
-                
-                
-            >>> data = MotorData()
-            >>> data.stat.pos
-            0.0
-            >>> link = DataLink( motor1, data )
-            >>> link.download() # download node values inside data from tins.motor1
-            >>> data.stat.pos
-            4.566   
-            >>> data.utc
-            '2020-12-17T10:05:15.831726'
+        @dataclass
+        class Data:
+            pos_actual: NodeVal = 0.0 
+            pos_error: NodeVar = 0.0
+       
+    :: 
         
-        It is also possible to point to a node path with the ``node`` keyword in a field
+        from pydevmgr_core import NodeVar 
+        from pydantic import BaseModel, Field
+        from pydantic_core.nodes import UtcTime  
+        
+        class Data(BaseModel):
+            pos_actual: NodeVal = 0.0 
+            pos_error: NodeVar = 0.0
+            time: NodeVar = Field( '1950-01-01T00:00:00.00000', node=UtcTime() )
+        
+        data = Data()
+        dl = DataLink( my_device.stat , data)
+        dl.download()
 
-        ::
+    Above the node parameter in Field is setting the node (no match to the object)
+    node argument can also be a string path to the node :
 
-            class MotorData(BaseModel):
-                pos: NodeVar[float] = Field(0.0, node='stat.pos_actual')
-                vel: NodeVar[float] = Field(0.0, node='stat.vel_actual')
-                utc:         NodeVar[str]   = Field('1950-01-01T00:00:00.00000', node=UtcTime('utc'))
+    ::
+        
+        from pydevmgr_core import NodeVar 
+        from pydantic import BaseModel, Field
+        from pydantic_core.nodes import UtcTime  
+        
+        class Data(BaseModel):
+            pos_actual: NodeVal = Field(0.0, node="stat.pos_actual")
+            pos_error: NodeVar  = Field(0.0, node="stat.pos_error") 
+            time: NodeVar = Field( '1950-01-01T00:00:00.00000', node=UtcTime() )
+        
+        data = Data()
+        dl = DataLink( my_device  , data)
+        dl.download()
+       
+    Data link try also to match input object structure and data strucure
 
+    ::
 
-        :class:`DataLink` can be added to a :class:`Downloader`, at init or with the :meth:`Dwonloader.add_datalink` method
-        typicaly, here after how it can be used in an application 
+          
+        from pydevmgr_core import NodeVar 
+        from pydantic import BaseModel, Field
+        from pydantic_core.nodes import UtcTime  
+        
+        class StatData:
+            pos_actual: NodeVal = 0.0 
+            pos_error: NodeVar = 0.0
+        
+        class Data:
+            stat = StatData()
+            time: NodeVar = Field( '1950-01-01T00:00:00.00000', node=UtcTime() )
+        
+        data = Data()
+        dl = DataLink( my_device , data)
+        dl.download()
 
-        ::
             
-            
-            from pydevmgr_core import Downloader, DataLink
-            form pydantic import BaseModel, Field 
-
-            class MyApp: 
-                class Data(BaseModel)
-                    pos: NodeVar[float] = Field(0.0, node='stat.pos_actual')
-                    vel: NodeVar[float] = Field(0.0, node='stat.vel_actual')
-                    utc: NodeVar[str]   = Field('1950-01-01T00:00:00.00000', node=UtcTime('utc'))
-
-                def __init__(self):
-                    self.data = Data()
-                    self._connection = None
-                
-                def update(self):
-                    print( f"{self.data.utc} Position is {self.data.pos:.3f} and velocity {self.data.vel:.2f}" )
-
-                def connect(self, downloader: Downloader, device)-> None:
-                    dl = DataLink( self.device, self.data)
-                    self._connection = downloader.new_connection()
-                    self._connection.add_datalink( dl ) 
-                    self._connection.add_callback( self.update) 
-
-                def disconnect(self):
-                    if self._connection:
-                        self._connection.disconnect()
     """
     def __init__(self, 
           input : Any, 
-          model : BaseModel, 
-          strick_match : bool = True 
+          model : BaseModel,
+          *other_models
         ) -> None:
         
         self._rnode_fields = {}
         self._wnode_fields = {}
-        if isinstance(input, BaseNode):
-            try:
-                model.value 
-            except AttributeError:
-                raise ValueError("To link a Node, the data model must have the 'value' attribute")
-            if isinstance(model, BaseModel):
-                self._collect_single_node(model, input)
-            else:
-                self._collect_single_node_from_normal_class(model, input)
-                
-            self._rnode_fields[input] = [('value', model)]
-            self._wnode_fields[input] = [('value', model)]
-            
-        else:
-            if isinstance(model, BaseModel):
-                self._collect_nodes(model, input, strick_match)
-            else:
-                if not hasattr( model, "__annotations__"):
-                    raise ValueError("Invalid model object ")
-                self._collect_nodes_on_normal_class(model, input, strick_match)
+        node_fields = collect_nodes(input, model)
+        for other in other_models:
+            collect_nodes( input, other, node_fields)
+
+
+        self._rnode_fields = node_fields.readable_nodes
+        self._wnode_fields = node_fields.writable_nodes
+
         self._input = input 
         self._model = model
-    
+
     @property
     def model(self)-> BaseModel:
         return self._model    
@@ -335,132 +497,7 @@ class DataLink(BaseDataLink):
     @property
     def wnodes(self)-> Iterable:
         return self._wnode_fields
-    
-    def _collect_single_node(self, model, input_obj):
-        for name, field in model.__fields__.items():
-            if not isinstance(field.type_, type):
-                continue            
-            if issubclass(field.type_, StaticVar):
-                val = _extract_static(input_obj, name, field)
-                setattr(model, name, val) 
-            elif issubclass(field.type_, (NodeVar_R,NodeVar,NodeVar_W, NodeVar_RW)):
-                raise ValueError("Linking a single node. Data model should not contain NodeVar fields")
-    
-    def _collect_single_node_from_normal_class(self, model, input_obj):
-        annotations = get_annotations(type(model))
-
-        for name  in dir(model):
-            if name.startswith("__"): continue
-
-            try:
-                origin = _get_node_var_annotation( annotations, name) 
-            except (AttributeError, KeyError, ValueError):
-                pass
-            else:
-                if issubclass( origin, NodeVar):
-                    raise ValueError("Linking a single node. Data model should not contain NodeVar fields")
-                elif issubclass(origin, StaticVar):
-                    setattr(model, name, getattr(input_obj, name))
- 
-
-    def _collect_nodes(self, model, input_obj, strick_match):
-        for name, field in model.__fields__.items():
-            if not isinstance(field.type_, type):
-                continue        
-            if issubclass(field.type_, StaticVar):
-                try:
-                    val = _extract_static(input_obj, name, field)
-                except MatchError as e:
-                    if strick_match: raise e
-                else:    
-                    setattr(model, name, val)
-                    
-            elif issubclass(field.type_, (NodeVar_R,)):
-                try:
-                    node = _extract_node(input_obj, name, field)               
-                except MatchError as e:
-                    if strick_match: raise e
-                else:
-                    self._rnode_fields.setdefault(node, []).append((name, model))
-            
-            elif issubclass(field.type_, (NodeVar, NodeVar_RW)):
-                try:
-                    node = _extract_node(input_obj, name, field)               
-                except MatchError as e:
-                    if strick_match: raise e
-                else:
-                    
-                    self._rnode_fields.setdefault(node, []).append((name, model))
-                    self._wnode_fields.setdefault(node, []).append((name, model))
-                       
-            elif issubclass(field.type_, (NodeVar_W, )):
-                try:
-                    node = _extract_node(input_obj, name, field)
-                except MatchError as e:
-                    if strick_match: raise e
-                else:                  
-                    self._wnode_fields.setdefault(node, []).append((name, model))   
-           
-            elif issubclass(field.type_, BaseModel):
-                # chidren is ignored if path is broken
-                sub_model = getattr(model, name)
-                if not isinstance(sub_model, BaseModel):                
-                    continue
-                
-                                                    
-                try:
-                    sub_obj = _extract_static(input_obj, name, field)
-                except MatchError as e:
-                    # if BaseData force the existance of the path 
-                    if strick_match and issubclass(field.type_, BaseData):
-                        raise e
-                else:                    
-                    self._collect_nodes( sub_model, sub_obj, strick_match)
-    
-    def _collect_nodes_on_normal_class(self, model, input_obj, strick_match):
-        annotations = get_annotations(type(model))
-        for name in dir(model):
-            if name.startswith("__"): continue
-            try:
-
-                origin = _get_node_var_annotation( annotations , name) 
-            except (AttributeError, KeyError, ValueError):
-                pass
-            else:
-                if issubclass( origin, NodeVar):
-                    node = getattr(input_obj, name)
-                    if not isinstance(node, BaseNode):
-                        raise ValueError(f"{name} attribute is not a node")
-                    if issubclass( origin, NodeVar_R):
-                        self._rnode_fields.setdefault(node, []).append((name, model))
-                    elif issubclass(origin, (NodeVar, NodeVar_RW)):
-                        self._rnode_fields.setdefault(node, []).append((name, model))
-                        self._wnode_fields.setdefault(node, []).append((name, model))
-                    elif issubclass(origin, (NodeVar_R,)):
-                        self._wnode_fields.setdefault(node, []).append((name, model)) 
-                    continue
-                elif issubclass(origin, StaticVar):
-                    setattr(model, name, getattr(input_obj, name))
-                    continue
-                
-            try:
-                sub_model = getattr( model, name)
-            except AttributeError:
-                pass
-            else:
-                try:
-                    sub_obj = getattr(input_obj, name)  
-                except AttributeError as e:
-                    pass
-                else:
-
-                    if isinstance(sub_model, type): continue # avoid classes 
-                    if isinstance(sub_model, BaseModel):
-                        self._collect_nodes(sub_model, sub_obj, strick_match)
-                    elif getattr( sub_model, "__annotations__", None):
-                        self._collect_nodes_on_normal_class(sub_model, sub_obj, strick_match)
-
-    
+         
 
     def download_from_nodes(self, nodevals: Dict[BaseNode,Any]) -> None:
         """ Update the data from a dictionary of node/value pairs
@@ -585,5 +622,57 @@ def create_data_class(name: str, objects: Iterable, base_class: Optional[Type] =
     return create_model( name, __base__= base_class, **data_obj  )
 
 
-    
+@dataclass
+class DataModelInfoExtractor:
+    InfoStructure: BaseModel 
+    include_type : Optional[Tuple[Type]] = None
+    def __post_init__(self):
+        self.field_extractor = ModelInfoFieldExtractor( self.InfoStructure)
 
+
+    def extract(self, Data: Type[BaseModel], name=None, base=None):
+                
+        infos = {}
+        for name, field in get_fields(Data).items():
+           
+            if issubclass(field.type_, BaseModel):
+                infos[name] = self.extract( field.type_)()
+            else:
+                if self.include_type:
+                    if not issubclass( field.type_, self.include_type): continue 
+                        
+                infos[name] = (self.InfoStructure, self.field_extractor.extract(field))
+        if name is None:
+            name = "Info"+Data.__name__
+        return create_model(name,__base__ = base, **infos)
+
+
+@dataclass 
+class ModelInfoFieldExtractor:
+    InfoStructure: BaseModel 
+    def __post_init__(self):
+        info_fields = get_fields(self.InfoStructure)
+        
+        def extract(field):
+            extras = field.field_info.extra
+            values = {}
+            for name in info_fields:
+                try:
+                    val = getattr(field.field_info, name)
+                except AttributeError:
+                    try:
+                        val = extras[name]
+                    except KeyError:
+                        pass 
+                    else:
+                        values[name] = val 
+                else:
+                    if val is not None:
+                        values[name] = val 
+    
+            return self.InfoStructure(**values) 
+
+        self.extract = extract
+
+def extract_model_info(Data,  InfoStructure, include_type= None, name=None, base=None):
+    return DataModelInfoExtractor(InfoStructure, include_type=include_type).extract(Data, name=name, base=base)
