@@ -21,6 +21,7 @@ class ObjPath(BasePath):
         self._path = path
     
     def resolve(self, parent):
+        if self._path == ".":  return parent 
         return eval( "parent."+self._path, _path_glv , {'parent':parent} ) 
     
 class AttrPath(BasePath):
