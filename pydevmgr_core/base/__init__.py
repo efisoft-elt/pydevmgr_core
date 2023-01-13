@@ -60,6 +60,6 @@ from .monitor import (
 
 from . import decorators
  
-from .object_path import BasePath, ObjPath, AttrPath
+from .object_path import BasePath, ObjPath, AttrPath, ItemPath, objpath
 
 # from .decorators import getter, setter, finaliser, nodealias, nodealias_maker, node_maker

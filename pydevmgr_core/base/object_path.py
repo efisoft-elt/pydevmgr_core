@@ -84,27 +84,43 @@ class DummyPath(BasePath):
         raise AttributeError("Cannot set value for DummyPath")
 
 class ObjPath(BasePath):
-    def __init__(self, path):
+    def __init__(self, path:str):
         if _forbiden.match(path):
             raise ValueError("Invalid path")
-        self._path = path
+        self._path = path.lstrip(".")
+        self._prefix = "" if path.startswith("[") else "."
     
     def resolve(self, parent):
-        if self._path == ".":  return parent 
-        return eval( "parent."+self._path, _path_glv , {'parent':parent} ) 
+        if not self._path:  return parent
+               
+        return eval( "parent"+self._prefix+self._path, _path_glv , {'parent':parent} ) 
     
     def set_value(self, root, value):
         
-        exec( "parent."+self._path+" = value",  _path_glv , {'parent':root, 'value':value})
+        exec( "parent"+self._prefix+self._path+" = value",  _path_glv , {'parent':root, 'value':value})
         
 
     def split(self)->Tuple[BasePath, BasePath]:
+        if self._path.startswith("["): # Cannot split path item ? 
+            return DummyPath(), self 
+        
         splitted = [p  for p in self._path.split(".") if p]
         if len (splitted)>1:
             return TuplePath(tuple(splitted[0:-1])), ObjPath(splitted[-1] )
         else:
             return DummyPath(), ObjPath( splitted[0] )  
 
+class ItemPath(BasePath):
+    def __init__(self, item):
+        self._item = item 
+    def resolve(self, root):
+        return root[self._item]
+    
+    def split( self):
+        return DummyPath(), self 
+
+    def set_value(self, root, value):
+        root[self._item] = value 
 
 class TuplePath(BasePath):
     def __init__(self, path):

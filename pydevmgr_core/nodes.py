@@ -7,7 +7,9 @@ from  datetime import datetime, timedelta
 from typing import Union, List, Dict, Optional, Any
 from py_expression_eval import Parser
 from dataclasses import dataclass
-import math 
+import math
+
+from pydevmgr_core.base.object_path import PathVar 
 
 _eval_parser = Parser()
 
@@ -56,6 +58,10 @@ __all__ = [
 ]
 
 
+class __Undefined__:
+    pass
+
+
 @register
 class Local(BaseNode):
     """ The node is getting/setting values from the localdata dictionary 
@@ -77,6 +83,31 @@ class Local(BaseNode):
         
     def fset(self, value):
         self.localdata[self.key] = value
+
+
+@register
+class DataValue(BaseNode):
+    """ node is getting/setting from the data structure found inside the engine 
+    The targeted node is resolved from the data_suffix attribute 
+    """
+    class Config:
+        data_suffix: PathVar 
+        default: Any = __Undefined__ 
+    
+    def fget(self):
+        try:
+            value = self.data_suffix.resolve(self.engine.data)
+        except AttributeError as e:
+            if self.default is __Undefined__:
+                raise e
+            else:
+                value = self.default 
+        return value
+    
+    def fset(self, value):
+        self.data_suffix.set_value( self.engine.data, value)
+         
+
 
 
 @register

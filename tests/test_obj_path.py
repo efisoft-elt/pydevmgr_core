@@ -1,6 +1,6 @@
 from pydantic.main import BaseModel
 import pytest 
-from pydevmgr_core.base.object_path import AttrPath, ObjPath, PathVar, TuplePath 
+from pydevmgr_core.base.object_path import AttrPath, ItemPath, ObjPath, PathVar, TuplePath 
 
 from pydevmgr_core import BaseManager,  BaseDevice
 from systemy import FactoryList, FactoryDict
@@ -77,6 +77,18 @@ def test_split_method():
     assert p.split()[0].resolve(root) is root.a.b.c
     assert p.split()[1].resolve(root.a.b.c) == root.a.b.c.l[0]
 
+def test_items():
+    l = [[10,20], 30]
+    p = ItemPath(1)
+    assert p.resolve(l) == 30
+    
+    p = ObjPath( "[0][1]")
+    assert p.resolve(l) == 20
+    class A:
+        x = 99.99
+    l = [[A()]]
+    p = ObjPath( "[0][0].x")
+    assert p.resolve(l) == 99.99 
 
 
 def test_set_value():
