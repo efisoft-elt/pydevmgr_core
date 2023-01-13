@@ -7,7 +7,7 @@ from pydevmgr_core.base.model_var import NodeVar, NodeVar_R, NodeVar_RW, NodeVar
 from pydevmgr_core.base.node_alias import NodeAlias1
 from pydevmgr_core.nodes import Value
 
-from pydevmgr_core.base.datamodel import NodeField, NodeMode, NodeResolver, NormalClassExtractor, ObjField, PydanticModelExtractor, SingleNodeModelExtractor, SingleNodeNormalClassExtractor, StaticField, extract_model_info, get_annotations
+from pydevmgr_core.base.datamodel import NodeField, NodeMode, NodeResolver, NormalClassExtractor, ObjField, PydanticModelExtractor, SingleNodeModelExtractor, SingleNodeNormalClassExtractor, StaticField, create_model_info, get_annotations
 
 class Scale(NodeAlias1):
     class Config:
@@ -297,7 +297,7 @@ def test_info_extractor():
         sub = SubData()
         
   
-    InfoData = extract_model_info( Data, Info)  
+    InfoData = create_model_info( Data, Info)  
     i = InfoData()
     
     assert i.x.unit == "mm"
@@ -316,7 +316,7 @@ def test_info_extractor_with_filter():
 
         
   
-    InfoData = extract_model_info( Data, Info, float)  
+    InfoData = create_model_info( Data, Info, include_type=float)  
     i = InfoData()
     
     assert i.x.unit == "mm"
@@ -324,9 +324,31 @@ def test_info_extractor_with_filter():
     with pytest.raises(AttributeError):
         i.text
     
-    InfoData = extract_model_info( Data, Info, (float, str))  
+    InfoData = create_model_info( Data, Info, include_type=(float, str))  
     i = InfoData()
     
     assert i.x.unit == "mm"
     assert i.x.description == "This is x"
     assert i.text.unit == ""
+
+    InfoData = create_model_info( Data, Info, include={"x"})  
+    i = InfoData()
+    
+    assert i.x.unit == "mm"
+    with pytest.raises(AttributeError):
+        i.text
+
+    InfoData = create_model_info( Data, Info, exclude={"text"})  
+    i = InfoData()
+    
+    assert i.x.unit == "mm"
+    with pytest.raises(AttributeError):
+        i.text
+    
+    InfoData = create_model_info( Data, Info, exclude_type=str)  
+    i = InfoData()
+    
+    assert i.x.unit == "mm"
+    with pytest.raises(AttributeError):
+        i.text
+

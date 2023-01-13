@@ -625,7 +625,11 @@ def create_data_class(name: str, objects: Iterable, base_class: Optional[Type] =
 @dataclass
 class DataModelInfoExtractor:
     InfoStructure: BaseModel 
-    include_type : Optional[Tuple[Type]] = None
+    include: Optional[Iterable] = None 
+    exclude: Iterable = field(default_factory=set)
+    include_type : Optional[Union[Type,Tuple[Type]]] = None
+    exclude_type: Optional[Union[Type,Tuple[Type]]] = None
+
     def __post_init__(self):
         self.field_extractor = ModelInfoFieldExtractor( self.InfoStructure)
 
@@ -633,8 +637,20 @@ class DataModelInfoExtractor:
     def extract(self, Data: Type[BaseModel], name=None, base=None):
                 
         infos = {}
-        for name, field in get_fields(Data).items():
-           
+        fields = get_fields(Data)
+        if self.include is not None:
+            def iterator():
+                for name in set(self.include):
+                    yield name, fields[name] 
+        else:
+            iterator = fields.items
+        
+        for name, field in iterator():
+            if name in self.exclude: 
+                continue
+            if self.exclude_type:
+                if issubclass( field.type_, self.exclude_type):
+                    continue
             if issubclass(field.type_, BaseModel):
                 infos[name] = self.extract( field.type_)()
             else:
@@ -674,5 +690,29 @@ class ModelInfoFieldExtractor:
 
         self.extract = extract
 
-def extract_model_info(Data,  InfoStructure, include_type= None, name=None, base=None):
-    return DataModelInfoExtractor(InfoStructure, include_type=include_type).extract(Data, name=name, base=base)
+def create_model_info(
+        Data: Type[BaseModel],  
+        InfoStructure: Type[BaseModel],
+        include: Optional[Iterable] = None, 
+        exclude: Iterable = None, 
+        include_type: Union[Type,Tuple[Type]] = None, 
+        exclude_type: Union[Type,Tuple[Type]] = None, 
+        name: str =None, 
+        base: Type = None
+    ) -> Type[BaseModel]:
+    """ create a pydantic model representing all information found in an other model 
+
+    Args:
+        Data  (Type[BaseModel]): a Model with some value and some extra field information 
+        InfoStructure (Type[BaseModel]): The Model representing information to be extracted 
+        include (Optional, Set[str]): A set of member name to include 
+        exclude (Optional, Set[Str]): A sett of member to exclude  
+        include_type: (Optional, Type, Tuple[Type]): include only members with the given type(s)
+        exclude_type: (Optional, Type, Tuple[Type]): exclude member with the given type(s) 
+    """
+    if exclude is None: exclude = set()
+    
+    return DataModelInfoExtractor(
+            InfoStructure, include=include, exclude=exclude, 
+            include_type=include_type, exclude_type=exclude_type
+        ).extract(Data, name=name, base=base)

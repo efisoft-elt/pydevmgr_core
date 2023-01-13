@@ -1,5 +1,6 @@
+from pydantic.main import BaseModel
 import pytest 
-from pydevmgr_core.base.object_path import ObjPath 
+from pydevmgr_core.base.object_path import AttrPath, ObjPath, PathVar, TuplePath 
 
 from pydevmgr_core import BaseManager,  BaseDevice
 from systemy import FactoryList, FactoryDict
@@ -30,3 +31,49 @@ def test_hac():
     m = M() 
     with pytest.raises(ValueError):
          ObjPath( 'test()' )
+
+def test_path_var_in_model():
+    class A:
+        b = 99
+    class Data:
+        a = A() 
+
+    class M(BaseModel):
+        path1: PathVar 
+        path2: PathVar 
+        path3: PathVar 
+        path4: PathVar  
+    m = M(path1 = "", path2="a.b", path3="a", path4=("a","b"))
+    data = Data()
+    assert m.path1.resolve(data) is data 
+
+
+def test_split_method():
+    
+    class C:
+        x = 9
+        l = [1,2]
+    class B:
+        c = C()
+    class A:
+        b = B()
+    class Root:
+        a = A()
+    root = Root()
+
+    p = ObjPath("a.b.c")
+    assert p.split()[0].resolve(root) is root.a.b
+    assert p.split()[1].resolve(root.a.b) is root.a.b.c
+
+    p = TuplePath(("a","b","c"))
+    assert p.split()[0].resolve(root) is root.a.b
+    assert p.split()[1].resolve(root.a.b) is root.a.b.c
+    
+    p = AttrPath("a")
+    assert p.split()[0].resolve(root) is root
+    assert p.split()[1].resolve(root) is root.a
+
+    p = ObjPath("a.b.c.l[0]")
+    assert p.split()[0].resolve(root) is root.a.b.c
+    assert p.split()[1].resolve(root.a.b.c) == root.a.b.c.l[0]
+
