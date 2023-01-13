@@ -77,3 +77,43 @@ def test_split_method():
     assert p.split()[0].resolve(root) is root.a.b.c
     assert p.split()[1].resolve(root.a.b.c) == root.a.b.c.l[0]
 
+
+
+def test_set_value():
+    class C:
+        x = 9
+        l = [1,2]
+    class B:
+        c = C()
+    class A:
+        b = B()
+    class Root:
+        a = A()
+    root = Root()
+    p = ObjPath("a.b.c.x")
+    assert p.resolve(root) == root.a.b.c.x 
+    assert root.a.b.c.x == 9 
+    p.set_value( root, -900)
+    assert root.a.b.c.x == -900
+    
+    root.a.b.c.x = 0 
+    p = TuplePath( ("a", "b", "c", "x") )
+    p.set_value( root, -999)
+    assert root.a.b.c.x == -999
+
+    root.a.b.c.x = 0 
+    p = AttrPath( "x")
+    p.set_value( root.a.b.c, 1200)
+    assert root.a.b.c.x == 1200 
+    
+    p = ObjPath("a.b.c.l[1]") 
+    assert root.a.b.c.l[1] == 2
+    p.set_value( root, 10)
+    assert root.a.b.c.l[1] == 10
+
+
+
+
+
+
+

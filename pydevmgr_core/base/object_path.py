@@ -60,6 +60,9 @@ class BasePath:
     def split(self):
         raise NotImplementedError("split")
 
+    def set_value(self, root, value):
+        raise NotImplementedError("set_value")
+
 def objpath( path) -> BasePath:
     if isinstance( path, BasePath):
         return path
@@ -77,7 +80,9 @@ class DummyPath(BasePath):
         return parent 
     def split(self)->Tuple[BasePath, BasePath]:
         raise ValueError("Cannot split a DummyPath")
-    
+    def set_value(self)->None:
+        raise AttributeError("Cannot set value for DummyPath")
+
 class ObjPath(BasePath):
     def __init__(self, path):
         if _forbiden.match(path):
@@ -88,6 +93,11 @@ class ObjPath(BasePath):
         if self._path == ".":  return parent 
         return eval( "parent."+self._path, _path_glv , {'parent':parent} ) 
     
+    def set_value(self, root, value):
+        
+        exec( "parent."+self._path+" = value",  _path_glv , {'parent':root, 'value':value})
+        
+
     def split(self)->Tuple[BasePath, BasePath]:
         splitted = [p  for p in self._path.split(".") if p]
         if len (splitted)>1:
@@ -99,6 +109,7 @@ class ObjPath(BasePath):
 class TuplePath(BasePath):
     def __init__(self, path):
         self._path = tuple(path)
+    
     def resolve(self, root:Any)->Any:
         obj = root 
         try:
@@ -107,7 +118,14 @@ class TuplePath(BasePath):
         except AttributeError:
             raise AttributeError(f"cannot resolve path {self._path!r} on {root!r}")
         return obj
+    
+    def set_value(self, root, value):
+        pr, attr = self.split()
+        root = pr.resolve(root)
+        attr.set_value( root, value)
+
         
+
     def split(self) -> Tuple[BasePath, BasePath]:
         if len(self._path)>1:
             return TuplePath( self._path[0:-1]), AttrPath(self._path[-1])
@@ -124,4 +142,6 @@ class AttrPath(BasePath):
         
     def split(self)->Tuple[BasePath, BasePath]:
         return DummyPath(), self
-
+    
+    def set_value(self, root, value)->None:
+        setattr( root, self._attr, value)
