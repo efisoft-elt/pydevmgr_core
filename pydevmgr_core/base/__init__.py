@@ -36,7 +36,8 @@ from .model_var import (
         StaticVar
     )
 
-from .datamodel import DataLink, create_data_class
+from .datamodel import DataLink
+from .dataclass import create_data_class
 from .defaults_var import Defaults
 
 from .download import  (

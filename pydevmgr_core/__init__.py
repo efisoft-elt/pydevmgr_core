@@ -5,6 +5,7 @@ from . import parsers
 from . import decorators
 from .io import open_device, open_manager, PydevmgrLoader
 from .decorators import nodealias 
+from .data_objects import *
 try:
     import numpy
 except ModuleNotFoundError:

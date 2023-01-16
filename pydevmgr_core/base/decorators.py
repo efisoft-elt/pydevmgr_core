@@ -3,6 +3,7 @@ from typing import  Optional, Union, Type
 
 
 from pydevmgr_core.base.base import BaseFactory, BaseObject, __Decorator__
+from pydevmgr_core.base.vtype import guess_vtype_from_signature
 
 
 
@@ -25,7 +26,7 @@ class BaseDecorator(__Decorator__):
     
     def __get__(self, parent, cls):
         if parent is None:
-            return self
+            return self.factory
         obj = self.factory.__get__(parent, cls)
         self._alterate(parent, obj)
         return obj
@@ -36,8 +37,11 @@ class BaseDecorator(__Decorator__):
     def __set_name__(self, parent, name):
         self.factory.__set_name__(parent, name)
     
+    def __set_method__(self, func):
+        self.method = func 
+
     def __call__(self, func):
-        self.method = func
+        self.__set_method__(func)
         return self
 
 
@@ -55,6 +59,8 @@ class getter(BaseNodeDecorator):
         if not self.method:
             return 
         
+
+
         parent_wr = weakref.ref(parent)
         if self.include_object:
             def fget(*args, **kwargs):
@@ -63,6 +69,17 @@ class getter(BaseNodeDecorator):
             def fget(*args, **kwargs):
                 return self.method(parent_wr(), *args, **kwargs)
         obj.fget = fget 
+    
+    def __set_method__(self, func):
+        try:
+            vtype = self.factory.vtype 
+        except AttributeError as e:
+            pass
+        else:
+            if vtype is None:
+                self.factory.vtype = guess_vtype_from_signature(func)
+        super().__set_method__(func) 
+
 
 class setter(BaseNodeDecorator):
     def _alterate(self, parent, obj):

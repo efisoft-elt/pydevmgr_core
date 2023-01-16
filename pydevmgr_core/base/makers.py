@@ -15,11 +15,11 @@ __all__ = [
 ]
 
 
-def nodealias(*nodes):
-    return getter(NodeAlias.Config(nodes=nodes))
+def nodealias(*nodes, __base__=NodeAlias, **kwargs):
+    return getter(__base__.Config(nodes=nodes, **kwargs))
 
-def rpc():
-    return caller(BaseRpc.Config())
+def rpc(*,Base=BaseRpc):
+    return caller(Base.Config())
     
 
 def node_maker(name: Optional[str] = None, *, __base__=BaseNode, include_object=False, **kwargs):

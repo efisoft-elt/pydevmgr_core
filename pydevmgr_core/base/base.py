@@ -117,11 +117,6 @@ class BaseObject(BaseSystem):
     def engine(self)-> Engine:
         """  engine  """
         return self._engine
-    
-    @property
-    def localdata(self)-> dict:
-        """ localdata dictionary """
-        return self.engine.localdata
 
 class ObjectDict(SystemDict):
     """ Dictionary of pydevmgr objects """
@@ -147,3 +142,56 @@ class ParentWeakRef:
         obj = super().new(parent, name, config)
         obj.get_parent = weakref.ref(parent)
         return obj
+
+
+
+
+def find_factories(cls,  SubClass=BaseObject ):
+    """ find factories defined inside a pydevmgr class """
+    # TODO: include this in systemy 
+    found = set()
+    for attr in dir(cls):
+        if attr.startswith("__"): continue
+        if attr == "Config": continue 
+        
+        try:
+            obj = getattr( cls, attr)
+        except AttributeError:
+            continue 
+        if not isinstance(obj, BaseFactory):
+            continue
+        
+        try:
+            System  = obj.get_system_class()
+        except ValueError:
+            continue
+
+        if not issubclass(System, SubClass):
+            continue 
+        found.add(attr)
+        yield (attr,obj) 
+        
+                    
+    for attr, field in cls.Config.__fields__.items():
+        if attr in found: continue 
+        
+        try:
+            obj = field.get_default()
+        except (ValueError, TypeError):
+            continue 
+        
+        if not isinstance(obj, BaseObject.Config):
+            continue 
+        
+        try:
+            System  = obj.get_system_class()
+        except ValueError:
+            continue
+       
+        if not issubclass(System, SubClass):
+            continue 
+        
+        yield (attr, obj)
+    
+        
+

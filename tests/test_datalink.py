@@ -7,8 +7,8 @@ from pydevmgr_core.base.model_var import NodeVar, NodeVar_R, NodeVar_RW, NodeVar
 from pydevmgr_core.base.node_alias import NodeAlias1
 from pydevmgr_core.nodes import Value
 
-from pydevmgr_core.base.datamodel import NodeField, NodeMode, NodeResolver, NormalClassExtractor, ObjField, PydanticModelExtractor, SingleNodeModelExtractor, SingleNodeNormalClassExtractor, StaticField, create_model_info, get_annotations
-
+from pydevmgr_core.base.datamodel import NodeField, NodeMode, NodeResolver, NormalClassExtractor, ObjField, PydanticModelExtractor, SingleNodeModelExtractor, SingleNodeNormalClassExtractor, StaticField, get_annotations
+from pydevmgr_core.base.dataclass import create_model_info 
 class Scale(NodeAlias1):
     class Config:
         scale: float = 1.0
@@ -351,4 +351,18 @@ def test_info_extractor_with_filter():
     assert i.x.unit == "mm"
     with pytest.raises(AttributeError):
         i.text
+
+
+
+def test_different_node_key():
+    
+    class Data(BaseModel):
+        i1: NodeVar = Field("AAAA", nodearg="i.i1")
+    dev = Device()
+    data = Data()
+    dl = DataLink(dev, data, node_key="nodearg")
+    dl.download()
+    
+    assert data.i1 == dev.i.i1.get()
+    
 

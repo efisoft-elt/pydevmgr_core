@@ -3,13 +3,15 @@ from enum import Enum, auto
 from pydantic import BaseModel, ValidationError, Field
 from pydantic.fields import ModelField
 from pydantic.main import create_model
+
+from .vtype import VType, find_vtype, nodedefault, nodetype, _vtype_type, _vtype_default
 from .download import download, BaseDataLink, reset
 from .upload import upload
 from .node import BaseNode
 from .model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
 from .base import BaseData, BaseFactory, BaseObject
 from .object_path import AttrPath, ObjPath, BasePath, TuplePath, objpath
-from typing import  Any, Iterable, Dict, List, Optional,  Tuple, Type, Union
+from typing import  Any, Iterable, Dict, List, Optional, Set,  Tuple, Type, Union
 from warnings import warn
 import inspect
 try:
@@ -75,9 +77,9 @@ class NodeField:
 
 
     @classmethod
-    def from_field(cls, name, field):
-        if C.NODE in field.field_info.extra:
-            node = field.field_info.extra[C.NODE]
+    def from_field(cls, name, field, node_key=C.NODE):
+        if node_key in field.field_info.extra:
+            node = field.field_info.extra[node_key]
         else:
             if "." in name:
                 node = ObjPath(name)
@@ -89,7 +91,7 @@ class NodeField:
         elif not isinstance(node, BaseNode):
             if not isinstance(node, BaseFactory):
                 raise ValueError( f"Invalid node argument expecting a BaseNode, a Factory or string got {node}")
-    
+        
         node_var = field.type_
         mode = _node_var2mode(node_var) 
         return cls(node, name, mode=mode)
@@ -191,8 +193,10 @@ class DataFields:
 class BaseExtractor:
     def extract(self, model)-> DataFields:
         raise NotImplementedError()
-    
+
+@dataclass
 class PydanticModelExtractor(BaseExtractor):
+    node_key: str = C.NODE
     def extract(self, model) -> DataFields:
         output = DataFields()
         fields = get_fields(model)
@@ -203,7 +207,7 @@ class PydanticModelExtractor(BaseExtractor):
             if issubclass(field.type_, StaticVar):
                 output.statics.append( StaticField.from_field(name, field)  )
             elif issubclass(field.type_, NodeVar):
-                output.nodes.append( NodeField.from_field( name, field) )
+                output.nodes.append( NodeField.from_field( name, field, self.node_key) )
             else:
                 output.objects.append( ObjField.from_field( name, field))
         return output
@@ -339,7 +343,7 @@ def _get_node_var_annotation(annotations, name):
             return annotation
         raise ValueError()    
     
-def collect_nodes( input, model, output: Optional[NodeDataLinks] = None) -> Union[None, NodeDataLinks]:
+def collect_nodes( input, model, output: Optional[NodeDataLinks] = None, node_key=C.NODE) -> Union[None, NodeDataLinks]:
     """ return a :class:`NodeDataLinks` object from the match of an object and a data model instance 
 
     Function mainly used by :class:`DataLink` to build the depences between nodes and data
@@ -355,7 +359,7 @@ def collect_nodes( input, model, output: Optional[NodeDataLinks] = None) -> Unio
             extractor = SingleNodeNormalClassExtractor()
     else:
         if isinstance( model, BaseModel):
-            extractor = PydanticModelExtractor()
+            extractor = PydanticModelExtractor(node_key=node_key)
         else:
             extractor = NormalClassExtractor()
     resolver = NodeResolver(extractor)
@@ -466,14 +470,15 @@ class DataLink(BaseDataLink):
     def __init__(self, 
           input : Any, 
           model : BaseModel,
-          *other_models
+          *other_models, 
+          node_key: str = C.NODE
         ) -> None:
         
         self._rnode_fields = {}
         self._wnode_fields = {}
-        node_fields = collect_nodes(input, model)
+        node_fields = collect_nodes(input, model, node_key=node_key)
         for other in other_models:
-            collect_nodes( input, other, node_fields)
+            collect_nodes( input, other, node_fields, node_key=node_key)
 
 
         self._rnode_fields = node_fields.readable_nodes
@@ -590,129 +595,3 @@ def _model_subset(
 
 
 
-def create_data_class(name: str, objects: Iterable, base_class: Optional[Type] = None, depth=-1)-> BaseModel:
-    """ Create a new data class for the object according to a list of objects 
-
-    the following rule is applied to childs:
-        - if a BaseNode it is added to the model as NodeVar with type Any and a default value None
-        - in case of an other object (e.g. Device, Manager, etc ...):
-            - if a Data class is defined (and not a BaseModel or a BaseData) it is instanciated in the model 
-            - otherwise create_data_class will build a new data model for the child object 
-
-    By default create_data_model is done recursively for anyking of object. However depth can be adjusted 
-    with the keyword depth (default depth=-1). ``depth=0`` will create the date model only for nodes find inside
-    the list of objects. 
-    
-    
-    .. warning::
-
-        Important note the data attribute is the object name. If two object have the same name this will create only 
-        one data field. 
-        
-    """       
-    data_obj = {}
-    for obj in objects:
-        if isinstance( obj, BaseNode):
-            data_obj[obj.name] = (NodeVar[Any], None)
-        elif depth and hasattr( obj, "Data") and obj.Data and obj.Data is not BaseData and obj.Data is not BaseModel:
-            data_obj[obj.name] = (obj.Data, obj.Data())
-        elif depth:
-            Data = create_data_class(obj.name.capitalize(),  obj.find( BaseObject ), depth=depth-1 ) 
-            data_obj[obj.name] = (Data, Data())
-    return create_model( name, __base__= base_class, **data_obj  )
-
-
-@dataclass
-class DataModelInfoExtractor:
-    InfoStructure: BaseModel 
-    include: Optional[Iterable] = None 
-    exclude: Iterable = field(default_factory=set)
-    include_type : Optional[Union[Type,Tuple[Type]]] = None
-    exclude_type: Optional[Union[Type,Tuple[Type]]] = None
-
-    def __post_init__(self):
-        self.field_extractor = ModelInfoFieldExtractor( self.InfoStructure)
-
-
-    def extract(self, Data: Type[BaseModel], name=None, base=None):
-                
-        infos = {}
-        fields = get_fields(Data)
-        if self.include is not None:
-            def iterator():
-                for name in set(self.include):
-                    yield name, fields[name] 
-        else:
-            iterator = fields.items
-        
-        for name, field in iterator():
-            if name in self.exclude: 
-                continue
-            if self.exclude_type:
-                if issubclass( field.type_, self.exclude_type):
-                    continue
-            if issubclass(field.type_, BaseModel):
-                infos[name] = self.extract( field.type_)()
-            else:
-                if self.include_type:
-                    if not issubclass( field.type_, self.include_type): continue 
-                        
-                infos[name] = (self.InfoStructure, self.field_extractor.extract(field))
-        if name is None:
-            name = "Info"+Data.__name__
-        return create_model(name,__base__ = base, **infos)
-
-
-@dataclass 
-class ModelInfoFieldExtractor:
-    InfoStructure: BaseModel 
-    def __post_init__(self):
-        info_fields = get_fields(self.InfoStructure)
-        
-        def extract(field):
-            extras = field.field_info.extra
-            values = {}
-            for name in info_fields:
-                try:
-                    val = getattr(field.field_info, name)
-                except AttributeError:
-                    try:
-                        val = extras[name]
-                    except KeyError:
-                        pass 
-                    else:
-                        values[name] = val 
-                else:
-                    if val is not None:
-                        values[name] = val 
-    
-            return self.InfoStructure(**values) 
-
-        self.extract = extract
-
-def create_model_info(
-        Data: Type[BaseModel],  
-        InfoStructure: Type[BaseModel],
-        include: Optional[Iterable] = None, 
-        exclude: Iterable = None, 
-        include_type: Union[Type,Tuple[Type]] = None, 
-        exclude_type: Union[Type,Tuple[Type]] = None, 
-        name: str =None, 
-        base: Type = None
-    ) -> Type[BaseModel]:
-    """ create a pydantic model representing all information found in an other model 
-
-    Args:
-        Data  (Type[BaseModel]): a Model with some value and some extra field information 
-        InfoStructure (Type[BaseModel]): The Model representing information to be extracted 
-        include (Optional, Set[str]): A set of member name to include 
-        exclude (Optional, Set[Str]): A sett of member to exclude  
-        include_type: (Optional, Type, Tuple[Type]): include only members with the given type(s)
-        exclude_type: (Optional, Type, Tuple[Type]): exclude member with the given type(s) 
-    """
-    if exclude is None: exclude = set()
-    
-    return DataModelInfoExtractor(
-            InfoStructure, include=include, exclude=exclude, 
-            include_type=include_type, exclude_type=exclude_type
-        ).extract(Data, name=name, base=base)

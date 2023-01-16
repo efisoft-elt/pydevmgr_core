@@ -1,13 +1,16 @@
 from warnings import warn
+
 from .base import (BaseObject, BaseData)
-from .decorators import getter
 
 from inspect import signature , _empty
 
-from pydantic import create_model,  validator
-from typing import Dict, Any, Optional,  Callable,  Dict
-
+from pydantic import create_model,  validator, BaseModel
+from typing import Dict, Any, Optional,  Callable,  Dict,  Type, Union
+from systemy import BaseSystem
 from valueparser import ParserFactory
+from .vtype import VType 
+
+
 
 
 class BaseNodeConfig(BaseObject.Config):
@@ -15,7 +18,7 @@ class BaseNodeConfig(BaseObject.Config):
     parser: Optional[ParserFactory] = None #NoneParserFactory()
     description: str = ""
     unit: str = ""
-    
+    vtype: VType = None 
         
 class BaseReadCollector:
     """ Object used to collect nodes values from the same server in one roundtrip 
@@ -376,5 +379,7 @@ class NodesWriter:
         # :TODO: At some point, this should be asynchrone 
         for collection in  self._dispatch.values():
             collection.write()
+
+
 
 

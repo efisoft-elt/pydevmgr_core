@@ -64,10 +64,10 @@ class __Undefined__:
 
 @register
 class Local(BaseNode):
-    """ The node is getting/setting values from the localdata dictionary 
+    """ The node is getting/setting values from the localnode_values dictionary inside the engine
 
-    The localdata dictionary can be created for instance on a parent device and passed to 
-    any child nodes. Values are writen inside this dictionary. 
+    The localnode_values dictionary is created as part of the base engine. 
+    Values are writen inside this dictionary. 
     If not already set, configured default is return 
 
     Config:
@@ -77,36 +77,13 @@ class Local(BaseNode):
         default: Any = None
         
     def fget(self):
-        if self.localdata is None:
+        if self.engine.localnode_values is None:
             return self.config.default                
-        return self.localdata.get(self.key,self.config.default)
+        return self.engine.localnode_values.get(self.key,self.config.default)
         
     def fset(self, value):
-        self.localdata[self.key] = value
+        self.engine.localnode_values[self.key] = value
 
-
-@register
-class DataValue(BaseNode):
-    """ node is getting/setting from the data structure found inside the engine 
-    The targeted node is resolved from the data_suffix attribute 
-    """
-    class Config:
-        data_suffix: PathVar 
-        default: Any = __Undefined__ 
-    
-    def fget(self):
-        try:
-            value = self.data_suffix.resolve(self.engine.data)
-        except AttributeError as e:
-            if self.default is __Undefined__:
-                raise e
-            else:
-                value = self.default 
-        return value
-    
-    def fset(self, value):
-        self.data_suffix.set_value( self.engine.data, value)
-         
 
 
 
