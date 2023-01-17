@@ -737,9 +737,9 @@ def download(nodes, data: Optional[Dict] = None) -> Union[list,None]:
     """ read node values from remote servers in one call per server    
 
     Args:
-        nodes (iterable):
+        nodes (iterable, BaseObject):
              Iterable of nodes, like [mgr.motor1.stat.pos_actual, mgr.motor2.stat.pos_actual]
-        
+                    
         data (dict, optional):
              This is mostlikely a dictionary, must define a __setitem__ method
              If given the function return None and update data in place. 
@@ -773,12 +773,13 @@ def download(nodes, data: Optional[Dict] = None) -> Union[list,None]:
      
     
     """
+
     if data is None:
         data = {}
         nodes = tuple(nodes) # in case this is a generator  
         NodesReader(nodes).read(data)
         return [data[n] for n in nodes]
-    else:    
+    else:
         NodesReader(nodes).read(data)
         return None
 

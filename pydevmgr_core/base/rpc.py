@@ -1,70 +1,69 @@
-from warnings import warn 
-from valueparser import BaseParser, ParserFactory
+from warnings import warn
+from pydantic.class_validators import root_validator 
+from valueparser import  ParserFactory
 
-from .decorators import caller 
 from .base import BaseObject
 
 from typing import Dict, List, Callable,  Optional, Type, Any
-from pydantic import create_model
-from inspect import signature , _empty
+from systemy import BaseSystem
 
 
+class Arg(BaseSystem):
+    class Config:
+        name: str
+        parser: Optional[ParserFactory] = None
+    
+    def parse(self, value):
+        if self.parser:
+            return self.parser.parse(value)
+        return value
+    
+    def __repr__(self):
+        return f"<{self.__class__.__name__} name={self.name!r} >"
+
+def argc(name, parser=None):
+    """ Helper to create an arg config 
+    
+    argc(name) -> Arg.Config( name=name, parser=None)
+    argc(name, parser) -> Arg.Config( name=name, parser=parser)
+    
+    """
+    return Arg.Config(name=name, parser=parser)
 
 class BaseRpcConfig(BaseObject.Config):
-    
+    # ToDo remove arg_parsers and kwargs_parsers 
     arg_parsers: List[ParserFactory] = [] 
     kwarg_parsers: Dict[str, ParserFactory] = {}
+    
+    args: List[Arg.Config] = []
+    kwargs: Dict[str, Arg.Config] = {} 
+    
+    @root_validator(pre=False)
+    def _fix_legacy_parsers(cls, values):
+        arg_parsers = values['arg_parsers']
+        if not values.get('args', None)  and arg_parsers:
+            warn( "arg_parser is deprecated, use the args argument", DeprecationWarning, stacklevel=2)
 
-class ArgParsers:
-    """ responsable to parse a list of arguments """
-    def __init__(self, parsers: List[BaseParser]):
-        self._parsers = parsers
-    
-    def parse(self, args: List[Any]):
-        modified_args = list(args)
-        for i,(p,a) in enumerate(zip(self._parsers, args)):
-            modified_args[i] = p.parse(a) 
-        return modified_args
-
-class DummyArgParser:
-    """ dummy parser returning input """
-    def parse(self, args):
-        return args 
-
-class KwargParsers:
-    """ responsable to parse a dictionary of argument """
-    def __init__(self, parsers: Dict[str, BaseParser]):
-        self._parsers = parsers
-    
-    def parse(self, kwargs: Dict[str, Any]):
-        modified_kwargs = dict(kwargs)
-        
-        for key,parser in self._parsers.items():
-            if key in kwargs:
-                modified_kwargs[key] = parser.parse( modified_kwargs[key] )
-        
-        return modified_kwargs
-    
-    
-         
+            values['args'] = [ Arg.Config(name=f"arg{i}", parser=arg_parser) for i,arg_parser in enumerate(arg_parsers)]
+        return values
 
 
 class BaseCallCollector:
     """ The Read Collector shall collect all nodes having the same sid and read them in one call
     
     - __init__ : should not take any argument 
-    - add : take one argument, the Node. Should add node in the read queue 
-    - read : takes a dictionary as arguement, read the nodes and feed the data according to node keys 
+    - add : take three argument, the Rpc, list of args and dictionary of kwargs. Should add the rpc  in the 'call' queue 
+    - call : takes a dictionary as arguement, read the nodes and feed the data according to node keys 
     
     The BaseReadCollector is just a dummy implementation where nodes are red one after the other     
     """
     def __init__(self):
         self._rpcs = []
     
-    def add(self, rpc, args, kwargs):
+    def add(self, rpc, args: List, kwargs: Dict) -> None:
         self._rpcs.append((rpc, args, kwargs))
         
-    def call(self):        
+    def call(self)-> None:        
         for rpc, args, kwargs in self._rpcs:
             rpc.rcall(*args, **kwargs)
                 
@@ -76,14 +75,12 @@ class RpcError(RuntimeError):
     rpc_error = 0
 
 
-
 class BaseRpc(BaseObject):
     
     Config = BaseRpcConfig
-    
-    _arg_parsers = DummyArgParser()
-    _kwarg_parsers = DummyArgParser()
-    
+    Arg = Arg 
+
+       
     def __init__(self, 
            key: Optional[str] = None, 
            config: Optional[Config] =None, 
@@ -92,12 +89,7 @@ class BaseRpc(BaseObject):
         super().__init__(key, config=config, **kwargs)
         
         
-        if self.arg_parsers is not None:
-            self._arg_parsers = ArgParsers( self.arg_parsers  )
-        if self.kwarg_parsers is not None:
-            self._kwarg_parsers = KwargParsers( self.kwarg_parsers )
-
-  
+          
     @property
     def sid(self):
         """ default id server is 0 
@@ -125,12 +117,17 @@ class BaseRpc(BaseObject):
            :func:`BaseRpc.rcall` method
           
         """
-        args   = self._arg_parsers.parse(args)
-        kwargs = self._kwarg_parsers.parse(kwargs)
+        args = [ arg.parse(value) for value, arg in zip(args, self.args)]
+        
+        self_kwargs = self.kwargs 
+        for k,v in kwargs.items():
+            if k in self_kwargs:
+                kwargs[k] = self_kwargs[k].parser.parse( v )
+
         return self.fcall(*args, **kwargs)
     
     def rcall(self, *args, **kwargs):
-        """ Call the Rpc Method but raised an exception in case of an error code is returned """
+        """ Call the Rpc Method but raised an exception in case of an non-null error code is returned """
         e = self.get_error(self.call(*args, **kwargs))
         if e:
             raise e

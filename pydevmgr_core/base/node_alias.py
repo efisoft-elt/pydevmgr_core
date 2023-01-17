@@ -33,7 +33,7 @@ class BaseNodeAlias(BaseNode):
         NodesReader(nodes).read(_n_data)
         values = [_n_data[n] for n in nodes]
         
-        return self.fget(*values)
+        return self.parse_output(self.fget(*values))
     
     def set(self, value: Any) -> None:
         """ set the node alias value to server or to data dictionary if given """

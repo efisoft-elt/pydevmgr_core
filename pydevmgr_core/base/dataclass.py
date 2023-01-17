@@ -68,7 +68,7 @@ class ObjectToDataModelExtractor:
         for obj in objects:
             if isinstance(obj, tuple):
                 attr, factory = obj 
-                ClassesToDataModelExtractor().extract_node(group, attr, factory) 
+                ClassesToDataModelExtractor().extract_item(group, attr, factory, depth) 
             elif isinstance( obj, BaseNode):
                 self.extract_node(group, obj) 
             elif depth:
@@ -112,16 +112,22 @@ class ClassesToDataModelExtractor:
         group = ModelGroup(name=name, key=name)
         
         for attr, factory in factories:
-            try:
-                System  = factory.get_system_class()
-            except ValueError:
-                continue 
-            if issubclass( System, BaseNode):
-                self.extract_node(group, attr, factory)
-            elif depth:
-                self.extract_subgroup( group, attr, factory, depth) 
+            self.extract_item( group, attr, factory, depth)    
         return group
     
+
+    def extract_item(self, group, attr, factory, depth)->None:
+        try:
+            System  = factory.get_system_class()
+        except ValueError:
+            return 
+        
+        if issubclass( System, BaseNode):
+            self.extract_node(group, attr, factory)
+        elif depth:
+            self.extract_subgroup( group, attr, factory, depth) 
+
+
     def extract_node(self, group, attr, factory)-> None:
         System  = factory.get_system_class()
         model_def = ModelNode(
@@ -132,6 +138,7 @@ class ClassesToDataModelExtractor:
                 Data = System.Data
             ) 
         group.nodes.append(model_def)
+    
     def extract_subgroup(self, group, attr, factory, depth):
         System = factory.get_system_class() 
         sub_group =  self.extract(attr, System, depth-1)
@@ -177,8 +184,12 @@ class DataModelCreator:
             SubModel = self.create(sub_group)
             members[sub_group.name.capitalize()] = SubModel 
             members[sub_group.name.lower()] = (SubModel, Field(SubModel(), path=_get_path_model(self.root, sub_group)))
-    
-        return create_model( group.name.capitalize(), __base__=base_class, **members) 
+        
+
+
+        class Config:
+            arbitrary_types_allowed = True 
+        return create_model( group.name.capitalize(), __base__=base_class, Config=Config, **members) 
 
 
 @dataclass
@@ -240,7 +251,7 @@ class CodeModelCreator:
 
 
 
-def create_data_class(
+def create_data_model(
         name: str, 
         objects: Union[Iterable[BaseObject],Iterable[Tuple[str, BaseFactory]], Type[BaseObject]],
         root: Union[BaseObject, str] = "", 
@@ -257,7 +268,7 @@ def create_data_class(
         - if a BaseNode it is added to the model as NodeVar with type Any and a default value None
         - in case of an other object (e.g. Device, Manager, etc ...):
             - if a Data class is defined (and not a BaseModel or a BaseData) it is instanciated in the model 
-            - otherwise create_data_class will build a new data model for the child object 
+            - otherwise create_data_model will build a new data model for the child object 
 
     By default create_data_model is done recursively for anyking of object. However depth can be adjusted 
     with the keyword depth (default depth=-1). ``depth=0`` will create the date model only for nodes find inside
@@ -291,6 +302,17 @@ def create_data_class(
                 )
     return creator.create(group, base_class)
 
+
+
+def set_data_model(cls):
+    """ Create a data model for a given class 
+
+    Store the model inside the .Data attribute 
+    Return the class so it can be used at decroator 
+    """
+    Data = create_data_model( "Data", cls, use_data_if_defined=True) 
+    cls.Data = Data 
+    return cls
 
 
 

@@ -23,7 +23,7 @@ from .node_alias import (
     ) 
 from .engine import BaseEngine 
 
-from .rpc import RpcError, BaseRpc
+from .rpc import RpcError, BaseRpc, Arg, argc
 from .interface import BaseInterface
 
 from .device import BaseDevice
@@ -37,7 +37,7 @@ from .model_var import (
     )
 
 from .datamodel import DataLink
-from .dataclass import create_data_class
+from .dataclass import create_data_model, set_data_model
 from .defaults_var import Defaults
 
 from .download import  (
@@ -62,5 +62,5 @@ from .monitor import (
 from . import decorators
  
 from .object_path import BasePath, ObjPath, AttrPath, ItemPath, objpath
-
+from .vtype import VType
 # from .decorators import getter, setter, finaliser, nodealias, nodealias_maker, node_maker

@@ -1,7 +1,7 @@
 from warnings import warn
 
 from .base import (BaseObject, BaseData)
-
+from .engine import BaseNodeEngine 
 from inspect import signature , _empty
 
 from pydantic import create_model,  validator, BaseModel
@@ -16,6 +16,7 @@ from .vtype import VType
 class BaseNodeConfig(BaseObject.Config):
     """ Config for a Node """
     parser: Optional[ParserFactory] = None #NoneParserFactory()
+    output_parser: Optional[ParserFactory] = None 
     description: str = ""
     unit: str = ""
     vtype: VType = None 
@@ -118,11 +119,13 @@ class BaseNode(BaseObject):
     To implement from BaseNode one need to implement the .fget and .fset method (they are called by .get and .set)
     """
     Config = BaseNodeConfig
-
-
+    Engine = BaseNodeEngine
+    
     class Data(BaseData):
         value: Any = None    
     _parser = None
+    _output_parser = None
+    _has_output_parser = False
     def __init__(self, 
            key: Optional[str] = None, 
            config: Optional[Config] = None, 
@@ -131,10 +134,16 @@ class BaseNode(BaseObject):
          ) -> None:
                                          
         super().__init__(key, config=config, com=com, **kwargs)
-        if self.__config__.parser is not None:
-            # !!! the parser builder can return None
-            self._parser = self.__config__.parser.build(self) 
-         
+        self._has_output_parser = self.output_parser is not None 
+
+        # if self.__config__.parser is not None:
+        #     # !!! the parser builder can return None
+        #     self._parser = self.__config__.parser.build(self)
+            
+        # if self.__config__.output_parser is not None:
+        #     # !!! the output_parser builder can return None
+        #     self._output_parser = self.__config__.output_parser.build(self) 
+
     @property
     def sid(self):
         """ default id server is 0 
@@ -143,9 +152,9 @@ class BaseNode(BaseObject):
         """
         return 0
     
-    @property
-    def parser(self):
-        return self._parser
+    # @property
+    # def parser(self):
+    #     return self._parser
     
     
     def parse(self, value):
@@ -163,7 +172,11 @@ class BaseNode(BaseObject):
         if not self.parser:
             return value
         return self.parser.parse(value)
-    
+   
+    def parse_output(self, value):
+        if self._has_output_parser:
+            return self.output_parser.parse(value)
+        return value  
                     
     def read_collector(self) -> BaseReadCollector:
         """ return a collector of nodes for readding 
@@ -202,9 +215,9 @@ class BaseNode(BaseObject):
         fget() will fetch the value from a distant server for instance (OPC-UA, Websocket, OLDB, etc ...)
         
         """
-        return self.fget()
+        return self.parse_output(self.fget())
                
-    def set(self, value, data=None):
+    def set(self, value):
         """ Set node value 
         
         If the optional data dictionary is given `data[self] = value`, otherwise  self.fset(value) is used 
@@ -212,10 +225,10 @@ class BaseNode(BaseObject):
         value = self.parse(value)
         self.fset(value)
 
-        if data is None:
-            self.fset(value)
-        else:
-            data[self] = value
+        # if data is None:
+        #     self.fset(value)
+        # else:
+        #     data[self] = value
     
     ### ############################################
     #

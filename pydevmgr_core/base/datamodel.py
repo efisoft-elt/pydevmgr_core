@@ -308,11 +308,17 @@ class NodeResolver:
             pairs =  (node_field.name, data)
 
             try:
-                getattr(data,  node_field.name).value 
+                target = getattr(data,  node_field.name)
             except AttributeError:
                 pass
             else:
-                pairs = ("value",  getattr( data, node_field.name))
+                if not isinstance( target, Enum):
+                    try:
+                        target.value 
+                    except AttributeError:
+                        pass
+                    else:
+                        pairs = ("value",  target)
 
             if node_field.is_readable():
                 output.readable_nodes.setdefault( node, []).append(  pairs) 

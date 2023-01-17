@@ -189,14 +189,14 @@ email = ["email-validator (>=1.0.3)"]
 
 [[package]]
 name = "pytest"
-version = "7.2.0"
+version = "7.2.1"
 description = "pytest: simple powerful testing with Python"
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "pytest-7.2.0-py3-none-any.whl", hash = "sha256:892f933d339f068883b6fd5a459f03d85bfcb355e4981e146d2c7616c21fef71"},
-    {file = "pytest-7.2.0.tar.gz", hash = "sha256:c4014eb40e10f11f355ad4e3c2fb2c6c6d1919c73f3b5a433de4708202cade59"},
+    {file = "pytest-7.2.1-py3-none-any.whl", hash = "sha256:c7c6ca206e93355074ae32f7403e8ea12163b1163c976fee7d4d84027c162be5"},
+    {file = "pytest-7.2.1.tar.gz", hash = "sha256:d45e0952f3727241918b8fd0f376f5ff6b301cc0777c6f9a556935c92d8a7d42"},
 ]
 
 [package.dependencies]
@@ -306,14 +306,14 @@ files = [
 
 [[package]]
 name = "valueparser"
-version = "0.1.2"
+version = "0.1.4"
 description = "Python package for quick creation of tools to parse a value"
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "valueparser-0.1.2-py3-none-any.whl", hash = "sha256:29aa88387703a110d5b411564bf1bf3b01a64f2772ba01ee0590f9cab170da66"},
-    {file = "valueparser-0.1.2.tar.gz", hash = "sha256:425bbf3e57f67979bff7db9de26f3815e929a535a9f118abca5ece0f9fef8273"},
+    {file = "valueparser-0.1.4-py3-none-any.whl", hash = "sha256:7fb31f20e1173c7214212ed2e895bcac5bf09ed330698c78f75be2343cfcc97f"},
+    {file = "valueparser-0.1.4.tar.gz", hash = "sha256:ba4c40fb08e4c23a22e4d37672b71f7c17c227d1e18ff26203b3be35a50bde3e"},
 ]
 
 [package.dependencies]
@@ -338,4 +338,4 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7"
-content-hash = "1078d590821abbccdbc45283be68a9ee83663b1ac91c98581a75a1b4d2e0a392"
+content-hash = "f8d61714ffedce2344120caab068ab7951dddd64c6459dafbd7271d437176fcb"

@@ -15,7 +15,7 @@ def test_rpc_api():
         def fcall(self, arg1, arg2):
             return arg1+arg2
         
-    myrpc = MyRpc('test', arg_parsers=[int, int])
+    myrpc = MyRpc('test', args=[{"name":"a1", "parser":int}, {"name":"a2", "parser":int}])
     
     assert myrpc.call(0, 0) is 0
 
@@ -26,8 +26,7 @@ def test_rpc_api():
     with pytest.raises(RuntimeError):
         myrpc.rcall(1,1)
 
-    
-    myrpc = MyRpc('test', arg_parsers=[int, {'type':("int","Clipped"), 'min':0}])
+    myrpc = MyRpc('test', args=[{"name":"a1","parser":int}, {"name":"a2", "parser":{'type':("int","Clipped"), 'min':0}}])
       
     assert myrpc.call(1, -1) == 1
 

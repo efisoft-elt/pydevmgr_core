@@ -3,7 +3,7 @@ from pydantic.fields import Field
 from pydantic.main import BaseModel
 import pytest
 from systemy.system import FactoryList
-from pydevmgr_core.base.dataclass import create_data_class
+from pydevmgr_core.base.dataclass import create_data_model
 from pydevmgr_core.base.base import BaseObject, find_factories
 from pydevmgr_core.base.defaults_var import Defaults
 from pydevmgr_core.base.device import BaseDevice
@@ -46,7 +46,7 @@ class Data(BaseModel):
 
 def test_create_model():
     mgr = Manager()
-    Data = create_data_class("Data", mgr.find(BaseObject)) 
+    Data = create_data_model("Data", mgr.find(BaseObject)) 
     data = Data() 
     
     assert data.device1.node == 0.0
@@ -54,7 +54,7 @@ def test_create_model():
     assert data.node is  None
 
 
-    Data = create_data_class("Data", mgr.find(BaseObject), depth=0) 
+    Data = create_data_model("Data", mgr.find(BaseObject), depth=0) 
     data = Data() 
     
     with pytest.raises( AttributeError):
@@ -88,16 +88,53 @@ def test_find_classes_with_nodealias():
     result = list(find_factories( Device, BaseNode))
     assert result == [("n1",Device.n1)]
 
-def test_create_data_class_from_class():
+def test_create_data_model_from_class():
     class Device(BaseDevice):
         n1 = BaseNode.Config()
         n2 = Static.Config(vtype=float)
-    Data = create_data_class("Data", Device)
+    Data = create_data_model("Data", Device)
     data = Data()
     assert data.n1 is None 
     assert data.n2 == 0.0 
 
-def test_create_data_class_with_node_model():
+
+def test_create_data_model_from_factories():
+    
+    class Device(BaseDevice):
+        class Config:
+            n1 = BaseNode.Config()
+        n2 = Static.Config(vtype=float)
+    Data = create_data_model("Data", find_factories(Device, BaseNode))
+    data = Data()
+    assert data.n1 is None 
+    assert data.n2 == 0.0 
+
+def test_create_data_model_with_node_aliases():
+    
+    class Device(BaseDevice):
+        class Config:
+            n1 = BaseNode.Config()
+        n2 = Static.Config(vtype=float)
+        
+        @nodealias("n2")
+        def isok_annotation(self, n2) -> bool:
+            return isinstance(n2, float)
+        
+        @nodealias("n2", vtype=(bool, True))
+        def isok_vtype(self, n2) -> bool:
+            return isinstance(n2, float)
+
+    Data = create_data_model("Data", find_factories(Device, BaseNode))
+    data = Data()
+    assert data.n1 is None 
+    assert data.n2 == 0.0 
+    assert data.isok_annotation is False 
+    assert data.isok_vtype is True 
+
+
+
+
+def test_create_data_model_with_node_model():
     class MyNode(BaseNode):
         class Config:
             min: float = 0.0 
@@ -112,7 +149,7 @@ def test_create_data_class_with_node_model():
         min: float = -9.99
         max: float = +9.99
     
-    Data = create_data_class("Data", Device, NodeModel=NodeData)
+    Data = create_data_model("Data", Device, NodeModel=NodeData)
     data = Data()
     assert data.n1.value is None 
     assert data.n2.value == 0.0 
