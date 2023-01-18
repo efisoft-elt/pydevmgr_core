@@ -1,6 +1,6 @@
 from pydantic.main import BaseModel
 import pytest 
-from pydevmgr_core.base.object_path import AttrPath, ItemPath, ObjPath, PathVar, TuplePath 
+from pydevmgr_core.base.object_path import AttrPath, ItemPath, ObjPath, PathVar, TuplePath, GroupPath
 
 from pydevmgr_core import BaseManager,  BaseDevice
 from systemy import FactoryList, FactoryDict
@@ -125,7 +125,46 @@ def test_set_value():
 
 
 
+def test_group_path():
+    class C:
+        x = 9
+        l = [1,2]
+    class B:
+        c = C()
+    class A:
+        b = B()
+    class Root:
+        a = A()
+    
+    root = Root()
+    p = GroupPath( ObjPath("a.b"), ObjPath("c.x"))
+    
+    assert p.resolve(root) == 9 
+    p.set_value( root,  999)
+    assert root.a.b.c.x == 999
+    
 
+    root = Root()
+    root.a.b.c.x = 9
+
+    p = ObjPath("a.b")
+    p2 = p.add("c.x")
+    
+    assert p2.resolve(root) == 9 
+    p3 = p.add("c.l").add( ItemPath(1) )
+    assert p3.resolve(root) == 2
+
+    p = GroupPath( ObjPath("a.b"), ObjPath("c.x"))
+    left, right = p.split() 
+    assert left.resolve(root) is root.a.b.c 
+    
+    p = GroupPath( "a")
+    left, right = p.split() 
+    assert left.resolve(root) is root 
+
+    p = GroupPath( "a.b")
+    left, right = p.split() 
+    assert left.resolve(root) is root.a 
 
 
 

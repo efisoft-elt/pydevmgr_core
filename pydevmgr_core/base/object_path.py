@@ -62,6 +62,11 @@ class BasePath:
 
     def set_value(self, root, value):
         raise NotImplementedError("set_value")
+    
+    def add(self, path):
+        path = objpath(path)
+        return GroupPath(self, path)
+
 
 def objpath( path) -> BasePath:
     if isinstance( path, BasePath):
@@ -82,6 +87,41 @@ class DummyPath(BasePath):
         raise ValueError("Cannot split a DummyPath")
     def set_value(self)->None:
         raise AttributeError("Cannot set value for DummyPath")
+
+
+class GroupPath(BasePath):
+    def __init__(self, *group):
+        self._group = tuple(objpath(p) for p in group)
+    
+    def resolve(self, parent):
+        for p in self._group:
+            parent = p.resolve(parent)
+        return parent 
+
+    def set_value(self, root, value):
+        for p in self._group[:-1]:
+            root = p.resolve(root)
+        self._group[-1].set_value(root, value)
+
+    def split(self):
+        n = len(self._group)
+        if n ==1 :
+            return self._group[-1].split()
+
+        left, right = self._group[-1].split() 
+        g = GroupPath( *self._group[:-1])
+        if not isinstance(left, DummyPath):
+            g = g.add(left)
+        return g, right 
+
+    
+    def add(self, path):
+        path = objpath(path)
+        if isinstance( path, GroupPath):
+            return GroupPath( *self._group, *path._group)
+        else:
+            return GroupPath( *self._group, path)
+
 
 class ObjPath(BasePath):
     def __init__(self, path:str):
@@ -109,6 +149,17 @@ class ObjPath(BasePath):
             return TuplePath(tuple(splitted[0:-1])), ObjPath(splitted[-1] )
         else:
             return DummyPath(), ObjPath( splitted[0] )  
+    
+    def add(self, path):
+        path = objpath(path)
+        if isinstance( path, ObjPath):
+            return ObjPath( self._path+"."+path._path )
+        else:
+            return GroupPath( self, path)
+
+
+
+
 
 class ItemPath(BasePath):
     def __init__(self, item):
@@ -147,7 +198,14 @@ class TuplePath(BasePath):
             return TuplePath( self._path[0:-1]), AttrPath(self._path[-1])
         else:
             return DummyPath(), AttrPath(self._path[0])
-        
+     
+    def add(self, path):
+        path = objpath(path)
+        if isinstance( path, TuplePath):
+            return TuplePath( self._path+path._path )
+        else:
+            return GroupPath( self, path)
+       
 
 class AttrPath(BasePath):
     def __init__(self, attr: str):
