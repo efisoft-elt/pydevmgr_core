@@ -63,4 +63,5 @@ from . import decorators
  
 from .object_path import BasePath, ObjPath, AttrPath, ItemPath, objpath
 from .vtype import VType
+from .storedproperty import storedproperty
 # from .decorators import getter, setter, finaliser, nodealias, nodealias_maker, node_maker
