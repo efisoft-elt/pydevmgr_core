@@ -5,7 +5,7 @@ from .base import  BaseObject
 import time
 from collections import  OrderedDict
 
-from typing import Any, Dict, Iterable, Union, Optional, Callable
+from typing import Any, Dict, Iterable, List, Tuple, Union, Optional, Callable
 
 
 class DataView:
@@ -110,19 +110,43 @@ class DownloaderConnection:
        downloader (:class:`Downloader`) :  parent Downloader instance
        token (Any): Connection token 
     """
-    def __init__(self, downloader, token):
+    def __init__(self, downloader: "Downloader", token: tuple):
         self._downloader = downloader 
         self._token = token 
+        self._child_connections = [] 
     
     def _check_connection(self):
-        if not self._token:
+        if not self.is_connected():
             raise RuntimeError("DownloaderConnection has been disconnected from its Downloader")
     
+
+    def _collect_tokens(self, tokens:List[Tuple]) -> None:
+        if self._token:
+            tokens.append( self._token) 
+        for child in self._child_connections:
+            child._collect_tokens(tokens) 
+            
+        
+
     @property
     def data(self) -> dict:
         """ downloader data """
         return self._downloader.data 
-           
+    
+
+    def is_connected(self)-> bool:
+        """ Return True if the connection is still established """
+        if not self._token:
+            return False 
+
+        if not self._token in self._downloader._dict_nodes :
+            return False 
+        return True 
+    
+    def clear(self)-> bool:
+        """ Remove child connections from the list if they have been disonnected """
+        self._child_connections = [child for child in self._child_connections if child.is_connected()]
+
     def disconnect(self) -> None:
         """ disconnect connection from the downloader 
         
@@ -132,9 +156,21 @@ class DownloaderConnection:
         
         Note that the disconnected nodes will stay inside the downloader data but will not be updated
         """
-        self._downloader.disconnect(self._token)
+        tokens = [] 
+        self._collect_tokens(tokens)
+        self._downloader.disconnect(*tokens)
+        self._child_connections = [] 
         self._token = None
-        
+    
+    def new_connection(self) -> "DownloaderConnection":
+        """ create a new child connection. When the master connection will be disconnect, alll child 
+        connection will be disconnected. 
+        """
+        connection =  self._downloader.new_connection() 
+        self._child_connections.append(connection)
+        return connection
+
+
     def add_node(self, *nodes) -> None:
         """ Register nodes to be downloader associated to this connection 
         
@@ -346,8 +382,6 @@ class Downloader:
             
         failure_callbacks = set() 
         
-        if callback is None:
-            callback = _dummy_callback
         if trigger is None:
             trigger =  _dummy_trigger
         
@@ -435,7 +469,7 @@ class Downloader:
         """
         return DownloaderConnection(self, self.new_token())
     
-    def disconnect(self, token: tuple) -> None:
+    def disconnect(self, *tokens: Tuple[tuple]) -> None:
         """ Disconnect the iddentified connection 
         
         All the nodes used by the connection (and not by other connected app) will be removed from the 
@@ -445,17 +479,18 @@ class Downloader:
         Note that the disconnected nodes will stay inside the downloader data but will not be updated
          
         Args:
-            token : a Token returned by :func:`Downloader.new_token`
+            *tokens : Token returned by :func:`Downloader.new_token`
         """
-        if token is Ellipsis:
-            raise ValueError('please provide a real token')
-        try:
-            self._dict_nodes.pop(token)
-            self._dict_datalinks.pop(token)
-            self._dict_callbacks.pop(token)
-            self._dict_failure_callbacks.pop(token)
-        except KeyError:
-            pass
+        for token in tokens:
+            if token is Ellipsis:
+                raise ValueError('please provide a real token')
+            try:
+                self._dict_nodes.pop(token)
+                self._dict_datalinks.pop(token)
+                self._dict_callbacks.pop(token)
+                self._dict_failure_callbacks.pop(token)
+            except KeyError:
+                pass
  
         self._rebuild_nodes()
         self._rebuild_callbacks()

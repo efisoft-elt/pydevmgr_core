@@ -2,7 +2,7 @@ from collections import OrderedDict
 from .node import NodesWriter, BaseNode
 from .download import BaseDataLink
 
-from typing import Union, Optional, Callable, Any, Dict 
+from typing import List, Tuple, Union, Optional, Callable, Any, Dict 
 import time 
 
 
@@ -16,14 +16,32 @@ class UploaderConnection:
        uploader (:class:`Uploader`) :  parent Uploader instance
        token (Any): Connection token 
     """
-    def __init__(self, uploader, token):
+    def __init__(self, uploader: "Uploader", token: tuple):
         self._uploader = uploader 
         self._token = token 
-    
+        self._child_connections = [] 
+
     def _check_connection(self):
+        if not self.is_connected():
+            raise RuntimeError("UploaderConnection has been disconnected from its Uploader")
+    
+    def _collect_tokens(self, tokens:List[Tuple]) -> None:
+        if self._token:
+            tokens.append( self._token) 
+        for child in self._child_connections:
+            child._collect_tokens(tokens) 
+            
+
+    def is_connected(self)-> bool:
+        """ Return True if the connection is still established """
         if not self._token:
-            raise RuntimeError("DownloaderConnection has been disconnected from its Downloader")
-           
+            return False 
+
+        if self._token not in self._uploader._dict_nodes:
+            return False 
+        return True 
+
+
     def disconnect(self) -> None:
         """ disconnect connection from the uploader 
         
@@ -32,9 +50,20 @@ class UploaderConnection:
         Also all callback associated with this connection will be removed from the uploader
         
         """
-        self._uploader.disconnect(self._token)
+        tokens = [] 
+        self._collect_tokens(tokens)
+        self._uploader.disconnect(*tokens)
+        self._child_connections = []   
         self._token = None
-        
+    
+    def new_connection(self) -> "UploaderConnection":
+        """ create a new child connection. When the master connection will be disconnect, alll child 
+        connection will be disconnected. 
+        """
+        connection = self._uploader.new_connection() 
+        self._child_connections.append( connection )
+        return connection 
+   
     def add_node(self, node: BaseNode, value: Any) -> None:
         """ Register nodes to be uploaded,  associated to this connection 
         
@@ -244,25 +273,26 @@ class Uploader:
         """ return an :class:`UploaderConnection` to handle uploader connection """
         return UploaderConnection(self, self.new_token() )
 
-    def disconnect(self, token: tuple) -> None:
+    def disconnect(self, *tokens: Tuple[Tuple]) -> None:
         """ Disconnect the iddentified connection 
         
         All the nodes used by the connection (and not by other connected app) will be removed from the upload queue of nodes.
         Also all callback associated with this connection will be removed from the uploader 
                  
         Args:
-            token : a Token returned by :func:`Uploader.new_token`
+            *tokens : Token returned by :func:`Uploader.new_token`
         """
-        if token is Ellipsis:
-            raise ValueError('please provide a real token')
-        try:
-            self._dict_nodes.pop(token)
-            self._dict_datalinks.pop(token)
-            self._dict_callbacks.pop(token)
-            self._dict_failure_callbacks.pop(token)
-        except KeyError:
-            pass
- 
+        for token in tokens:
+            if token is Ellipsis:
+                raise ValueError('please provide a real token')
+            try:
+                self._dict_nodes.pop(token)
+                self._dict_datalinks.pop(token)
+                self._dict_callbacks.pop(token)
+                self._dict_failure_callbacks.pop(token)
+            except KeyError:
+                pass
+     
         self._rebuild_nodes()
         self._rebuild_datalinks()
         self._rebuild_callbacks()

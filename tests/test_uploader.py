@@ -145,7 +145,6 @@ def test_connection():
 
     uploader = Uploader()
     connection = uploader.new_connection()
-    
     dl = DataLink( dev, data)
 
     connection.add_datalink(dl)
@@ -166,9 +165,37 @@ def test_connection():
     uploader.upload()
     assert dev.v1.get() == 100.0 
     assert dev.v2.get() == 200.0 
-
-
     
 
+def test_sub_connection():
+    dev = Device()
+    class Data(BaseModel):
+        v1: NodeVar[float] = 0.0 
+        v2: NodeVar[float] = 0.0 
+    data = Data(v1=10.0, v2=20.0)
+    uploader = Uploader()
+
+    master_connection = uploader.new_connection()
+    connection = master_connection.new_connection()
+
+    dl = DataLink( dev, data)
+    connection.add_datalink(dl)
+    uploader.upload()
+    assert dev.v1.get() == 10.0 
+    assert dev.v2.get() == 20.0 
+    
+    data.v1 = 100.0
+    data.v2 = 200.0
+    
+    uploader.upload()
+    assert dev.v1.get() == 100.0 
+    assert dev.v2.get() == 200.0 
+
+    master_connection.disconnect()
+    data.v1 = 1.0
+    data.v2 = 2.0 
+    uploader.upload()
+    assert dev.v1.get() == 100.0 
+    assert dev.v2.get() == 200.0 
 
 
