@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Optional, Tuple, Type
+from typing import Any, List, Optional, Tuple, Type
 import weakref
 
 from pydantic import BaseModel, Extra, validator
@@ -146,13 +146,22 @@ class ParentWeakRef:
 
 
 
-def find_factories(cls,  SubClass=BaseObject ):
+def find_factories(cls,  
+        SubClass=BaseObject, 
+        include:Optional[set] = None, 
+        exclude:Optional[set] = None
+    )-> List[Tuple[str, BaseFactory]]:
     """ find factories defined inside a pydevmgr class """
     # TODO: include this in systemy 
     found = set()
-    for attr in dir(cls):
+    iterator = dir(cls) if include is None else include
+    
+    if exclude is None: 
+        exclude = set() 
+    for attr in iterator:
         if attr.startswith("__"): continue
         if attr == "Config": continue 
+        if attr in exclude: continue
         
         try:
             obj = getattr( cls, attr)

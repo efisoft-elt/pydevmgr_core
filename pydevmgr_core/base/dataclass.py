@@ -304,16 +304,22 @@ def create_data_model(
 
 
 
-def set_data_model(cls):
+def set_data_model(__cls__=None, name="Data", exclude: Optional[set] =None, include: Optional[set]=None):
     """ Create a data model for a given class 
 
     Store the model inside the .Data attribute 
     Return the class so it can be used at decroator 
     """
-    Data = create_data_model( "Data", cls, use_data_if_defined=True) 
-    cls.Data = Data 
-    return cls
+    def data_model_setter(cls):
+        Data = create_data_model( name, find_factories(cls, include=include, exclude=exclude)) 
+        setattr( cls, name, Data)
+        return cls 
 
+    if __cls__:
+        return data_model_setter(__cls__)
+    else:
+        return data_model_setter 
+  
 
 
 # ##################################################################
