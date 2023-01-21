@@ -9,7 +9,8 @@ from pydevmgr_core.base.io import load_config
 from .engine import BaseEngine 
 from .model_var import StaticVar, NodeVar
 from systemy import BaseSystem, BaseFactory, SystemDict, SystemList
-from systemy import get_factory_class
+from systemy import get_factory_class, find_factories
+
   
 
 class __Decorator__: #  place holder for decorator base class (see base.decorators) 
@@ -144,63 +145,4 @@ class ParentWeakRef:
         return obj
 
 
-
-
-def find_factories(cls,  
-        SubClass=BaseObject, 
-        include:Optional[set] = None, 
-        exclude:Optional[set] = None
-    )-> List[Tuple[str, BaseFactory]]:
-    """ find factories defined inside a pydevmgr class """
-    # TODO: include this in systemy 
-    found = set()
-    iterator = dir(cls) if include is None else include
-    
-    if exclude is None: 
-        exclude = set() 
-    for attr in iterator:
-        if attr.startswith("__"): continue
-        if attr == "Config": continue 
-        if attr in exclude: continue
-        
-        try:
-            obj = getattr( cls, attr)
-        except AttributeError:
-            continue 
-        if not isinstance(obj, BaseFactory):
-            continue
-        
-        try:
-            System  = obj.get_system_class()
-        except ValueError:
-            continue
-
-        if not issubclass(System, SubClass):
-            continue 
-        found.add(attr)
-        yield (attr,obj) 
-        
-                    
-    for attr, field in cls.Config.__fields__.items():
-        if attr in found: continue 
-        
-        try:
-            obj = field.get_default()
-        except (ValueError, TypeError):
-            continue 
-        
-        if not isinstance(obj, BaseObject.Config):
-            continue 
-        
-        try:
-            System  = obj.get_system_class()
-        except ValueError:
-            continue
-       
-        if not issubclass(System, SubClass):
-            continue 
-        
-        yield (attr, obj)
-    
-        
 
