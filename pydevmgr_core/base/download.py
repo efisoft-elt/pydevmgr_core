@@ -254,6 +254,8 @@ class DownloaderConnection:
         """
         self._check_connection() 
         self._downloader.remove_failure_callback(self._token, *callbacks)
+    
+    
 
 class StopDownloader(StopIteration):
     pass
@@ -755,12 +757,12 @@ class Downloader:
            n (int): The number of node/value pair removed 
         """
         d = self.data
-        n = 0
+        count = 0
         for n in list(d): # list(d) in order to avoid deletion on the iterator
-            if not n in self._nodes:
+            if n not in self._nodes:
                 d.pop(n, None)
-                n+=1
-        return n
+                count+=1
+        return count
 
 
 def reset(nodes: Iterable):
