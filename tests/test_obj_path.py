@@ -124,6 +124,10 @@ def test_set_value():
     assert root.a.b.c.l[1] == 10
 
 
+def test_path_var_instance():
+    x = 2
+    assert PathVar(".").resolve(x) == 2
+
 
 def test_group_path():
     class C:

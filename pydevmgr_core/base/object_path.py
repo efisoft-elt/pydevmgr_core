@@ -1,7 +1,7 @@
 import re
 import ast
 import operator as op
-from typing import Any, Generic, Tuple, TypeVar
+from typing import Any, Generic, Tuple, TypeVar, Union
 
 from pydantic.error_wrappers import ValidationError
 from pydantic.fields import ModelField
@@ -14,10 +14,12 @@ _path_glv = {'open':None, '__name__':None, '__file__':None, 'globals':None, 'loc
 
 _forbiden = re.compile( '.*[()].*' )
 
-
 PathType = TypeVar('PathType')
 
 class PathVar(Generic[PathType]):
+    def __new__(cls, path: Union[str,"BasePath"]):
+        return objpath( path )
+
     @classmethod
     def __get_validators__(cls):
         yield cls.validate
