@@ -1,3 +1,4 @@
+import pytest
 from valueparser.parsers import Clipped
 from pydevmgr_core import BaseRpc
 from pydevmgr_core.base.rpc import Arg 
@@ -13,7 +14,8 @@ def test_arg_are_parsed():
     assert rpc.args[0].parse("1.0") == 1.0
 
 def test_arg_legacy():
-    rpc = BaseRpc( arg_parsers=[float])
+    with pytest.deprecated_call():
+        rpc = BaseRpc( arg_parsers=[float])
     assert rpc.args[0].parse(1.0) == 1.0
 
 

@@ -264,14 +264,14 @@ files = [
 
 [[package]]
 name = "systemy"
-version = "0.1.3"
+version = "0.1.5"
 description = "A core package to manipulate model or system hierarchical classes"
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "systemy-0.1.3-py3-none-any.whl", hash = "sha256:94aa03ec4fe7e2daf0d4f38791a0d05239805ffe9137ccd2db128047e4188027"},
-    {file = "systemy-0.1.3.tar.gz", hash = "sha256:8e47889e5ea3b36488992740d2be81d0f7d60f74a971060801a614a9b42ca37c"},
+    {file = "systemy-0.1.5-py3-none-any.whl", hash = "sha256:81d8c48e6bfaa12c07234978799bfd71f479496374fb0a1d5f404a582fea8d5b"},
+    {file = "systemy-0.1.5.tar.gz", hash = "sha256:676e34c3ddc9eb776478cbc3667d0076815c12323dbe4a1f34268e54f013a14d"},
 ]
 
 [package.dependencies]

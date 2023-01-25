@@ -27,6 +27,8 @@ def _vtype_default(vtype):
         return default
     if vtype is None:
         return 
+    if not hasattr( vtype, "__call__"):
+        return None
     return vtype()
 
 def find_vtype( obj: Union[BaseSystem, Type[BaseSystem], BaseSystem.Config, Type[BaseSystem.Config]]) -> Type:

@@ -364,7 +364,8 @@ class NodesWriter:
         
         # start with aliases, returned values are set inside 
         # the node_values dictionary
-        for node, value in node_values.items():
+        # list it because node_values can increase in case of NodeAlias
+        for node, value in list(node_values.items()):
             if node.sid is None:
                 for n,v in zip(node.nodes(), node.fset(value)):
                     node_values[n] = v 
