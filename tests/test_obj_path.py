@@ -6,8 +6,9 @@ from pydevmgr_core import BaseManager,  BaseDevice
 from systemy import FactoryList, FactoryDict
 
 
-class Device(BaseDevice, toto=0):
-    pass
+class Device(BaseDevice):
+    class Config:
+        toto: int =0 
 
 class M(BaseManager):
         dev_list = FactoryList( [BaseDevice.Config()], BaseDevice.Config)

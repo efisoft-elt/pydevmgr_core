@@ -264,14 +264,14 @@ files = [
 
 [[package]]
 name = "systemy"
-version = "0.1.5"
+version = "0.2a0"
 description = "A core package to manipulate model or system hierarchical classes"
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "systemy-0.1.5-py3-none-any.whl", hash = "sha256:81d8c48e6bfaa12c07234978799bfd71f479496374fb0a1d5f404a582fea8d5b"},
-    {file = "systemy-0.1.5.tar.gz", hash = "sha256:676e34c3ddc9eb776478cbc3667d0076815c12323dbe4a1f34268e54f013a14d"},
+    {file = "systemy-0.2a0-py3-none-any.whl", hash = "sha256:6e72171492b305b8fe961e537f87b8e6334bd9437706b5fc78bf66ce0b7fafad"},
+    {file = "systemy-0.2a0.tar.gz", hash = "sha256:5bacd5744d6236f61cca13a1ef63c690743d74e9c4bcf7f692a127e9b2d6d06f"},
 ]
 
 [package.dependencies]
@@ -306,18 +306,18 @@ files = [
 
 [[package]]
 name = "valueparser"
-version = "0.1.5"
+version = "0.2a0"
 description = "Python package for quick creation of tools to parse a value"
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "valueparser-0.1.5-py3-none-any.whl", hash = "sha256:c4af4a5c50afde8e43e719a34a2e6a19ef881d0e3adde49ea077451c5eab9e20"},
-    {file = "valueparser-0.1.5.tar.gz", hash = "sha256:961e2d72ff7973c62e27fce5d23a999aad7a1c3d1dd5f9acf3ef62d454342152"},
+    {file = "valueparser-0.2a0-py3-none-any.whl", hash = "sha256:e3edd02b762ff9375fdbadf9c929b73f9733b7ea1246e5c0a58aac6a4fba5af7"},
+    {file = "valueparser-0.2a0.tar.gz", hash = "sha256:241476151153d0cbaf949115ddf11c3258502706828a0258409fcea14f2604b4"},
 ]
 
 [package.dependencies]
-systemy = ">=0.1.1,<0.2.0"
+systemy = "0.2a0"
 
 [[package]]
 name = "zipp"
@@ -338,4 +338,4 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7"
-content-hash = "f8d61714ffedce2344120caab068ab7951dddd64c6459dafbd7271d437176fcb"
+content-hash = "871c2cf70871fd8c392aeb5864222e17e5216cebca708fe99a9943572f8881e7"

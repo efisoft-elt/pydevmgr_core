@@ -11,7 +11,9 @@ from typing import Any
 
 @pytest.fixture
 def MyNode():
-    class MyNode(BaseNode, value = (Any, 0.0)):
+    class MyNode(BaseNode):
+        class Config:
+            value: Any = 0.0
         def fget(self):
             return self.config.value
         def fset(self, value):

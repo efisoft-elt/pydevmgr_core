@@ -1,5 +1,6 @@
 from typing import List
-import pytest 
+import pytest
+from systemy.system import SystemList 
 from pydevmgr_core import  BaseDevice, BaseNode, KINDS, BaseObject
 from systemy import FactoryList
 
@@ -8,7 +9,7 @@ def test_factory_list_are_auto_members():
     class MyDevice(BaseDevice):
         class Config(BaseDevice.Config):
             
-            mixed: List[BaseObject.Config] = []
+            mixed: FactoryList[BaseObject.Config] = []
     
     d = MyDevice()
     assert d.mixed == []
@@ -25,7 +26,7 @@ def test_factory_list_with_factory_class():
 
     class MyDevice(BaseDevice):
         class Config(BaseDevice.Config):
-            sub_devices: List[MySubDevice.Config] = [] 
+            sub_devices: FactoryList[MySubDevice.Config] = [] 
              
 
     c =  MyDevice.Config( sub_devices= [{}, {'new_value':9.9}]  ) #
@@ -46,13 +47,13 @@ def test_factory_list_member_are_findable():
     class MyDevice(BaseDevice):
         class Config(BaseDevice.Config):
             type = "MyDevice"
-            sub_devices: List[MySubDevice.Config] = []
+            sub_devices: FactoryList[MySubDevice.Config] = []
             
     c =  MyDevice.Config( sub_devices= [{}, {'new_value':9.9}]  ) #
     d = MyDevice(config=c) 
     
     assert len(list(d.find( MySubDevice, -1))) == 2
-     
+    assert isinstance(d.sub_devices , SystemList) 
     list(d.find( MySubDevice, -1))[0] == d.sub_devices[0]
 
 def test_factory_list_can_be_copied():

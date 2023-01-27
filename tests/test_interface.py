@@ -1,7 +1,11 @@
 import pytest 
 from pydevmgr_core import BaseInterface, BaseNode
 
-class DefaultNode(BaseNode, default=(int, 0), type="Default"):
+class DefaultNode(BaseNode):
+    class Config:
+        default : int = 0
+        type: str = "Default"
+
     def fget(self):
         return self.config.default
 

@@ -12,19 +12,20 @@ def test_factory_dict_shall_be_a_auto_member():
     class MyDevice(BaseDevice):
         class Config(BaseDevice.Config):
             
-            mixed: Dict[str,BaseObject.Config] = {}
+            mixed: FactoryDict[str,BaseObject.Config] = {}
     
     
     d = MyDevice()
     assert d.mixed == {}
     
 
-    class Sub(BaseDevice, toto=(int, 0)):
-        ...
+    class Sub(BaseDevice):
+        class Config:
+            toto: int = 0
     
     class MyDevice(BaseDevice):
         class Config:
-            mixed: Dict[str, Sub.Config] = {'sub1': Sub.Config() }
+            mixed: FactoryDict[str, Sub.Config] = {'sub1': Sub.Config() }
     
     d = MyDevice()
     assert d.mixed['sub1'].config.toto == 0
@@ -42,7 +43,7 @@ def test_element_factory_class():
 
         class Mydevice(BaseDevice):
             class Config(BaseDevice.Config):
-                nodes: Dict[str, MyNode.Config] = {}
+                nodes: FactoryDict[str, MyNode.Config] = {}
         
         d = Mydevice(nodes = { 'n1':{}, 'n2':{} } )
         assert isinstance( d.nodes['n1'], MyNode)

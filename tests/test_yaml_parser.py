@@ -19,10 +19,10 @@ class Node(BaseNode):
         self.config.value = value 
 
 @register_factory("Device/Test")
-class Motor(BaseDevice, 
-            prefix = "default",
-            x=9.99  
-    ):
+class Motor(BaseDevice):
+    class Config:
+        prefix = "default"
+        x=9.99  
     pass
 
 

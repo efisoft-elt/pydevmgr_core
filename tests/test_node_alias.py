@@ -11,7 +11,9 @@ from systemy import FactoryList
 
 @pytest.fixture
 def MyNode():
-    class MyNode(BaseNode, value = (Any, 0.0)):
+    class MyNode(BaseNode):
+        class Config:
+            value: Any = 0.0
         def fget(self):
             return self.config.value
         def fset(self, value):
@@ -31,7 +33,9 @@ def node20(MyNode):
 
 @pytest.fixture
 def Scaler():
-    class Scaler(NodeAlias1, scale=1.0):
+    class Scaler(NodeAlias1):
+        class Config:
+            scale=1.0
         def fget(self, value):
             return value* self.config.scale
         def fset(self, value):
@@ -96,8 +100,9 @@ def test_nodealias_property_decorator(MyNode):
 
 def test_embeded_node_alias():
 
-    class Device(BaseDevice, node = Static.Config(value=9)):
-        pass
+    class Device(BaseDevice):
+        class Config:
+            node = Static.Config(value=9)
 
     class Manager(BaseManager):
         dev_list = FactoryList( [Device.Config()], Device.Config)
