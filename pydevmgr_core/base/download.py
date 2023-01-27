@@ -454,8 +454,8 @@ class Downloader:
         token = id(self), self._next_token
         self._dict_nodes[token] = set()
         self._dict_datalinks[token] = set()
-        self._dict_callbacks[token] = [] #set()
-        self._dict_failure_callbacks[token] = [] #set()
+        self._dict_callbacks[token] = set()
+        self._dict_failure_callbacks[token] = set()
         
         self._next_token += 1
         # self._rebuild_nodes()

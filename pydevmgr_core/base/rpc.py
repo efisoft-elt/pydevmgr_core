@@ -5,7 +5,7 @@ from valueparser import  ParserFactory
 from .base import BaseObject
 
 from typing import Dict, List, Callable,  Optional, Type, Any
-from systemy import BaseSystem
+from systemy import BaseSystem, FactoryDict, FactoryList
 
 
 class Arg(BaseSystem):
@@ -30,13 +30,19 @@ def argc(name, parser=None):
     """
     return Arg.Config(name=name, parser=parser)
 
+
+ArgsFactoryList = FactoryList[Arg.Config] 
+KwargsFactoryDict = FactoryDict[str, Arg.Config] 
+
 class BaseRpcConfig(BaseObject.Config):
     # ToDo remove arg_parsers and kwargs_parsers 
-    arg_parsers: List[ParserFactory] = [] 
-    kwarg_parsers: Dict[str, ParserFactory] = {}
-    
-    args: List[Arg.Config] = []
-    kwargs: Dict[str, Arg.Config] = {} 
+    # !!! These will be removed 
+    arg_parsers: FactoryList[ParserFactory] = [] 
+    kwarg_parsers: FactoryDict[str, ParserFactory] = {}
+    # ################################################
+
+    args: ArgsFactoryList = ArgsFactoryList()
+    kwargs: KwargsFactoryDict = KwargsFactoryDict()
     
     @root_validator(pre=False)
     def _fix_legacy_parsers(cls, values):
@@ -44,7 +50,19 @@ class BaseRpcConfig(BaseObject.Config):
         if not values.get('args', None)  and arg_parsers:
             warn( "arg_parser is deprecated, use the args argument", DeprecationWarning, stacklevel=2)
 
-            values['args'] = [ Arg.Config(name=f"arg{i}", parser=arg_parser) for i,arg_parser in enumerate(arg_parsers)]
+            values['args'] = ArgsFactoryList( 
+                    [ Arg.Config(name=f"arg{i}", parser=arg_parser) for i,arg_parser in enumerate(arg_parsers)]
+            )
+        kwarg_parsers = values['kwarg_parsers']
+
+        if not values.get('kwargs', None)  and kwarg_parsers:
+            warn( "kwarg_parser is deprecated, use the kwargs kwargument", DeprecationWarning, stacklevel=2)
+
+            values['kwargs'] = ArgsFactoryList( 
+                    [ Arg.Config(name=f"kwarg{i}", parser=kwarg_parser) for i,kwarg_parser in kwarg_parsers.items()]
+            )
+
+
         return values
 
 
