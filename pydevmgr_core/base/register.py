@@ -11,7 +11,7 @@ from pydevmgr_core.base.node import BaseNode
 from pydevmgr_core.base.interface import BaseInterface
 from pydevmgr_core.base.manager import BaseManager
 from pydevmgr_core.base.rpc import BaseRpc
-from valueparser.engine import AbcParser, BaseParser
+from valueparser.engine import  BaseParser
 
 class KINDS(str, Enum):
     PARSER = "Parser"
@@ -141,7 +141,7 @@ def _get_string_kind(cls):
         return KINDS.DEVICE
     if issubclass(cls, BaseManager):
         return KINDS.MANAGER
-    if issubclass(cls, (AbcParser, BaseParser)):
+    if issubclass(cls, (BaseParser)):
         return KINDS.PARSER
     return None
 
