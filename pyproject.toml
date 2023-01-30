@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pydevmgr_core"
-version = "0.6a4"
+version = "0.6a5"
 description = "Python package to handle distributed device handling"
 license = "Creative Commons Attribution-Noncommercial-Share Alike license"
 authors = ["Sylvain Guieu <sylvain.guieu@univ-grenoble-alpes.fr>"]
