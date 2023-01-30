@@ -425,6 +425,8 @@ define the :meth:`pydevmgr_core.BaseNodeAlias.nodes`:
     assert device.value.get() == "b"
 
 
+On The exemple above the :class:`ParentWeakRef` is just implementing the get_parent() method and is subclassing the
+new() method 
 
 
 Rpc
@@ -511,7 +513,7 @@ See also Alphabetical :ref:`genindex`
 
 
 .. automodule:: pydevmgr_core
-   :members: BaseParser, BaseNode, NodeAlias, BaseRpc, BaseInterface, BaseDevice, BaseManager, 
+   :members: Parser, BaseNode, NodeAlias, BaseRpc, BaseInterface, BaseDevice, BaseManager, 
              download, Downloader, upload, Uploader
     
 

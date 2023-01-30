@@ -1,6 +1,6 @@
 from .base.register import register 
-# from .base.parser_engine import BaseParser, parser
-from valueparser import BaseParser, parser
+# from .base.parser_engine import Parser, parser
+from valueparser import Parser, parser
 from systemy import register_factory 
 
 from .misc.math_parser import ExpEval
@@ -21,7 +21,7 @@ from valueparser import (
 
 
 __all__ = [
-"BaseParser", 
+"Parser", 
 "parser", 
 "Int", "Float", "Complex", "Bool", "Str", "Tuple", "Set", "List", 
 "Clipped", "Bounded", "Loockup", 
@@ -37,8 +37,8 @@ class _Empty_:
     pass
 
 @register
-class Loockup(BaseParser):
-    class Config(BaseParser.Config):
+class Loockup(Parser):
+    class Config(Parser.Config):
         loockup : list = []
         loockup_default : Optional[Any] = _Empty_
     
@@ -56,9 +56,9 @@ class Loockup(BaseParser):
 
 
 @register
-class DefaultFloat(BaseParser):
+class DefaultFloat(Parser):
     """ parse a float to a float or a default (e.g. NaN) if not a float """
-    class Config(BaseParser.Config):
+    class Config(Parser.Config):
         default: float = math.nan
     
     @staticmethod
@@ -69,8 +69,8 @@ class DefaultFloat(BaseParser):
             return config.default
 
 @register
-class ToString(BaseParser):
-    class Config(BaseParser.Config):
+class ToString(Parser):
+    class Config(Parser.Config):
         format : str = "%s"
         
     @staticmethod    
@@ -78,52 +78,52 @@ class ToString(BaseParser):
         return config.format%(value,)
 
 @register
-class Capitalized(BaseParser):
+class Capitalized(Parser):
     @staticmethod
     def __parse__(value, config):
         return value.capitalize()
 
 # @register(type="Lower")
 @register
-class Lowered(BaseParser):
+class Lowered(Parser):
     @staticmethod
     def __parse__(value, config):
         return value.lower()
 
 # @register(type="Upper")
 @register
-class Uppered(BaseParser):
+class Uppered(Parser):
     @staticmethod
     def __parse__(value, config):
         return value.upper()
 
 @register
-class Stripped(BaseParser):
-    class Config(BaseParser.Config):
+class Stripped(Parser):
+    class Config(Parser.Config):
         strip: Optional[str] = None
     @staticmethod
     def __parse__(value, config):
         return value.strip(config.strip)
 
 @register
-class LStripped(BaseParser):
-    class Config(BaseParser.Config):
+class LStripped(Parser):
+    class Config(Parser.Config):
         lstrip: Optional[str] = None
     @staticmethod
     def __parse__(value, config):
         return value.lstrip(config.lstrip)
 
 @register
-class RStripped(BaseParser):
-    class Config(BaseParser.Config):
+class RStripped(Parser):
+    class Config(Parser.Config):
         rstrip: Optional[str] = None
     @staticmethod
     def __parse__(value, config):
         return value.rstrip(config.rstrip)
 
 @register
-class Formula(BaseParser):
-    class Config(BaseParser.Config):
+class Formula(Parser):
+    class Config(Parser.Config):
         formula: str = 'x'
         varname: str = 'x'
     
@@ -137,12 +137,12 @@ class Formula(BaseParser):
 
 
 @register
-class Math(BaseParser):
+class Math(Parser):
     """ Parse a mathematical expression (string) to a value 
 
     If value is numerical, it is returned as such.
     """
-    class Config(BaseParser.Config):
+    class Config(Parser.Config):
         variables: dict = {'pi':math.pi}
     @staticmethod
     def __parse__(value, config):
