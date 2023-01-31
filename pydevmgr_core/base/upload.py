@@ -1,13 +1,148 @@
 from collections import OrderedDict
 from .node import NodesWriter, BaseNode
-from .download import BaseDataLink
+from .download import BaseDataLink, DownloadInput, DownloadInputs , Token, Callback, _BaseDownloader, StopDownloader
 
 from typing import List, Tuple, Union, Optional, Callable, Any, Dict 
+from dataclasses import dataclass, field 
 import time 
+import weakref 
+
+@dataclass
+class UploadInput(DownloadInput):
+    nodes: Dict[BaseNode, Any] = field(default_factory=dict) 
+    
+    def add_node(self, node: BaseNode, value: Any)->None:
+        self.nodes[node] = value 
+
+    def add_nodes(self, nodes: Dict[BaseNode,Any]):
+        self.nodes.update( nodes )
+
+    def remove_node(self, *nodes):
+        for node in nodes:
+            try:
+                self.nodes.pop(node)
+            except KeyError:
+                pass 
+    
 
 
+@dataclass 
+class UploadInputs(DownloadInputs):
 
-class UploaderConnection:
+    def new_input(self, token: Token):
+        self.connections[token] = UploadInput() 
+        return self.connections[token]
+
+    
+    def build_nodes(self,
+            tokens:Optional[List[Token]] = None  
+        )-> None:
+        nodes = {}
+        for connection in self.iter_connection(tokens):
+            nodes.update(connection.nodes)
+        return nodes, NodesWriter(nodes)
+
+    def build_uploader(self, 
+         tokens:Optional[List[Token]] = None, 
+        )-> Tuple[List[BaseNode], Callable]:
+        
+        nodes, writer = self.build_nodes( tokens )
+        datalinks = self.build_datalinks( tokens ) 
+        callbacks = self.build_callbacks( tokens )
+        failure_callbacks = self.build_failure_callbacks( tokens )
+        
+        def upload(did_failed=False):
+            for dl in datalinks:
+                dl._upload_to(nodes)
+
+            try:
+                NodesWriter(nodes).write()
+                # writer.write() 
+            except Exception as e:
+                did_failed = True
+    
+                if failure_callbacks:
+                    for func in failure_callbacks:
+                        func(e)
+                else:
+                    raise e 
+            else:
+                if did_failed:
+                    did_failed  = False
+                    for func in failure_callbacks:                    
+                        func(None)
+                    
+                for func in callbacks:
+                    func()
+
+               
+                return did_failed
+        return nodes, upload        
+
+
+class _BaseUploader(_BaseDownloader):
+    def add_node(self, node, value) -> None:
+        """ Register node to be downloaded for an iddentified app
+        
+        Args:
+            *nodes :  nodes to be added to the download queue, associated to the app
+        """
+        self._check_connection() 
+        self.download_inputs[self._token].add_node(node, value) 
+        self._rebuild()
+
+    def add_nodes(self, nodes: Dict[BaseNode,Any]) -> None:
+        """ Register node to be downloaded for an iddentified app
+        
+        Args:
+            *nodes :  nodes to be added to the download queue, associated to the app
+        """
+        self._check_connection() 
+        self.download_inputs[self._token].add_nodes(nodes) 
+        self._rebuild()
+
+    def run(self, 
+            period: float =1.0, 
+            stop_signal: Callable =lambda : False, 
+            sleepfunc: Callable =time.sleep
+        ) -> None:
+        """ run the upload indefinitely or when stop_signal return True 
+        
+        Args:
+            period (float, optional): period between downloads in second
+            stop_signal (callable, optional): a function returning True to stop the loop or False to continue
+            
+        """
+        try:
+            while not stop_signal():
+                s_time = time.time()
+                self.upload()
+                sleepfunc( max( period-(time.time()-s_time), 0))
+        except StopDownloader: # any downloader call back can send a StopDownloader to stop the runner 
+            return 
+            
+    def runner(self, 
+        period: float =1.0, 
+        stop_signal: Callable =lambda : False, 
+        sleepfunc: Callable =time.sleep
+        ) -> Callable: 
+        """ Create a function to run the download in a loop 
+        
+        Usefull to define a Thread for instance
+        
+        Args:
+            period (float, optional): period between downloads in second
+            stop_signal (callable, optional): a function returning True to stop the loop or False to continue
+        
+                
+        """       
+        def run_func():
+            self.run(period=period, sleepfunc=sleepfunc, stop_signal=stop_signal)
+        return run_func
+   
+
+
+class UploaderConnection(_BaseUploader):
     """ Hold a connection to a :class:`Uploader` 
     
     Most likely created by :meth:`Uploader.new_connection` 
@@ -16,10 +151,12 @@ class UploaderConnection:
        uploader (:class:`Uploader`) :  parent Uploader instance
        token (Any): Connection token 
     """
+    _did_failed_flag = False 
     def __init__(self, uploader: "Uploader", token: tuple):
         self._uploader = uploader 
         self._token = token 
         self._child_connections = [] 
+        self.download_inputs = uploader.download_inputs 
 
     def _check_connection(self):
         if not self.is_connected():
@@ -30,17 +167,34 @@ class UploaderConnection:
             tokens.append( self._token) 
         for child in self._child_connections:
             child._collect_tokens(tokens) 
-            
+    
+
+    def _get_parent(self):
+        return None
+
+    def _rebuild(self):
+        tokens = []
+        self._collect_tokens( tokens )
+        self._nodes, self._upload_func = self.download_inputs.build_uploader( tokens )
+        parent = self._get_parent()
+        if parent:
+            parent._rebuild()
+
+    def __has__(self, node):
+        return node in self._nodes
 
     def is_connected(self)-> bool:
         """ Return True if the connection is still established """
         if not self._token:
             return False 
 
-        if self._token not in self._uploader._dict_nodes:
+        if self._token not in self._uploader.download_inputs:
             return False 
         return True 
 
+    def upload(self) -> None:
+        """ upload the linked node/value dictionaries """
+        self._did_failed_flag = self._upload_func( self._did_failed_flag )
 
     def disconnect(self) -> None:
         """ disconnect connection from the uploader 
@@ -52,9 +206,20 @@ class UploaderConnection:
         """
         tokens = [] 
         self._collect_tokens(tokens)
-        self._uploader.disconnect(*tokens)
-        self._child_connections = []   
+        for token in tokens:
+            try:
+                self.download_inputs.del_input(token)
+            except KeyError:
+                pass
+
+        self._child_connections = [] 
         self._token = None
+        def upload(data, flag):
+            raise ValueError("Disconnected")
+        self._nodes, self._upload_func = [] , upload 
+        parent = self._get_parent()
+        if parent:
+            parent._rebuild()
     
     def new_connection(self) -> "UploaderConnection":
         """ create a new child connection. When the master connection will be disconnect, alll child 
@@ -62,107 +227,13 @@ class UploaderConnection:
         """
         connection = self._uploader.new_connection() 
         self._child_connections.append( connection )
+        connection._get_parent = weakref.ref( self )
+       
         return connection 
-   
-    def add_node(self, node: BaseNode, value: Any) -> None:
-        """ Register nodes to be uploaded,  associated to this connection 
-        
-        Args:
-            *nodes :  nodes to be added to the upload queue
-        """ 
-        self._check_connection() 
-        self._uploader.add_node(self._token, node, value)
-    
-    def add_nodes(self, nodes: Dict[BaseNode,Any]) -> None:
-        """ Register nodes to be uploaded associated to this connection 
-        
-        Args:
-            nodes (dict) :  nodes to be added to the upload queue. 
-                     A dictionary of node/value pairs
-        """
-        self._check_connection() 
-        self._uploader.add_nodes(self._token, nodes)
-    
-    def remove_node(self, *nodes) -> None:
-        """ remove  any nodes to the downloader associated to this connection 
-        
-        Note that the node will stay inside the downloader data but will not be updated 
-        
-        Args:
-            *nodes :  nodes to be removed from the download queue
-        """ 
-        self._check_connection() 
-        self._uploader.remove_node(self._token, *nodes)
-    
-    def add_datalink(self, *datalinks) -> None:
-        """ Register datalinks to the downloader associated to this connection 
-        
-        Args:
-            *datalinks :  :class:`DataLink` to be added to the download queue on the associated downloader
-        """
-        self._check_connection() 
-        self._uploader.add_datalink(self._token, *datalinks)        
-    
-    def remove_datalink(self, *datalinks) -> None:
-        """ Remove any given datalinks to the downloader associated to this connection 
-        
-        Args:
-            *datalinks :  :class:`DataLink` to be removed 
-        """
-        self._check_connection() 
-        self._uploader.remove_datalink(self._token, *datalinks)        
-    
-    def add_callback(self, *callbacks, priority: int =0) -> None:
-        """ Register callbacks to be executed after each download of the associated downloader 
-        
-        Args:            
-            *callbacks :  callbacks to be added to the queue of callbacks on the associated downloader       
-            priority (optional, int): a priority number for the callback 
-                    at a lowest priority number, the callback is called first  
-                    at highest priority number, the callback is called at the end 
-
-        """
-        self._check_connection() 
-        self._uploader.add_callback(self._token, *callbacks, priority = priority)
-    
-    def remove_callback(self, *callbacks) -> None:
-        """ Remove any of given callbacks of the associated downloader 
-        
-        Args:            
-            *callbacks :  callbacks to be remove 
-        """
-        self._check_connection() 
-        self._uploader.remove_callback(self._token, *callbacks)
-    
-    def add_failure_callback(self, *callbacks, priority:int =0) -> None:
-        """ Register callbacks to be executed after each download of the associated downloader 
-        
-        Args:            
-            *callbacks :  failure callbacks to be added to the queue of callbacks on the associated downloader       
-            priority (optional, int): a priority number for the callback 
-                    at a lowest priority number, the callback is called first  
-                    at highest priority number, the callback is called at the end 
-
-        """
-        self._check_connection() 
-        self._uploader.add_failure_callback(self._token, *callbacks, priority=priority)
-        
-    def remove_failure_callback(self, *callbacks) -> None:
-        """ Remove any given callbacks of the associated downloader 
-        
-        Args:            
-            *callbacks :  failure callbacks to be removed 
-        """
-        self._check_connection() 
-        self._uploader.remove_failure_callback(self._token, *callbacks)
+       
 
 
-
-
-
-
-
-class Uploader:
+class Uploader(_BaseUploader):
     """ An uploader object to upload data to the PLC 
     
     The values to upload is defined in a dictionary of node/value pairs. 
@@ -210,278 +281,48 @@ class Uploader:
           callback: Optional[Callable] = None
         ) -> None:
         
-        if node_dict_or_datalink is None:
-            node_values = {}
-            datalinks = [] 
-        elif isinstance(node_dict_or_datalink, BaseDataLink):
-            datalinks = [node_dict_or_datalink]
-            node_values = {}
-        else:
-            node_values = node_dict_or_datalink
-            datalinks = []
         
+        self._token = Ellipsis
+        self.download_inputs = UploadInputs()
+        main_input = self.download_inputs.new_input( self._token ) 
+        
+        
+
+        if node_dict_or_datalink:
+            if isinstance(node_dict_or_datalink, BaseDataLink):
+                main_input.add_datalink( node_dict_or_datalink) 
+            else:
+                main_input.add_nodes( node_dict_or_datalink)
+            
         if callback:
-            callbacks = [callback]
-        else:
-            callbacks = [] 
+            main_input.add_callback( callback )
             
-        
-        self._dict_nodes =OrderedDict([(Ellipsis,node_values)])
-        self._dict_datalinks = OrderedDict([(Ellipsis, datalinks)])
-            
-        failure_callbacks = []
-        self._dict_callbacks = OrderedDict([(Ellipsis,[ (0,c) for c in callbacks] )])
-        self._dict_failure_callbacks = OrderedDict([(Ellipsis,[(0,c) for c  in failure_callbacks])])
 
-        self._rebuild_nodes()
-        self._rebuild_datalinks()
-        self._rebuild_callbacks()
-        self._rebuild_failure_callbacks()
-        # self.node_values = node_values 
-
-        self.datalink = datalinks[0] if datalinks else None
+        self._rebuild()        # self.node_values = node_values 
         self._next_token = 1
-
-    def _rebuild_nodes(self):
-        nodes: Dict[BaseNode,Any] = {}
-        for nds in self._dict_nodes.values():
-            nodes.update(nds)
-
-        # for dls in self._dict_datalinks.values():
-        #     for dl in dls:
-        #         dl._upload_to( nodes )
-        #         nodes.update(dl.wnodes)
-                                
-        self.node_values = nodes
-    def _rebuild_datalinks(self):
-        datalinks = set()
-        for dls in self._dict_datalinks.values():
-            datalinks.update(dls)
-        self.datalinks = datalinks 
-
-    def _rebuild_callbacks(self):
-        callbacks = []
-        for clbc in self._dict_callbacks.values():
-            callbacks.extend(clbc)
-        callbacks.sort( key=lambda x:x[0] )
-        self._callbacks = [c for _,c in callbacks]
-    
-    def _rebuild_failure_callbacks(self):
-        callbacks = []
-        for clbc in self._dict_failure_callbacks.values():
-            callbacks.extend(clbc)
-        callbacks.sort( key=lambda x:x[0] )
-        self._failure_callbacks = [c for _,c in callbacks]
-
-    def new_token(self) -> tuple:
-        token = id(self), self._next_token
-        self._dict_nodes[token] =  {}
-        self._dict_datalinks[token] = set()
-        self._dict_callbacks[token] = []
-        self._dict_failure_callbacks[token] = []
-
-        self._next_token += 1
-        return token 
-    
-    def new_connection(self) -> UploaderConnection:
-        """ return an :class:`UploaderConnection` to handle uploader connection """
-        return UploaderConnection(self, self.new_token() )
-
-    def disconnect(self, *tokens: Tuple[Tuple]) -> None:
-        """ Disconnect the iddentified connection 
-        
-        All the nodes used by the connection (and not by other connected app) will be removed from the upload queue of nodes.
-        Also all callback associated with this connection will be removed from the uploader 
-                 
-        Args:
-            *tokens : Token returned by :func:`Uploader.new_token`
-        """
-        for token in tokens:
-            if token is Ellipsis:
-                raise ValueError('please provide a real token')
-            try:
-                self._dict_nodes.pop(token)
-                self._dict_datalinks.pop(token)
-                self._dict_callbacks.pop(token)
-                self._dict_failure_callbacks.pop(token)
-            except KeyError:
-                pass
-     
-        self._rebuild_nodes()
-        self._rebuild_datalinks()
-        self._rebuild_callbacks()
-        self._rebuild_failure_callbacks()
-    
-    def add_node(self, token: tuple, node: BaseNode, value: Any)-> None:
-        """ register a single node/value pair to the uploader """
-        self.add_nodes( token , {node:value})
-
-
-    def add_nodes(self, token: tuple, nodes: Dict[BaseNode, Any]) -> None:
-        """ Register nodes to be uploader for an iddentified app
-        
-        Args:
-            token: a Token returned by :func:`Uploader.new_token` 
-                   ``add_node(...,node1, node2)`` can also be used, in this case nodes will be added
-                   to the main pool of nodes and cannot be removed from the uploader 
-            nodes (Dict): dictionary of node/value pairs to be uploaded
-        """
-               
-        self._dict_nodes[token].update(nodes)
-        self._rebuild_nodes()
-    
-    def remove_node(self, token: tuple, *nodes) -> None:
-        """ Remove node from the upload queue
-    
-        if the node is not in the queueu nothing is done or raised
-        
-        
-        Args:
-            token: a Token returned by :func:`Downloader.new_token`                  
-            *nodes :  nodes to be removed 
-        """   
-        for node in nodes:
-            try:
-                self._dict_nodes[token].pop(node)
-            except KeyError:
-                pass 
-        self._rebuild_nodes()
-
-    def add_datalink(self, token: tuple, *datalinks) -> None:
-        """ Register a new datalink
-        
-        Args:
-            token: a Token returned by :func:`Uploader.new_token`
-                ``add_datalink(...,dl1, dl2)`` can also be used, in this case they will be added
-                to the main pool of datalinks and cannot be remove from the downloader   
-            *datalinks :  :class:`DataLink` to be added to the download queue, associated to the token 
-        """             
-        self._dict_datalinks[token].update(datalinks)
-        self._rebuild_datalinks()
-    
-    
-    def remove_datalink(self, token: tuple, *datalinks) -> None:
-        """ Remove a datalink from a established connection
-        
-        If the datalink is not in the queueu nothing is done or raised
-        
-        Args:
-            token: a Token returned by :func:`Uploader.new_token`
-            *datalinks :  :class:`DataLink` objects to be removed         
-        """
-        for dl in  datalinks:
-            try:
-                self._dict_datalinks[token].remove(dl)
-            except KeyError:
-                pass 
-        self._rebuild_datalinks()
-    
-    def add_callback(self, token: tuple, *callbacks, priority=0) -> None:   
-        """ Register callbacks to be executed after each upload 
-        
-        The callback must have the signature f(), no arguments.
-        
-        Args:
-            token: a Token returned by :func:`Uploader.new_connection`
-            *callbacks :  callbacks to be added to the queue of callbacks, associated to the app
-            priority (optional, int): a priority number for the callback 
-                    at a lowest priority number, the callback is called first  
-                    at highest priority number, the callback is called at the end 
-        
-        """ 
-        self._dict_callbacks[token].extend(  (priority, c) for c in  callbacks)
-        self._rebuild_callbacks()
-    
-    def remove_callback(self, token: tuple, *callbacks) -> None:   
-        """ Remove callbacks 
-        
-        If the callback  is not in the queueu nothing is done or raised
-        
-        Args:
-            token: a Token returned by :func:`Uploader.new_token`
-            *callbacks :  callbacks to be removed 
-        """
-        for c in callbacks:
-            for p, lc in self._dict_callbacks[token]:
-                if lc is c:
-                    break 
-            else:
-                continue 
-            try:
-                self._dict_callbacks[token].remove((p,c))
-            except KeyError:
-                pass 
-        self._rebuild_callbacks()
-          
-    
-    def add_failure_callback(self, token: tuple, *callbacks, priority=0) -> None:  
-        """ Add one or several callbacks to be executed when a download failed 
-        
-        When ever occur a failure (Exception during upload) ``f(e)`` is called with ``e`` the exception. 
-        If a upload is successfull **after** a failure ``f(None)`` is called one time only, this allow 
-        to clear an error state in the app.
-                
-        Args:
-            token: a Token returned by :func:`Uploader.new_token`
-            *callbacks: callbacks to be added to the queue of failure callbacks, associated to the app
-            priority (optional, int): a priority number for the callback 
-                    at a lowest priority number, the callback is called first  
-                    at highest priority number, the callback is called at the end 
-      
-        """ 
-        self._dict_failure_callbacks[token].update( (priority, c) for c in callbacks)
-        self._rebuild_failure_callbacks()
-    
-    def remove_failure_callback(self, token: tuple, *callbacks) -> None:  
-        """ remove  one or several failure callbacks 
-        
-        If the callback  is not in the queue nothing is done or raised
-        
-        Args:
-            token: a Token returned by :func:`Uploader.new_token`
-            *callbacks :  callbacks to be removed         
-        """ 
-        for c in callbacks:
-            for p, lc in self._dict_failure_callbacks[token]:
-                if lc is c:
-                    break 
-            else:
-                continue 
-            try:
-                self._dict_failure_callbacks[token].remove((p,c))
-            except KeyError:
-                pass         
-        self._rebuild_failure_callbacks()
-
+    def _rebuild(self):
+        self._nodes, self._upload_func = self.download_inputs.build_uploader()
 
     def __has__(self, node):
-        return node in self._node_values
-        
+        return node in self._nodes
+
+    def new_token(self) -> tuple:
+        token = Token(id(self), self._next_token)
+        self.download_inputs.new_input( token ) 
+        self._next_token += 1
+        return token
+          
+    def new_connection(self) -> UploaderConnection:
+        """ return an :class:`UploaderConnection` to handle uploader connection """
+        connection = UploaderConnection(self, self.new_token() )
+        connection._get_parent = weakref.ref(self)
+        return connection 
+    
+            
     def upload(self) -> None:
         """ upload the linked node/value dictionaries """
-        for dl in self.datalinks:
-            dl._upload_to(self.node_values)
-        # if self.datalink:
-        #     self.datalink._upload_to(self.node_values)
-        try: 
-            NodesWriter(self.node_values).write() 
-        except Exception as e:
-            self._did_failed_flag = True
+        self._did_failed_flag = self._upload_func( self._did_failed_flag )
 
-            if self._failure_callbacks:
-                for func in self._failure_callbacks:
-                    func(e)
-            else:
-                raise e 
-        else:
-            if self._did_failed_flag:
-                self._did_failed_flag = False
-                for func in self._failure_callbacks:                    
-                    func(None)
-                
-            for func in self._callbacks:
-                func()
-                  
     def run(self, 
           period: float = 1.0, 
           stop_signal: Callable = lambda : False, 

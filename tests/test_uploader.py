@@ -36,12 +36,18 @@ def test_upload_data_link():
     dev = Device()
     dl = DataLink(dev, data) 
     uploader = Uploader(dl)
-    uploader.upload() 
+    uploader.upload()
+    print( uploader.download_inputs.connections)
+    print( uploader.download_inputs.build_nodes())
+    print( uploader.download_inputs.build_datalinks())
+
     assert dev.v1.get() == 10.0 
     assert dev.v2.get() == 20.0 
     data.v2 = 40.0
     uploader.upload()
     assert dev.v2.get() == 40.0 
+test_upload_data_link()
+
 
 def test_upload_after_adding_dl():
     class Data(BaseModel):
@@ -51,8 +57,9 @@ def test_upload_after_adding_dl():
     dev = Device()
     dl = DataLink(dev, data) 
     uploader = Uploader({})
-    token = uploader.new_token()
-    uploader.add_datalink(token, dl) 
+    c = uploader.new_connection()
+    c.add_datalink( dl) 
+    
     uploader.upload()
     assert dev.v1.get() == 10.0 
     assert dev.v2.get() == 20.0 
@@ -61,15 +68,7 @@ def test_upload_after_adding_dl():
     assert dev.v2.get() == 40.0
 
 
-def test_new_token():
-    
-    dev = Device()
-    uploader = Uploader({dev.v1:10})
-    token = uploader.new_token()
-    uploader.add_nodes( token, {dev.v2:20})
-    uploader.upload()
-    assert dev.v1.get() == 10.0 
-    assert dev.v2.get() == 20.0 
+
 
 
 callback_flag = False
@@ -82,8 +81,9 @@ def test_upload_callback():
     def callback():
         global callback_flag
         callback_flag = True 
-    token = uploader.new_token()
-    uploader.add_callback( token, callback)
+    
+    c = uploader.new_connection()
+    c.add_callback( callback)
     uploader.upload()
     assert callback_flag
 
@@ -99,13 +99,14 @@ def test_upload_failure_callback():
     with pytest.raises(ValueError):
         uploader.upload() 
 
-    token = uploader.new_token()
-    uploader.add_failure_callback( token, callback)
+    c = uploader.new_connection()
+
+    c.add_failure_callback( callback)
     uploader.upload()
     assert callback_flag
 
     callback_flag = False 
-    uploader.remove_failure_callback(token, callback)
+    c.remove_failure_callback(callback)
     with pytest.raises(ValueError):
         uploader.upload() 
 
@@ -115,7 +116,7 @@ def test_remove_node():
 
     uploader = Uploader( {dev.v1:10} )
 
-    uploader.remove_node(..., dev.v1)
+    uploader.remove_node( dev.v1)
     uploader.upload()
     assert dev.v1.get() == 1
 
@@ -124,14 +125,15 @@ def test_disconnect():
     dev = Device()
 
     uploader = Uploader({})
-    token  = uploader.new_token()
-    uploader.add_node(token, dev.v1, 10)
+    c = uploader.new_connection() 
+
+    c.add_node(dev.v1, 10)
     uploader.upload()
     assert dev.v1.get() == 10
     dev.v1.set(20)
     uploader.upload()
     assert dev.v1.get() == 10 
-    uploader.disconnect( token ) 
+    c.disconnect(  ) 
     dev.v1.set(20)
     uploader.upload()
     assert dev.v1.get() == 20 

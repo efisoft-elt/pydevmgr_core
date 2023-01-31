@@ -1,12 +1,18 @@
+from dataclasses import dataclass, field
+
+from pydevmgr_core.base.vtype import nodedefault, nodetype
 from .node import NodesReader, BaseNode
 from .base import  BaseObject
 
 
 import time
-from collections import  OrderedDict
+from collections import  OrderedDict, namedtuple
 
-from typing import Any, Dict, Iterable, List, Tuple, Union, Optional, Callable
+from typing import Any, Dict, Iterable, List, Tuple, Union, Optional, Callable, Set
+import weakref 
 
+Callback = namedtuple("Callback", ["func", "priority"])
+Token = namedtuple("Token", ["id", "number"])
 
 class DataView:
     def __init__(self, 
@@ -101,442 +107,198 @@ class BaseDataLink:
     pass
 
 
-class DownloaderConnection:
-    """ Hold a connection to a :class:`Downloader` 
-    
-    Most likely created by :meth:`Downloader.new_connection` 
-    
-    Args:
-       downloader (:class:`Downloader`) :  parent Downloader instance
-       token (Any): Connection token 
-    """
-    def __init__(self, downloader: "Downloader", token: tuple):
-        self._downloader = downloader 
-        self._token = token 
-        self._child_connections = [] 
-    
-    def _check_connection(self):
-        if not self.is_connected():
-            raise RuntimeError("DownloaderConnection has been disconnected from its Downloader")
-    
-
-    def _collect_tokens(self, tokens:List[Tuple]) -> None:
-        if self._token:
-            tokens.append( self._token) 
-        for child in self._child_connections:
-            child._collect_tokens(tokens) 
-            
-        
-
-    @property
-    def data(self) -> dict:
-        """ downloader data """
-        return self._downloader.data 
-    
-
-    def is_connected(self)-> bool:
-        """ Return True if the connection is still established """
-        if not self._token:
-            return False 
-
-        if not self._token in self._downloader._dict_nodes :
-            return False 
-        return True 
-    
-    def clear(self)-> bool:
-        """ Remove child connections from the list if they have been disonnected """
-        self._child_connections = [child for child in self._child_connections if child.is_connected()]
-
-    def disconnect(self) -> None:
-        """ disconnect connection from the downloader 
-        
-        All nodes related to this connection (and not used by other connection) are removed from the
-        the downloader queue. 
-        Also all callback associated with this connection will be removed from the downloader 
-        
-        Note that the disconnected nodes will stay inside the downloader data but will not be updated
-        """
-        tokens = [] 
-        self._collect_tokens(tokens)
-        self._downloader.disconnect(*tokens)
-        self._child_connections = [] 
-        self._token = None
-    
-    def new_connection(self) -> "DownloaderConnection":
-        """ create a new child connection. When the master connection will be disconnect, alll child 
-        connection will be disconnected. 
-        """
-        connection =  self._downloader.new_connection() 
-        self._child_connections.append(connection)
-        return connection
 
 
-    def add_node(self, *nodes) -> None:
-        """ Register nodes to be downloader associated to this connection 
-        
-        Args:
-            *nodes :  nodes to be added to the download queue
-        """ 
-        self._check_connection() 
-        self._downloader.add_node(self._token, *nodes)
-    
-    def add_nodes(self, nodes) -> None:
-        """ Register nodes to be downloader associated to this connection 
-        
-        Args:
-            nodes :  nodes to be added to the download queue. 
-                     If a dictionary of node/value pairs, they are added to the downloader data. 
-        """
-        self._check_connection() 
-        self._downloader.add_nodes(self._token, nodes)
-    
-    def remove_node(self, *nodes) -> None:
-        """ remove  any nodes to the downloader associated to this connection 
-        
-        Note that the node will stay inside the downloader data but will not be updated 
-        
-        Args:
-            *nodes :  nodes to be removed from the download queue
-        """ 
-        self._check_connection() 
-        self._downloader.remove_node(self._token, *nodes)
-    
-    def add_datalink(self, *datalinks) -> None:
-        """ Register datalinks to the downloader associated to this connection 
-        
-        Args:
-            *datalinks :  :class:`DataLink` to be added to the download queue on the associated downloader
-        """
-        self._check_connection() 
-        self._downloader.add_datalink(self._token, *datalinks)        
-    
-    def remove_datalink(self, *datalinks) -> None:
-        """ Remove any given datalinks to the downloader associated to this connection 
-        
-        Args:
-            *datalinks :  :class:`DataLink` to be removed 
-        """
-        self._check_connection() 
-        self._downloader.remove_datalink(self._token, *datalinks)        
-    
-    def add_callback(self, *callbacks, priority=0) -> None:
-        """ Register callbacks to be executed after each download of the associated downloader 
-        
-        Args:            
-            *callbacks :  callbacks to be added to the queue of callbacks on the associated downloader 
-            priority (optional, int): a priority number for the callback 
-                    at a lowest priority number, the callback is called first  
-                    at highest priority number, the callback is called at the end 
+@dataclass
+class DownloadInput: 
+    """ Collect information from one connection """
+    nodes: set = field( default_factory=set) 
+    datalinks: set = field( default_factory=set) 
+    callbacks: List[Callback] = field( default_factory=list )
+    failure_callbacks: List[Callback] = field( default_factory=list )
 
-        """
-        self._check_connection() 
-        self._downloader.add_callback(self._token, *callbacks, priority=priority)
-    
-    def remove_callback(self, *callbacks) -> None:
-        """ Remove any of given callbacks of the associated downloader 
-        
-        Args:            
-            *callbacks :  callbacks to be remove 
-        """
-        self._check_connection() 
-        self._downloader.remove_callback(self._token, *callbacks)
-    
-    def add_failure_callback(self, *callbacks, priority=0) -> None:
-        """ Register callbacks to be executed after each download of the associated downloader 
-        
-        Args:            
-            *callbacks :  failure callbacks to be added to the queue of callbacks on the associated downloader       
-            priority (optional, int): a priority number for the callback 
-                    at a lowest priority number, the callback is called first  
-                    at highest priority number, the callback is called at the end 
-
-        """
-        self._check_connection() 
-        self._downloader.add_failure_callback(self._token, *callbacks, priority=priority)
-        
-    def remove_failure_callback(self, *callbacks) -> None:
-        """ Remove any given callbacks of the associated downloader 
-        
-        Args:            
-            *callbacks :  failure callbacks to be removed 
-        """
-        self._check_connection() 
-        self._downloader.remove_failure_callback(self._token, *callbacks)
-    
-    
-
-class StopDownloader(StopIteration):
-    pass
-
-class Downloader:
-    """ object dedicated to download nodes, feed data and run some callback 
-
-    An application can request nodes to be downloaded and callback to be executed after each 
-    success download or each failures. 
-    
-    Args:    
-        nodes_or_datalink (iterable of node or :class:`DataLink`): 
-            - An initial, always downloaded, list of nodes 
-            - Or a :class:`DataLink` object
-        data (dict, optional): A dictionary to store the data. If not given, one is created and
-                               accessible through the .data attribute. 
-                               This data is made of node/value pairs, the .get_data_view gives however
-                               a dictionary like object with string/value pairs. 
-                               Each time a new node is added to the downloader it will be added to 
-                               the data as ``data[node] = None``. None will be replaced after the 
-                               next download.  
-                               
-        callback (callable, optional): one single function with signature f(), if given always 
-                                      called after successful download. 
-        trigger (callable, optional): a function taking no argument and should return True or False 
-                                      If given the "download" method download nodes only if f() return True. 
-                                      Can be used if the download object is running in a thread for instance.
-    
-    Example: 
-    
-        A dumy exemple, replace the print_pos by a GUI interface for instance:
-        
-        ::
-                        
-            def print_pos(m, data):
-                "An application"
-                print("Position :",  data[m.stat.pos_actual], data[m.stat.pos_error] )
-                
-            >>> tins = open_manager('tins/tins.yml')
-            >>> tins.connect() 
-            >>> downloader = Downloader()
-            >>> token = downloader.new_token()
-            >>> downloader.add_node(token, tins.motor1.stat.pos_actual, tins.motor1.stat.pos_error )
-            >>> downloader.add_callback(token, lambda : print_pos(tins.motor1, downloader.data))
-            >>> downloader.download() 
-            Position : 3.45 0.003
-            >>> downloader.data
-            {
-            <UaNode key='motor1.pos_error'>: 0.003, 
-            <UaNode key='motor1.pos_actual'>:  3.45
-            }
-            
-            >>> downloader.disconnect(token) # disconnect the print_pos function and remove 
-                                             # the pos_actual, pos_error node from the list of nodes
-                                             # to download (except if an other connection use it)
-            
-        Same result can be obtained with this exemple: 
-        
-        :: 
-        
-            def print_pos(data):
-                "An application"
-                print("Position :",  data['pos_actual'], data['pos_error'] )
-            
-            >>> nodes_data = {tins.motor1.stat.pos_actual: -9.99 , tins.motor1.stat.pos_error: -9.99}
-            >>> m1_data = DataView(nodes_data, tins.motor1.stat)            
-            >>> downloader = Downloader(nodes_data, callback=lambda: print_pos(m1_data))
-            >>> downloader.download() 
-            Position : 3.45 0.003
-            >>> m1_data
-            {'pos_error': 0.003, 'pos_actual': 3.45}
-        
-        
-        
-                                     
-    """
-    
-    _did_failed_flag = False 
-    Connection = DownloaderConnection
-    StopDownloader = StopDownloader
-    
-    def __init__(self,  
-            nodes_or_datalink: Union[Iterable, BaseDataLink] = None,  
-            data: Optional[Dict] = None, 
-            callback: Optional[Callable] = None,
-            trigger: Optional[Callable] = None
-        ) -> None:
-        if data is None:
-            data = {}
-               
-        self._data = data 
-        
-        if nodes_or_datalink is None:
-            nodes = set()
-            datalinks = set()
-        elif isinstance(nodes_or_datalink, BaseDataLink):
-            nodes = set()
-            datalinks = set([nodes_or_datalink])
-        
-        elif isinstance( nodes_or_datalink, dict):
-            nodes = set()
-            datalinks = set()
-            for k,v in nodes_or_datalink.items():
-                if isinstance( v, BaseDataLink ):
-                    datalinks.add(v)
-                else:
-                    nodes.add(v)
-        
-        else:
-            nodes = set()
-            datalinks = set()
-            for v in nodes_or_datalink:
-                if isinstance( v, BaseDataLink ):
-                    datalinks.add(v)
-                else:
-                    nodes.add(v)
-            
-
-
-
-        #nodes = set() if nodes is None else set(nodes)
-        if callback is None:
-            callbacks = []
-        else:
-            callbacks = [callback]
-            
-        failure_callbacks = []
-        
-        if trigger is None:
-            trigger =  _dummy_trigger
-        
-        self._trigger = trigger
-        # Ellipsis is here to define general nodes,datalinks,callbacks, ... independent to connection
-        self._dict_nodes = OrderedDict([(Ellipsis,nodes)])
-        self._dict_datalinks = OrderedDict([(Ellipsis,datalinks)])
-        self._dict_callbacks = OrderedDict( [(Ellipsis,   [(i,c) for i,c in enumerate(callbacks)] )] )
-        self._dict_failure_callbacks = OrderedDict( [(Ellipsis, [(i,c) for i,c in enumerate(failure_callbacks)])] )
-        
-        
-        self.trigger = trigger
-        self._next_token = 1
-        
-        self._rebuild_nodes()
-        self._rebuild_callbacks()
-        self._rebuild_failure_callbacks()
-    
-    def __has__(self, node):
-        return node in self._nodes
-    
-    @property
-    def data(self):
-        return self._data
-    
-    def _rebuild_nodes(self):
-        nodes = set()
-        for nds in self._dict_nodes.values():
-            nodes.update(nds)
-            for n in nds:
-                self._data.setdefault(n,None)
-        for dls in self._dict_datalinks.values():
-            for dl in dls:
-                nodes.update(dl.rnodes)
-                for n in dl.rnodes:
-                    self._data.setdefault(n,None)
-                
-        self._nodes = nodes
-        self._to_read = NodesReader(nodes)
-
-    def _rebuild_callbacks(self):
-        callbacks = []
-        for clbc in self._dict_callbacks.values():
-            callbacks.extend(clbc)
-        callbacks.sort( key=lambda x:x[0] )
-        self._callbacks = [c for _,c in callbacks]
-    
-    def _rebuild_failure_callbacks(self):
-        callbacks = []
-        for clbc in self._dict_failure_callbacks.values():
-            callbacks.extend(clbc)
-        callbacks.sort( key=lambda x:x[0] )
-        self._failure_callbacks = [c for _,c in callbacks]
-    
-    def new_token(self) -> tuple:
-        """ add a new app connection token
-        
-        Return:
-           A token, the token and type itself is not relevant, it is just a unique ID to be used in 
-                    add_node, add_callback, add_failure_callback, and disconnect methods 
-                    
-        .. note::
-        
-            new_connection() method return object containing a pair of token and downloader and all
-                methods necessary to add_nodes, add_callbacks, etc ... 
-                
-        
-        """
-        token = id(self), self._next_token
-        self._dict_nodes[token] = set()
-        self._dict_datalinks[token] = set()
-        self._dict_callbacks[token] = []
-        self._dict_failure_callbacks[token] = []
-        
-        self._next_token += 1
-        # self._rebuild_nodes()
-        # self._rebuild_callbacks()
-        # self._rebuild_failure_callbacks()
-        return token
-    
-    def new_connection(self):
-        """ Return a :class:`DownloaderConnection` object 
-        
-        The :class:`DownloaderConnection` object contain a token and the downloader in order to have 
-        a standalone object to handle the add/remove of queue nodes and callbacks 
-        """
-        return DownloaderConnection(self, self.new_token())
-    
-    def disconnect(self, *tokens: Tuple[tuple]) -> None:
-        """ Disconnect the iddentified connection 
-        
-        All the nodes used by the connection (and not by other connected app) will be removed from the 
-        download queue of nodes.
-        Also all callback associated with this connection will be removed from the downloader 
-        
-        Note that the disconnected nodes will stay inside the downloader data but will not be updated
-         
-        Args:
-            *tokens : Token returned by :func:`Downloader.new_token`
-        """
-        for token in tokens:
-            if token is Ellipsis:
-                raise ValueError('please provide a real token')
+    def add_node(self, *nodes):
+        self.nodes.update( nodes)
+    def remove_node(self, *nodes):
+        for node in nodes:
             try:
-                self._dict_nodes.pop(token)
-                self._dict_datalinks.pop(token)
-                self._dict_callbacks.pop(token)
-                self._dict_failure_callbacks.pop(token)
+                self.nodes.remove(node)
             except KeyError:
-                pass
- 
-        self._rebuild_nodes()
-        self._rebuild_callbacks()
-        self._rebuild_failure_callbacks()
+                pass 
     
-    def add_node(self, token: tuple, *nodes) -> None:
+    def add_datalink( self, *datalinks):
+        self.datalinks.update( datalinks)
+    
+    def remove_datalink(self, *datalinks):
+        for dl in  datalinks:
+            try:
+                self.datalinks.remove(dl)
+            except KeyError:
+                pass 
+
+
+    def add_callback(self, *callbacks, priority=0):
+        for func in callbacks:
+            self.callbacks.append( Callback(func, priority) )
+
+    def remove_callback(self, *callbacks):
+         for func in callbacks:
+            for lc, p  in self.callbacks:
+                if lc is func:
+                    break 
+            else:
+                continue 
+            try:
+                self.callbacks.remove( Callback(func,p))
+            except KeyError:
+                pass 
+       
+
+
+    def add_failure_callback( self, *callbacks, priority=0):
+         for func in callbacks:
+            self.failure_callbacks.append( Callback(func, priority) )
+    
+    def remove_failure_callback(self, *callbacks):
+        for func in callbacks:
+            for lc, p  in self.failure_callbacks:
+                if lc is func:
+                    break 
+            else:
+                continue 
+            try:
+                self.failure_callbacks.remove( Callback(func,p))
+            except KeyError:
+                pass 
+
+@dataclass
+class DownloadInputs:
+    connections: OrderedDict = field( default_factory= OrderedDict)
+   
+    def __getitem__(self, item):
+        return self.connections[item]
+    
+    def has_token(self, token):
+        return token in self.connections
+
+    def iter_connection(self, tokens:Optional[List[Token]] = None):
+        if tokens is None:
+            tokens = self.connections
+        for token in tokens:
+            yield self.connections[token]
+
+    def new_input(self, token: Token):
+        self.connections[token] = DownloadInput() 
+        return self.connections[token]
+    
+    def del_input(self, token: Token):
+        del self.connections[token]
+
+    def build_nodes(self, 
+            tokens:Optional[List[Token]] = None,  
+            data: Optional[Dict[BaseNode, Any]]=None
+        )->Tuple[set, NodesReader]:
+        
+        nodes = set()
+        for connection in self.iter_connection(tokens):
+            nodes.update(connection.nodes)
+            for dl in connection.datalinks:
+                nodes.update(dl.rnodes)
+               
+        if data is not None:
+            for n in nodes:
+                data.setdefault( n, nodedefault(n, None) )
+
+        return nodes, NodesReader(nodes)
+    
+    def build_callbacks(self, tokens:Optional[List[Token]] = None )-> List[Callback]:
+        callbacks = []
+        for connection in self.iter_connection(tokens):
+            callbacks.extend(connection.callbacks)
+        callbacks.sort( key=lambda c:c.priority )
+        return  [c.func for c in callbacks]
+
+    def build_failure_callbacks(self, tokens:Optional[List[Token]] = None )-> List[Callback]:
+        callbacks = []
+        for connection in self.iter_connection(tokens):
+            callbacks.extend(connection.failure_callbacks)
+        callbacks.sort( key=lambda c:c.priority )
+        return  [c.func for c in callbacks]
+    
+    def build_datalinks(self, tokens:Optional[List[Token]] = None )-> List[BaseDataLink]:
+        datalinks = []
+        for connection in self.iter_connection(tokens):
+            datalinks.extend(connection.datalinks)
+        return datalinks
+    
+    def build_downloader(self, 
+            tokens:Optional[List[Token]] = None, 
+            data: Optional[Dict[BaseNode,Any]] = None
+        )-> Tuple[List[BaseNode], Callable]:
+        nodes, reader = self.build_nodes( tokens, data )
+        datalinks = self.build_datalinks( tokens ) 
+        callbacks = self.build_callbacks( tokens )
+        failure_callbacks = self.build_failure_callbacks( tokens )
+        
+        def download(data, did_failed=False):
+            try:
+                reader.read(data)
+            except Exception as e:
+                if failure_callbacks:
+                    did_failed = True
+                    for func in failure_callbacks:                    
+                        func(e)
+                else:
+                    raise e            
+            else:
+                # Populate the data links 
+                for dl in datalinks:
+                    dl._download_from(data)
+            
+                if did_failed:
+                    did_failed = False
+                    for func in failure_callbacks:                    
+                        func(None)
+                        
+                for func in callbacks:
+                    func()
+
+            return did_failed
+        return nodes, download        
+
+
+
+
+
+class _BaseDownloader:
+    def add_node(self,  *nodes) -> None:
         """ Register node to be downloaded for an iddentified app
         
         Args:
-            token: a Token returned by :func:`Downloader.new_token` 
-                   ``add_node(...,node1, node2)`` can also be used, in this case nodes will be added
-                   to the main pool of nodes and cannot be removed from the downloader 
             *nodes :  nodes to be added to the download queue, associated to the app
-        """   
-        self._dict_nodes[token].update(nodes)
-        self._rebuild_nodes()
-    
-    def add_nodes(self, token: tuple, nodes: Union[dict,Iterable]) -> None:
+        """
+        self._check_connection() 
+
+        self.download_inputs[self._token].add_node(*nodes) 
+        self._rebuild()
+
+    def add_nodes(self, nodes: Union[dict,Iterable]) -> None:
         """ Register nodes to be downloaded for an iddentified app
         
         Args:
-            token: a Token returned by :func:`Downloader.new_token` 
-                   ``add_node(...,node1, node2)`` can also be used, in this case nodes will be added
-                   to the main pool of nodes and cannot be removed from the downloader 
-            nodes (Iterable, dict):  nodes to be added to the download queue, associated to the app
+           nodes (Iterable, dict):  nodes to be added to the download queue, associated to the app
                    If a dictionary of node/value pairs, they are added to the downloader data.  
         """
+        self._check_connection() 
+
         if isinstance(nodes, dict):
             for node,val in nodes.items():
                 self._data[node] = val
-        
-        self._dict_nodes[token].update(nodes)
-        self._rebuild_nodes()
+        self.download_inputs[self._token].add_node(*nodes) 
+        self._rebuild() 
     
-    def remove_node(self, token: tuple, *nodes) -> None:
+
+    def remove_node(self,  *nodes) -> None:
         """ Remove node from the download queue
     
         if the node is not in the queueu nothing is done or raised
@@ -544,119 +306,97 @@ class Downloader:
         Note that the node will stay inside the downloader data but will not be updated 
         
         Args:
-            token: a Token returned by :func:`Downloader.new_token`                  
             *nodes :  nodes to be removed 
-        """   
-        for node in nodes:
-            try:
-                self._dict_nodes[token].remove(node)
-            except KeyError:
-                pass 
-        self._rebuild_nodes()
-    
-    def add_datalink(self, token: tuple, *datalinks) -> None:
+        """ 
+        self._check_connection() 
+
+        self.download_inputs[self._token].remove_node(*nodes) 
+        self._rebuild()  
+   
+    def add_datalink(self,  *datalinks) -> None:
         """ Register a new datalink
         
         Args:
-            token: a Token returned by :func:`Downloader.new_token`
-                ``add_datalink(...,dl1, dl2)`` can also be used, in this case they will be added
-                to the main pool of datalinks and cannot be remove from the downloader   
             *datalinks :  :class:`DataLink` to be added to the download queue, associated to the token 
-        """           
-        self._dict_datalinks[token].update(datalinks)
-        self._rebuild_nodes()    
-    
-    def remove_datalink(self, token: tuple, *datalinks) -> None:
+        """ 
+        self._check_connection() 
+
+        self.download_inputs[self._token].add_datalink(*datalinks) 
+        self._rebuild()  
+   
+    def remove_datalink(self, *datalinks) -> None:
         """ Remove a datalink from a established connection
         
         If the datalink is not in the queueu nothing is done or raised
         
         Args:
-            token: a Token returned by :func:`Downloader.new_token`
             *datalinks :  :class:`DataLink` objects to be removed         
         """
-        for dl in  datalinks:
-            try:
-                self._dict_datalinks[token].remove(dl)
-            except KeyError:
-                pass 
-        self._rebuild_nodes()
+        self._check_connection() 
+
+        self.download_inputs[self._token].remove_datalink(*datalinks) 
+        self._rebuild()  
         
-    def add_callback(self, token: tuple, *callbacks, priority=0) -> None:   
+    def add_callback(self, *callbacks, priority=0) -> None:   
         """ Register callbacks to be executed after each download 
         
         The callback must have the signature f(), no arguments.
         
         Args:
-            token: a Token returned by :func:`Downloader.new_connection`
             *callbacks :  callbacks to be added to the queue of callbacks, associated to the app
             priority (optional, int): a priority number for the callback 
                     at a lowest priority number, the callback is called first  
                     at highest priority number, the callback is called at the end 
-        """ 
-        self._dict_callbacks[token].extend( (priority,c) for c in callbacks)
-        self._rebuild_callbacks()
+        """
+        self._check_connection() 
+
+        self.download_inputs[self._token].add_callback(*callbacks, priority=priority) 
+        self._rebuild()  
     
-    def remove_callback(self, token: tuple, *callbacks) -> None:   
+    def remove_callback(self,  *callbacks) -> None:   
         """ Remove callbacks 
         
         If the callback  is not in the queueu nothing is done or raised
         
         Args:
-            token: a Token returned by :func:`Downloader.new_token`
+            
             *callbacks :  callbacks to be removed 
         
         """
-        for c in callbacks:
-            for p, lc in self._dict_callbacks[token]:
-                if lc is c:
-                    break 
-            else:
-                continue 
-            try:
-                self._dict_callbacks[token].remove((p,c))
-            except KeyError:
-                pass 
-        self._rebuild_callbacks()
+        self._check_connection() 
+
+        self.download_inputs[self._token].remove_callback(*callbacks) 
+        self._rebuild() 
     
-    
-    def add_failure_callback(self, token: tuple, *callbacks, priority=0) -> None:  
+    def add_failure_callback(self, *callbacks, priority=0) -> None:  
         """ Add one or several callbacks to be executed when a download failed 
         
         When ever occur a failure (Exception during download) ``f(e)`` is called with ``e`` the exception. 
         If a download is successfull after a failure ``f(None)`` is called one time only.
                 
         Args:
-            token: a Token returned by :func:`Downloader.new_token`
             *callbacks: callbacks to be added to the queue of failure callbacks, associated to the app
             priority (optional, int): a priority number for the callback 
                     at a lowest priority number, the callback is called first  
                     at highest priority number, the callback is called at the end 
         """ 
-        self._dict_failure_callbacks[token].extend( (priority,c) for c in callbacks)
-        self._rebuild_failure_callbacks()
+        self._check_connection() 
+
+        self.download_inputs[self._token].add_failure_callback(*callbacks, priority=priority) 
+        self._rebuild()  
     
-    def remove_failure_callback(self, token: tuple, *callbacks) -> None:  
+    def remove_failure_callback(self,  *callbacks) -> None:  
         """ remove  one or several failure callbacks 
         
         If the callback  is not in the queue nothing is done or raised
         
         Args:
-            token: a Token returned by :func:`Downloader.new_token`
+            
             *callbacks :  callbacks to be removed         
-        """ 
-        for c in callbacks:
-            for p, lc in self._dict_failure_callbacks[token]:
-                if lc is c:
-                    break 
-            else:
-                continue 
-            try:
-                self._dict_failure_callbacks[token].remove((p,c))
-            except KeyError:
-                pass         
-        self._rebuild_failure_callbacks()
-    
+        """
+        self._check_connection() 
+        self.download_inputs[self._token].remove_failure_callback(*callbacks) 
+        self._rebuild()  
     
     def run(self, 
             period: float =1.0, 
@@ -690,17 +430,236 @@ class Downloader:
         Args:
             period (float, optional): period between downloads in second
             stop_signal (callable, optional): a function returning True to stop the loop or False to continue
-        
-        Example:
-            
-            >>> downloader = Downloader([mgr.motor1.substate, mgr.motor1.pos_actual])
-            >>> t = Thread( target = downloader.runner(period=0.1) )
-            >>> t.start()
             
         """       
         def run_func():
             self.run(period=period, sleepfunc=sleepfunc, stop_signal=stop_signal)
         return run_func
+   
+
+
+class DownloaderConnection(_BaseDownloader):
+    """ Hold a connection to a :class:`Downloader` 
+    
+    Most likely created by :meth:`Downloader.new_connection` 
+    
+    The download method of a Downloader Connection will download only the nodes of 
+    the connection and its child connection. However the nodes values retrieved will 
+    be writen inside the root data dictionary of the Downloader 
+
+
+    Args:
+       downloader (:class:`Downloader`) :  parent Downloader instance
+       token (Any): Connection token 
+    """
+    _did_failed_flag = False 
+    def __init__(self, 
+          downloader: "Downloader", 
+          token: tuple, 
+        ):
+        self._downloader: Downloader = downloader 
+        self._token = token 
+        self._child_connections = [] 
+        
+        self.download_inputs = downloader.download_inputs 
+        self._did_failed_flag = False
+       
+    def _check_connection(self):
+        if not self.is_connected():
+            raise RuntimeError("DownloaderConnection has been disconnected from its Downloader")
+
+    def _collect_tokens(self, tokens:List[Token]) -> None:
+        if self._token:
+            tokens.append( self._token) 
+        for child in self._child_connections:
+            child._collect_tokens(tokens) 
+    
+    def __has__(self, node):
+        return node in self._nodes
+  
+    def _rebuild(self):
+        tokens = []
+        self._collect_tokens( tokens )
+        self._nodes, self._download_func = self.download_inputs.build_downloader( tokens, self.data )
+        parent = self._get_parent()
+        if parent:
+            parent._rebuild()
+
+    def _get_parent(self):
+        return None
+
+    @property
+    def data(self) -> dict:
+        """ downloader data """
+        return self._downloader.data 
+    
+    @property
+    def nodes(self)->Set[BaseNode]:
+        return self._nodes
+
+    def download(self):
+        self._did_failed_flag = self._download_func(self.data,  self._did_failed_flag)
+    
+    def is_connected(self)-> bool:
+        """ Return True if the connection is still established """
+        if not self._token:
+            return False 
+        return self._downloader.download_inputs.has_token(self._token)
+    
+    def clear(self)-> bool:
+        """ Remove child connections from the list if they have been disonnected """
+        self._child_connections = [child for child in self._child_connections if child.is_connected()]
+        
+
+    def disconnect(self) -> None:
+        """ disconnect connection from the downloader 
+        
+        All nodes related to this connection (and not used by other connection) are removed from the
+        the downloader queue. 
+        Also all callback associated with this connection will be removed from the downloader 
+        
+        Note that the disconnected nodes will stay inside the downloader data but will not be updated
+        """
+        tokens = [] 
+        self._collect_tokens(tokens)
+        for token in tokens:
+            try:
+                self.download_inputs.del_input(token)
+            except KeyError:
+                pass
+
+        self._child_connections = [] 
+        self._token = None
+        def download(data, flag):
+            raise ValueError("Disconnected")
+        self._nodes, self._download_func = [] , download 
+        parent = self._get_parent()
+        if parent:
+            parent._rebuild()
+    
+    def new_connection(self) -> "DownloaderConnection":
+        """ create a new child connection. When the master connection will be disconnect, alll child 
+        connection will be disconnected. 
+        """
+        connection =  self._downloader.new_connection() 
+        self._child_connections.append(connection)
+        connection._get_parent = weakref.ref( self )
+
+        self._rebuild()
+        return connection
+
+class StopDownloader(StopIteration):
+    pass
+
+class Downloader(_BaseDownloader):
+    """ object dedicated to download nodes, feed data and run some callback 
+
+    An application can request nodes to be downloaded and callback to be executed after each 
+    success download or each failures. 
+    
+    Args:    
+        nodes_or_datalink (iterable of node or :class:`DataLink`): 
+            - An initial, always downloaded, list of nodes 
+            - Or a :class:`DataLink` object
+        data (dict, optional): A dictionary to store the data. If not given, one is created and
+                               accessible through the .data attribute. 
+                               This data is made of node/value pairs, the .get_data_view gives however
+                               a dictionary like object with string/value pairs. 
+                               Each time a new node is added to the downloader it will be added to 
+                               the data as ``data[node] = default``. where default is the node defaul or None 
+                               it will be replaced after the next download.  
+                               
+        callback (callable, optional): one single function with signature f(), if given always 
+                                      called after successful download. 
+    """
+    
+    _did_failed_flag = False 
+    Connection = DownloaderConnection
+    StopDownloader = StopDownloader
+    
+    def __init__(self,  
+            nodes_or_datalink: Union[Iterable, BaseDataLink] = None,  
+            data: Optional[Dict] = None, 
+            callback: Optional[Callable] = None,
+        ) -> None:
+        if data is None:
+            data = {}
+               
+        self._data = data 
+        
+        
+        self._token = Ellipsis
+        self.download_inputs = DownloadInputs()
+        main_input = self.download_inputs.new_input( self._token ) 
+        
+
+
+        if nodes_or_datalink:
+            if isinstance(nodes_or_datalink, BaseDataLink):
+                main_input.add_datalink(nodes_or_datalink)
+            elif hasattr(nodes_or_datalink, "__iter__"):
+
+                if isinstance( nodes_or_datalink, dict):
+                    nodes_or_datalink = nodes_or_datalink.values()
+                for v in nodes_or_datalink:
+                    if isinstance( v, BaseDataLink ):
+                        main_input.add_datalink( v) 
+                    else:
+                        main_input.add_node( v) 
+        if callback:
+            main_input.add_callback( callback )
+               
+        self._rebuild()        
+        self._next_token = 1
+        
+    def __has__(self, node):
+        return node in self._nodes
+    
+    def _rebuild(self):
+        self._nodes, self._download_func = self.download_inputs.build_downloader(data = self._data)
+
+    @property
+    def data(self):
+        return self._data
+    
+    @property 
+    def nodes(self):
+        return self._nodes 
+    
+    def _check_connection(self):
+        pass
+
+    def new_token(self) -> tuple:
+        """ add a new app connection token
+        
+        Return:
+           A token, the token and type itself is not relevant, it is just a unique ID to be used in 
+                    add_node, add_callback, add_failure_callback, and disconnect methods 
+                    
+        .. note::
+        
+            new_connection() method return object containing a pair of token and downloader and all
+                methods necessary to add_nodes, add_callbacks, etc ... 
+                
+        
+        """
+        token = Token(id(self), self._next_token)
+        self.download_inputs.new_input( token ) 
+        self._next_token += 1
+        return token
+    
+    def new_connection(self):
+        """ Return a :class:`DownloaderConnection` object 
+        
+        The :class:`DownloaderConnection` object contain a token and the downloader in order to have 
+        a standalone object to handle the add/remove of queue nodes and callbacks 
+        """
+        connection = DownloaderConnection(self, self.new_token())
+        connection._get_parent = weakref.ref(self)
+        return connection 
+
+    
+     
     
     def download(self) -> None:
         """ Execute a download 
@@ -708,38 +667,13 @@ class Downloader:
         Each nodes on the queue are fetched and the .data dictionary is updated
         from new values.
         
-        If the Downloader has a trigger method and the trigger return false, nothing is done
-        
         """
-        
-        if not self.trigger(): return 
-        
-        try:
-            self._to_read.read(self._data)
-        except Exception as e:
-            if self._failure_callbacks:
-                self._did_failed_flag = True
-                for func in self._failure_callbacks:                    
-                    func(e)
-            else:
-                raise e            
-        else:
-            # Populate the data links 
-            for dls in self._dict_datalinks.values():
-                for dl in dls:
-                    dl._download_from(self._data)
-            
-            if self._did_failed_flag:
-                self._did_failed_flag = False
-                for func in self._failure_callbacks:                    
-                    func(None)
-                    
-            for func in self._callbacks:
-                func()
-    
+        self._did_failed_flag = self._download_func(self.data, self._did_failed_flag)
+
+      
     def reset(self) -> None:
         """ All nodes of the downloader with a reset method will be reseted """
-        reset(self._dict_nodes)
+        reset(self._nodes)
             
     def get_data_view(self, prefix: str ='') -> DataView:
         """ Return a view of the data in a dictionary where keys are string keys extracted from nodes

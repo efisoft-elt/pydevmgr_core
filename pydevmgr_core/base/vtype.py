@@ -16,7 +16,7 @@ def _vtype_type(vtype):
         vtype, _ = vtype 
     return vtype 
 
-def _vtype_default(vtype):
+def _vtype_default(vtype, default_default=None):
     """ return the default value from vtype as defined in BaseNode.Config 
     
     vtype can be a Type or a (Type,default) or None 
@@ -26,9 +26,9 @@ def _vtype_default(vtype):
         _, default = vtype 
         return default
     if vtype is None:
-        return 
+        return default_default
     if not hasattr( vtype, "__call__"):
-        return None
+        return default_default
     return vtype()
 
 def find_vtype( obj: Union[BaseSystem, Type[BaseSystem], BaseSystem.Config, Type[BaseSystem.Config]]) -> Type:
@@ -45,8 +45,13 @@ def find_vtype( obj: Union[BaseSystem, Type[BaseSystem], BaseSystem.Config, Type
 def nodetype( obj: Union[BaseSystem, Type[BaseSystem], BaseSystem.Config, Type[BaseSystem.Config]]) -> Type:
     return _vtype_type( find_vtype(obj) )
 
-def nodedefault( obj: Union[BaseSystem, Type[BaseSystem], BaseSystem.Config, Type[BaseSystem.Config]]) -> Any:
-    return _vtype_default( find_vtype(obj) )
+
+def nodedefault( 
+        obj: Union[BaseSystem, Type[BaseSystem], BaseSystem.Config, Type[BaseSystem.Config]], 
+        default: Optional[Any] = None
+    ) -> Any:
+    
+    return _vtype_default( find_vtype(obj), default )
 
 
 
