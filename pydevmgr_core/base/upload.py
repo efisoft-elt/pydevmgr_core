@@ -112,14 +112,18 @@ class UploaderConnection:
         self._check_connection() 
         self._uploader.remove_datalink(self._token, *datalinks)        
     
-    def add_callback(self, *callbacks) -> None:
+    def add_callback(self, *callbacks, priority: int =0) -> None:
         """ Register callbacks to be executed after each download of the associated downloader 
         
         Args:            
             *callbacks :  callbacks to be added to the queue of callbacks on the associated downloader       
+            priority (optional, int): a priority number for the callback 
+                    at a lowest priority number, the callback is called first  
+                    at highest priority number, the callback is called at the end 
+
         """
         self._check_connection() 
-        self._uploader.add_callback(self._token, *callbacks)
+        self._uploader.add_callback(self._token, *callbacks, priority = priority)
     
     def remove_callback(self, *callbacks) -> None:
         """ Remove any of given callbacks of the associated downloader 
@@ -130,14 +134,18 @@ class UploaderConnection:
         self._check_connection() 
         self._uploader.remove_callback(self._token, *callbacks)
     
-    def add_failure_callback(self, *callbacks) -> None:
+    def add_failure_callback(self, *callbacks, priority:int =0) -> None:
         """ Register callbacks to be executed after each download of the associated downloader 
         
         Args:            
             *callbacks :  failure callbacks to be added to the queue of callbacks on the associated downloader       
+            priority (optional, int): a priority number for the callback 
+                    at a lowest priority number, the callback is called first  
+                    at highest priority number, the callback is called at the end 
+
         """
         self._check_connection() 
-        self._uploader.add_failure_callback(self._token, *callbacks)
+        self._uploader.add_failure_callback(self._token, *callbacks, priority=priority)
         
     def remove_failure_callback(self, *callbacks) -> None:
         """ Remove any given callbacks of the associated downloader 
@@ -211,14 +219,19 @@ class Uploader:
         else:
             node_values = node_dict_or_datalink
             datalinks = []
+        
+        if callback:
+            callbacks = [callback]
+        else:
+            callbacks = [] 
             
         
         self._dict_nodes =OrderedDict([(Ellipsis,node_values)])
         self._dict_datalinks = OrderedDict([(Ellipsis, datalinks)])
             
-        callbacks, failure_callbacks = [], [] # !TODO implement
-        self._dict_callbacks = OrderedDict([(Ellipsis,callbacks)])
-        self._dict_failure_callbacks = OrderedDict([(Ellipsis,failure_callbacks)])
+        failure_callbacks = []
+        self._dict_callbacks = OrderedDict([(Ellipsis,[ (0,c) for c in callbacks] )])
+        self._dict_failure_callbacks = OrderedDict([(Ellipsis,[(0,c) for c  in failure_callbacks])])
 
         self._rebuild_nodes()
         self._rebuild_datalinks()
@@ -227,7 +240,6 @@ class Uploader:
         # self.node_values = node_values 
 
         self.datalink = datalinks[0] if datalinks else None
-        self.callback = callback
         self._next_token = 1
 
     def _rebuild_nodes(self):
@@ -248,23 +260,25 @@ class Uploader:
         self.datalinks = datalinks 
 
     def _rebuild_callbacks(self):
-        callbacks = set()
+        callbacks = []
         for clbc in self._dict_callbacks.values():
-            callbacks.update(clbc)
-        self._callbacks = callbacks
+            callbacks.extend(clbc)
+        callbacks.sort( key=lambda x:x[0] )
+        self._callbacks = [c for _,c in callbacks]
     
     def _rebuild_failure_callbacks(self):
-        callbacks = set()
+        callbacks = []
         for clbc in self._dict_failure_callbacks.values():
-            callbacks.update(clbc)
-        self._failure_callbacks = callbacks
+            callbacks.extend(clbc)
+        callbacks.sort( key=lambda x:x[0] )
+        self._failure_callbacks = [c for _,c in callbacks]
 
     def new_token(self) -> tuple:
         token = id(self), self._next_token
         self._dict_nodes[token] =  {}
         self._dict_datalinks[token] = set()
-        self._dict_callbacks[token] = set()
-        self._dict_failure_callbacks[token] = set()
+        self._dict_callbacks[token] = []
+        self._dict_failure_callbacks[token] = []
 
         self._next_token += 1
         return token 
@@ -362,7 +376,7 @@ class Uploader:
                 pass 
         self._rebuild_datalinks()
     
-    def add_callback(self, token: tuple, *callbacks) -> None:   
+    def add_callback(self, token: tuple, *callbacks, priority=0) -> None:   
         """ Register callbacks to be executed after each upload 
         
         The callback must have the signature f(), no arguments.
@@ -370,9 +384,12 @@ class Uploader:
         Args:
             token: a Token returned by :func:`Uploader.new_connection`
             *callbacks :  callbacks to be added to the queue of callbacks, associated to the app
+            priority (optional, int): a priority number for the callback 
+                    at a lowest priority number, the callback is called first  
+                    at highest priority number, the callback is called at the end 
         
         """ 
-        self._dict_callbacks[token].update(callbacks)
+        self._dict_callbacks[token].extend(  (priority, c) for c in  callbacks)
         self._rebuild_callbacks()
     
     def remove_callback(self, token: tuple, *callbacks) -> None:   
@@ -383,17 +400,21 @@ class Uploader:
         Args:
             token: a Token returned by :func:`Uploader.new_token`
             *callbacks :  callbacks to be removed 
-        
         """
         for c in callbacks:
+            for p, lc in self._dict_callbacks[token]:
+                if lc is c:
+                    break 
+            else:
+                continue 
             try:
-                self._dict_callbacks[token].remove(c)
+                self._dict_callbacks[token].remove((p,c))
             except KeyError:
                 pass 
         self._rebuild_callbacks()
+          
     
-    
-    def add_failure_callback(self, token: tuple, *callbacks) -> None:  
+    def add_failure_callback(self, token: tuple, *callbacks, priority=0) -> None:  
         """ Add one or several callbacks to be executed when a download failed 
         
         When ever occur a failure (Exception during upload) ``f(e)`` is called with ``e`` the exception. 
@@ -403,9 +424,12 @@ class Uploader:
         Args:
             token: a Token returned by :func:`Uploader.new_token`
             *callbacks: callbacks to be added to the queue of failure callbacks, associated to the app
-        
+            priority (optional, int): a priority number for the callback 
+                    at a lowest priority number, the callback is called first  
+                    at highest priority number, the callback is called at the end 
+      
         """ 
-        self._dict_failure_callbacks[token].update(callbacks)
+        self._dict_failure_callbacks[token].update( (priority, c) for c in callbacks)
         self._rebuild_failure_callbacks()
     
     def remove_failure_callback(self, token: tuple, *callbacks) -> None:  
@@ -418,12 +442,17 @@ class Uploader:
             *callbacks :  callbacks to be removed         
         """ 
         for c in callbacks:
+            for p, lc in self._dict_failure_callbacks[token]:
+                if lc is c:
+                    break 
+            else:
+                continue 
             try:
-                self._dict_failure_callbacks[token].remove(c)
+                self._dict_failure_callbacks[token].remove((p,c))
             except KeyError:
                 pass         
         self._rebuild_failure_callbacks()
-    
+
 
     def __has__(self, node):
         return node in self._node_values
