@@ -23,7 +23,6 @@ class UploadInput(DownloadInput):
                 self.nodes.pop(node)
             except KeyError:
                 pass 
-    
 
 
 @dataclass 
@@ -40,13 +39,14 @@ class UploadInputs(DownloadInputs):
         nodes = {}
         for connection in self.iter_connection(tokens):
             nodes.update(connection.nodes)
-        return nodes, NodesWriter(nodes)
+       
+        return nodes
 
     def build_uploader(self, 
          tokens:Optional[List[Token]] = None, 
         )-> Tuple[List[BaseNode], Callable]:
         
-        nodes, writer = self.build_nodes( tokens )
+        nodes= self.build_nodes( tokens )
         datalinks = self.build_datalinks( tokens ) 
         callbacks = self.build_callbacks( tokens )
         failure_callbacks = self.build_failure_callbacks( tokens )
@@ -57,7 +57,7 @@ class UploadInputs(DownloadInputs):
 
             try:
                 NodesWriter(nodes).write()
-                # writer.write() 
+                
             except Exception as e:
                 did_failed = True
     
@@ -88,7 +88,7 @@ class _BaseUploader(_BaseDownloader):
             *nodes :  nodes to be added to the download queue, associated to the app
         """
         self._check_connection() 
-        self.download_inputs[self._token].add_node(node, value) 
+        self.inputs[self._token].add_node(node, value) 
         self._rebuild()
 
     def add_nodes(self, nodes: Dict[BaseNode,Any]) -> None:
@@ -98,7 +98,7 @@ class _BaseUploader(_BaseDownloader):
             *nodes :  nodes to be added to the download queue, associated to the app
         """
         self._check_connection() 
-        self.download_inputs[self._token].add_nodes(nodes) 
+        self.inputs[self._token].add_nodes(nodes) 
         self._rebuild()
 
     def run(self, 
@@ -156,7 +156,7 @@ class UploaderConnection(_BaseUploader):
         self._uploader = uploader 
         self._token = token 
         self._child_connections = [] 
-        self.download_inputs = uploader.download_inputs 
+        self.inputs = uploader.inputs 
 
     def _check_connection(self):
         if not self.is_connected():
@@ -175,7 +175,7 @@ class UploaderConnection(_BaseUploader):
     def _rebuild(self):
         tokens = []
         self._collect_tokens( tokens )
-        self._nodes, self._upload_func = self.download_inputs.build_uploader( tokens )
+        self._nodes, self._upload_func = self.inputs.build_uploader( tokens )
         parent = self._get_parent()
         if parent:
             parent._rebuild()
@@ -187,11 +187,8 @@ class UploaderConnection(_BaseUploader):
         """ Return True if the connection is still established """
         if not self._token:
             return False 
-
-        if self._token not in self._uploader.download_inputs:
-            return False 
-        return True 
-
+        return self.inputs.has_token(self._token) 
+        
     def upload(self) -> None:
         """ upload the linked node/value dictionaries """
         self._did_failed_flag = self._upload_func( self._did_failed_flag )
@@ -208,7 +205,7 @@ class UploaderConnection(_BaseUploader):
         self._collect_tokens(tokens)
         for token in tokens:
             try:
-                self.download_inputs.del_input(token)
+                self.inputs.del_input(token)
             except KeyError:
                 pass
 
@@ -283,8 +280,8 @@ class Uploader(_BaseUploader):
         
         
         self._token = Ellipsis
-        self.download_inputs = UploadInputs()
-        main_input = self.download_inputs.new_input( self._token ) 
+        self.inputs = UploadInputs()
+        main_input = self.inputs.new_input( self._token ) 
         
         
 
@@ -300,15 +297,19 @@ class Uploader(_BaseUploader):
 
         self._rebuild()        # self.node_values = node_values 
         self._next_token = 1
-    def _rebuild(self):
-        self._nodes, self._upload_func = self.download_inputs.build_uploader()
 
+    def _rebuild(self):
+        self._nodes, self._upload_func = self.inputs.build_uploader()
+    
+    def _check_connection(self):
+        pass 
+    
     def __has__(self, node):
         return node in self._nodes
 
     def new_token(self) -> tuple:
         token = Token(id(self), self._next_token)
-        self.download_inputs.new_input( token ) 
+        self.inputs.new_input( token ) 
         self._next_token += 1
         return token
           
@@ -339,7 +340,7 @@ class Uploader(_BaseUploader):
             s_time = time.time()
             self.upload()
             sleepfunc( max( period-(time.time()-s_time), 0))
-    
+
     def runner(self, 
           period: float = 1.0, 
           stop_signal: Callable = lambda : False, 

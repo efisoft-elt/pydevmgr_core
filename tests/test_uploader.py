@@ -37,16 +37,13 @@ def test_upload_data_link():
     dl = DataLink(dev, data) 
     uploader = Uploader(dl)
     uploader.upload()
-    print( uploader.download_inputs.connections)
-    print( uploader.download_inputs.build_nodes())
-    print( uploader.download_inputs.build_datalinks())
-
+ 
     assert dev.v1.get() == 10.0 
     assert dev.v2.get() == 20.0 
     data.v2 = 40.0
     uploader.upload()
     assert dev.v2.get() == 40.0 
-test_upload_data_link()
+
 
 
 def test_upload_after_adding_dl():
@@ -167,7 +164,8 @@ def test_connection():
     uploader.upload()
     assert dev.v1.get() == 100.0 
     assert dev.v2.get() == 200.0 
-    
+test_connection()
+
 
 def test_sub_connection():
     dev = Device()

@@ -209,7 +209,7 @@ class DownloadInputs:
             for n in nodes:
                 data.setdefault( n, nodedefault(n, None) )
 
-        return nodes, NodesReader(nodes)
+        return nodes
     
     def build_callbacks(self, tokens:Optional[List[Token]] = None )-> List[Callback]:
         callbacks = []
@@ -235,7 +235,8 @@ class DownloadInputs:
             tokens:Optional[List[Token]] = None, 
             data: Optional[Dict[BaseNode,Any]] = None
         )-> Tuple[List[BaseNode], Callable]:
-        nodes, reader = self.build_nodes( tokens, data )
+        nodes  = self.build_nodes( tokens, data )
+        reader =  NodesReader(nodes)
         datalinks = self.build_datalinks( tokens ) 
         callbacks = self.build_callbacks( tokens )
         failure_callbacks = self.build_failure_callbacks( tokens )
@@ -279,7 +280,7 @@ class _BaseDownloader:
         """
         self._check_connection() 
 
-        self.download_inputs[self._token].add_node(*nodes) 
+        self.inputs[self._token].add_node(*nodes) 
         self._rebuild()
 
     def add_nodes(self, nodes: Union[dict,Iterable]) -> None:
@@ -294,7 +295,7 @@ class _BaseDownloader:
         if isinstance(nodes, dict):
             for node,val in nodes.items():
                 self._data[node] = val
-        self.download_inputs[self._token].add_node(*nodes) 
+        self.inputs[self._token].add_node(*nodes) 
         self._rebuild() 
     
 
@@ -310,7 +311,7 @@ class _BaseDownloader:
         """ 
         self._check_connection() 
 
-        self.download_inputs[self._token].remove_node(*nodes) 
+        self.inputs[self._token].remove_node(*nodes) 
         self._rebuild()  
    
     def add_datalink(self,  *datalinks) -> None:
@@ -321,7 +322,7 @@ class _BaseDownloader:
         """ 
         self._check_connection() 
 
-        self.download_inputs[self._token].add_datalink(*datalinks) 
+        self.inputs[self._token].add_datalink(*datalinks) 
         self._rebuild()  
    
     def remove_datalink(self, *datalinks) -> None:
@@ -334,7 +335,7 @@ class _BaseDownloader:
         """
         self._check_connection() 
 
-        self.download_inputs[self._token].remove_datalink(*datalinks) 
+        self.inputs[self._token].remove_datalink(*datalinks) 
         self._rebuild()  
         
     def add_callback(self, *callbacks, priority=0) -> None:   
@@ -350,7 +351,7 @@ class _BaseDownloader:
         """
         self._check_connection() 
 
-        self.download_inputs[self._token].add_callback(*callbacks, priority=priority) 
+        self.inputs[self._token].add_callback(*callbacks, priority=priority) 
         self._rebuild()  
     
     def remove_callback(self,  *callbacks) -> None:   
@@ -365,7 +366,7 @@ class _BaseDownloader:
         """
         self._check_connection() 
 
-        self.download_inputs[self._token].remove_callback(*callbacks) 
+        self.inputs[self._token].remove_callback(*callbacks) 
         self._rebuild() 
     
     def add_failure_callback(self, *callbacks, priority=0) -> None:  
@@ -382,7 +383,7 @@ class _BaseDownloader:
         """ 
         self._check_connection() 
 
-        self.download_inputs[self._token].add_failure_callback(*callbacks, priority=priority) 
+        self.inputs[self._token].add_failure_callback(*callbacks, priority=priority) 
         self._rebuild()  
     
     def remove_failure_callback(self,  *callbacks) -> None:  
@@ -395,7 +396,7 @@ class _BaseDownloader:
             *callbacks :  callbacks to be removed         
         """
         self._check_connection() 
-        self.download_inputs[self._token].remove_failure_callback(*callbacks) 
+        self.inputs[self._token].remove_failure_callback(*callbacks) 
         self._rebuild()  
     
     def run(self, 
@@ -461,7 +462,7 @@ class DownloaderConnection(_BaseDownloader):
         self._token = token 
         self._child_connections = [] 
         
-        self.download_inputs = downloader.download_inputs 
+        self.inputs = downloader.inputs 
         self._did_failed_flag = False
        
     def _check_connection(self):
@@ -480,7 +481,7 @@ class DownloaderConnection(_BaseDownloader):
     def _rebuild(self):
         tokens = []
         self._collect_tokens( tokens )
-        self._nodes, self._download_func = self.download_inputs.build_downloader( tokens, self.data )
+        self._nodes, self._download_func = self.inputs.build_downloader( tokens, self.data )
         parent = self._get_parent()
         if parent:
             parent._rebuild()
@@ -504,7 +505,7 @@ class DownloaderConnection(_BaseDownloader):
         """ Return True if the connection is still established """
         if not self._token:
             return False 
-        return self._downloader.download_inputs.has_token(self._token)
+        return self._downloader.inputs.has_token(self._token)
     
     def clear(self)-> bool:
         """ Remove child connections from the list if they have been disonnected """
@@ -524,7 +525,7 @@ class DownloaderConnection(_BaseDownloader):
         self._collect_tokens(tokens)
         for token in tokens:
             try:
-                self.download_inputs.del_input(token)
+                self.inputs.del_input(token)
             except KeyError:
                 pass
 
@@ -589,8 +590,8 @@ class Downloader(_BaseDownloader):
         
         
         self._token = Ellipsis
-        self.download_inputs = DownloadInputs()
-        main_input = self.download_inputs.new_input( self._token ) 
+        self.inputs = DownloadInputs()
+        main_input = self.inputs.new_input( self._token ) 
         
 
 
@@ -616,7 +617,7 @@ class Downloader(_BaseDownloader):
         return node in self._nodes
     
     def _rebuild(self):
-        self._nodes, self._download_func = self.download_inputs.build_downloader(data = self._data)
+        self._nodes, self._download_func = self.inputs.build_downloader(data = self._data)
 
     @property
     def data(self):
@@ -644,7 +645,7 @@ class Downloader(_BaseDownloader):
         
         """
         token = Token(id(self), self._next_token)
-        self.download_inputs.new_input( token ) 
+        self.inputs.new_input( token ) 
         self._next_token += 1
         return token
     
