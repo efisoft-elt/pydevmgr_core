@@ -165,6 +165,7 @@ class UploaderConnection(_BaseUploader):
         self._child_connections = [] 
         self.inputs = uploader.inputs 
         self.info = UploadInfo()
+        self._rebuild()
 
     def _check_connection(self):
         if not self.is_connected():
