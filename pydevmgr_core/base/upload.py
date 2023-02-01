@@ -1,26 +1,32 @@
 from collections import OrderedDict
 from .node import NodesWriter, BaseNode
-from .download import BaseDataLink, DownloadInput, DownloadInputs , Token, Callback, _BaseDownloader, StopDownloader
+from .download import (BaseDataLink, DownloadInput, DownloadInputs , Token, Callback,
+        _BaseDownloader, StopDownloader, DownloadInfo)
 
-from typing import List, Tuple, Union, Optional, Callable, Any, Dict 
+from typing import List, Set, Tuple, Union, Optional, Callable, Any, Dict 
 from dataclasses import dataclass, field 
 import time 
 import weakref 
 
+
+UploadInfo = DownloadInfo
+
 @dataclass
 class UploadInput(DownloadInput):
-    nodes: Dict[BaseNode, Any] = field(default_factory=dict) 
+    nodes: Set[BaseNode] = field(default_factory=set) 
     
-    def add_node(self, node: BaseNode, value: Any)->None:
-        self.nodes[node] = value 
+    def add_node(self, node: BaseNode, value: Any, data)->None:
+        self.nodes.add(node)
+        data[node] = value 
 
-    def add_nodes(self, nodes: Dict[BaseNode,Any]):
+    def add_nodes(self, nodes: Dict[BaseNode,Any], data: Dict[BaseNode, Any]):
         self.nodes.update( nodes )
+        data.update(nodes)
 
     def remove_node(self, *nodes):
         for node in nodes:
             try:
-                self.nodes.pop(node)
+                self.nodes.remove(node)
             except KeyError:
                 pass 
 
@@ -36,7 +42,7 @@ class UploadInputs(DownloadInputs):
     def build_nodes(self,
             tokens:Optional[List[Token]] = None  
         )-> None:
-        nodes = {}
+        nodes = set()
         for connection in self.iter_connection(tokens):
             nodes.update(connection.nodes)
        
@@ -51,32 +57,34 @@ class UploadInputs(DownloadInputs):
         callbacks = self.build_callbacks( tokens )
         failure_callbacks = self.build_failure_callbacks( tokens )
         
-        def upload(did_failed=False):
+        def upload(data, info:UploadInfo):
+            node_values = {n:data[n] for n in nodes}
+
+            info.start_time = time.time( ) 
             for dl in datalinks:
-                dl._upload_to(nodes)
+                dl._upload_to(node_values)
 
             try:
-                NodesWriter(nodes).write()
+                NodesWriter(node_values).write()
                 
             except Exception as e:
-                did_failed = True
-    
+                info.error = e 
+                info.n_nodes = 0
                 if failure_callbacks:
                     for func in failure_callbacks:
                         func(e)
                 else:
                     raise e 
             else:
-                if did_failed:
-                    did_failed  = False
+                if info.error:
+                    info.error  = None
                     for func in failure_callbacks:                    
                         func(None)
                     
                 for func in callbacks:
                     func()
-
-               
-                return did_failed
+                info.n_nodes = len(node_values)   
+                info.end_time = time.time()
         return nodes, upload        
 
 
@@ -88,7 +96,7 @@ class _BaseUploader(_BaseDownloader):
             *nodes :  nodes to be added to the download queue, associated to the app
         """
         self._check_connection() 
-        self.inputs[self._token].add_node(node, value) 
+        self.inputs[self._token].add_node(node, value, self.data) 
         self._rebuild()
 
     def add_nodes(self, nodes: Dict[BaseNode,Any]) -> None:
@@ -98,7 +106,7 @@ class _BaseUploader(_BaseDownloader):
             *nodes :  nodes to be added to the download queue, associated to the app
         """
         self._check_connection() 
-        self.inputs[self._token].add_nodes(nodes) 
+        self.inputs[self._token].add_nodes(nodes, self.data) 
         self._rebuild()
 
     def run(self, 
@@ -151,12 +159,12 @@ class UploaderConnection(_BaseUploader):
        uploader (:class:`Uploader`) :  parent Uploader instance
        token (Any): Connection token 
     """
-    _did_failed_flag = False 
     def __init__(self, uploader: "Uploader", token: tuple):
         self._uploader = uploader 
         self._token = token 
         self._child_connections = [] 
         self.inputs = uploader.inputs 
+        self.info = UploadInfo()
 
     def _check_connection(self):
         if not self.is_connected():
@@ -167,8 +175,10 @@ class UploaderConnection(_BaseUploader):
             tokens.append( self._token) 
         for child in self._child_connections:
             child._collect_tokens(tokens) 
+    @property
+    def data(self):
+        return self._uploader.data 
     
-
     def _get_parent(self):
         return None
 
@@ -191,7 +201,7 @@ class UploaderConnection(_BaseUploader):
         
     def upload(self) -> None:
         """ upload the linked node/value dictionaries """
-        self._did_failed_flag = self._upload_func( self._did_failed_flag )
+        self._upload_func( self.data, self.info )
 
     def disconnect(self) -> None:
         """ disconnect connection from the uploader 
@@ -271,25 +281,24 @@ class Uploader(_BaseUploader):
        
        
     """
-    _did_failed_flag = False
 
     def __init__(self, 
           node_dict_or_datalink: Union[Dict[BaseNode,Any], BaseDataLink, None] = None, 
           callback: Optional[Callable] = None
         ) -> None:
         
-        
+        self._data = {}
+
         self._token = Ellipsis
         self.inputs = UploadInputs()
         main_input = self.inputs.new_input( self._token ) 
-        
-        
+        self.info = UploadInfo() 
 
         if node_dict_or_datalink:
             if isinstance(node_dict_or_datalink, BaseDataLink):
                 main_input.add_datalink( node_dict_or_datalink) 
             else:
-                main_input.add_nodes( node_dict_or_datalink)
+                main_input.add_nodes( node_dict_or_datalink, self._data)
             
         if callback:
             main_input.add_callback( callback )
@@ -306,6 +315,9 @@ class Uploader(_BaseUploader):
     
     def __has__(self, node):
         return node in self._nodes
+    @property
+    def data(self):
+        return self._data 
 
     def new_token(self) -> tuple:
         token = Token(id(self), self._next_token)
@@ -322,7 +334,7 @@ class Uploader(_BaseUploader):
             
     def upload(self) -> None:
         """ upload the linked node/value dictionaries """
-        self._did_failed_flag = self._upload_func( self._did_failed_flag )
+        self._upload_func(self._data,  self.info )
 
     def run(self, 
           period: float = 1.0, 

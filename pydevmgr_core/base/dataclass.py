@@ -104,13 +104,13 @@ class ClassesToDataModelExtractor:
         
         if isinstance(cls, type):
             factories = find_factories(cls)
-        elif isinstance(cls, dir):
+        elif isinstance(cls, dict):
             factories = cls.items 
         else:
             factories = cls 
         
         group = ModelGroup(name=name, key=name)
-        
+         
         for attr, factory in factories:
             self.extract_item( group, attr, factory, depth)    
         return group

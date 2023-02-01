@@ -14,6 +14,14 @@ import weakref
 Callback = namedtuple("Callback", ["func", "priority"])
 Token = namedtuple("Token", ["id", "number"])
 
+@dataclass 
+class DownloadInfo:
+    error: Optional[Exception] = None 
+    start_time: float = 0.0 
+    end_time: float = 0.0 
+    n_nodes: int = 0
+
+
 class DataView:
     def __init__(self, 
             data: Dict[BaseNode,Any], 
@@ -240,13 +248,16 @@ class DownloadInputs:
         datalinks = self.build_datalinks( tokens ) 
         callbacks = self.build_callbacks( tokens )
         failure_callbacks = self.build_failure_callbacks( tokens )
-        
-        def download(data, did_failed=False):
+        n_nodes = len(nodes)
+        def download(data, info: DownloadInfo):
+            info.start_time = time.time()
             try:
                 reader.read(data)
             except Exception as e:
+                info.error = e 
+                info.n_node = 0
+
                 if failure_callbacks:
-                    did_failed = True
                     for func in failure_callbacks:                    
                         func(e)
                 else:
@@ -256,15 +267,15 @@ class DownloadInputs:
                 for dl in datalinks:
                     dl._download_from(data)
             
-                if did_failed:
-                    did_failed = False
+                if info.error:
+                    info.error = None
                     for func in failure_callbacks:                    
                         func(None)
                         
                 for func in callbacks:
                     func()
-
-            return did_failed
+            info.n_nodes = n_nodes 
+            info.end_time = time.time()
         return nodes, download        
 
 
@@ -453,7 +464,6 @@ class DownloaderConnection(_BaseDownloader):
        downloader (:class:`Downloader`) :  parent Downloader instance
        token (Any): Connection token 
     """
-    _did_failed_flag = False 
     def __init__(self, 
           downloader: "Downloader", 
           token: tuple, 
@@ -463,7 +473,8 @@ class DownloaderConnection(_BaseDownloader):
         self._child_connections = [] 
         
         self.inputs = downloader.inputs 
-        self._did_failed_flag = False
+        self.info = DownloadInfo()
+
        
     def _check_connection(self):
         if not self.is_connected():
@@ -499,7 +510,7 @@ class DownloaderConnection(_BaseDownloader):
         return self._nodes
 
     def download(self):
-        self._did_failed_flag = self._download_func(self.data,  self._did_failed_flag)
+        self._download_func(self.data,  self.info)
     
     def is_connected(self)-> bool:
         """ Return True if the connection is still established """
@@ -574,7 +585,7 @@ class Downloader(_BaseDownloader):
                                       called after successful download. 
     """
     
-    _did_failed_flag = False 
+    
     Connection = DownloaderConnection
     StopDownloader = StopDownloader
     
@@ -592,8 +603,7 @@ class Downloader(_BaseDownloader):
         self._token = Ellipsis
         self.inputs = DownloadInputs()
         main_input = self.inputs.new_input( self._token ) 
-        
-
+        self.info = DownloadInfo() 
 
         if nodes_or_datalink:
             if isinstance(nodes_or_datalink, BaseDataLink):
@@ -669,7 +679,7 @@ class Downloader(_BaseDownloader):
         from new values.
         
         """
-        self._did_failed_flag = self._download_func(self.data, self._did_failed_flag)
+        self._download_func(self.data, self.info)
 
       
     def reset(self) -> None:
