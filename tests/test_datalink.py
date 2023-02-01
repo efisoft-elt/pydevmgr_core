@@ -3,6 +3,7 @@ from pydantic.main import BaseModel, Field
 import pytest
 from pydevmgr_core import DataLink, BaseDevice, BaseInterface
 from systemy import FactoryDict
+from pydevmgr_core import nodes
 from pydevmgr_core.base.model_var import NodeVar, NodeVar_R, NodeVar_RW, NodeVar_W, StaticVar
 from pydevmgr_core.base.node_alias import NodeAlias1
 from pydevmgr_core.nodes import Value
@@ -366,3 +367,17 @@ def test_different_node_key():
     assert data.i1 == dev.i.i1.get()
     
 
+def test_with_normal_field():
+
+    class Data(BaseModel):
+        n1: NodeVar[float] = 0.0 
+        n2: NodeVar[float] = 0.0 
+        name: str = ""
+
+    class Device(BaseDevice):
+        n1 = nodes.Value.Config(value=1.0)
+        n2 = nodes.Value.Config(value=2.0)
+    
+    data = Data()
+    dev = Device() 
+    dl = DataLink(dev, data)  

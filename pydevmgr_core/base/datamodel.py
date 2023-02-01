@@ -329,7 +329,7 @@ class NodeResolver:
         for obj_field in fields.objects:
             try:
                 sub_obj = obj_field.resolve(obj)
-            except (KeyError, AttributeError) as e:
+            except (KeyError, AttributeError, ValueError) as e:
                 pass
             else:
                 if hasattr(sub_obj, "__dict__"):
