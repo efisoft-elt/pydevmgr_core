@@ -62,6 +62,6 @@ from .monitor import (
 from . import decorators
  
 from .object_path import BasePath, ObjPath, AttrPath, ItemPath, objpath, PathVar
-from .vtype import VType
-from systemy import storedproperty, find_factories 
+from .vtype import VType, nodedefault, nodetype 
+from systemy import storedproperty, find_factories , FactoryList, FactoryDict
 # from .decorators import getter, setter, finaliser, nodealias, nodealias_maker, node_maker
