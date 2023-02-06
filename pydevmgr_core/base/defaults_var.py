@@ -2,7 +2,9 @@
 
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import ModelField
-from typing import Optional, TypeVar, Generic 
+from typing import Optional, TypeVar, Generic
+
+from systemy.system import BaseFactory 
 
 
 RecVar= TypeVar('RecVar')
@@ -60,7 +62,8 @@ def _default_walk_set(  default: BaseModel, new: BaseModel ):
 
 
 
-class Defaults(Generic[RecVar]):
+class Defaults(BaseFactory, Generic[RecVar]):
+# class Defaults(BaseFactory):
     """ Make the value of a default submodel the default values of the incoming payload 
     """
     _walker = _default_walk_set
@@ -98,8 +101,9 @@ class Defaults(Generic[RecVar]):
             errors.append(error)
         if errors:
             raise ValidationError(errors, cls)
-        if field.default is not None:
-            cls._walker(field.default, valid_value) 
+        default = field.get_default()
+        if default is not None:
+            cls._walker(default, valid_value) 
         # Validation passed without errors, return validated value
         return valid_value
     

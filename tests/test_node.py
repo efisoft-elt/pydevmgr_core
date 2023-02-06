@@ -1,6 +1,8 @@
+from typing import Type
 import pytest
 
 from pydevmgr_core import BaseNode, KINDS
+from pydevmgr_core.base.vtype import VType, nodedefault, nodetype
 
 def test_node_ipa():
     node = BaseNode('test') 
@@ -47,4 +49,20 @@ def test_node_config():
     
     
     assert config.get_system_class() is BaseNode
+
+def test_node_type_and_default():
+
+    class N(BaseNode):
+        class Config(BaseNode.Config):
+            vtype: VType  = int
+
+    assert nodetype(N.Config()) is int
+    assert nodedefault(N.Config()) is 0
+    
+    assert nodetype(N()) is int
+    assert nodedefault( N() ) is 0
+
+    assert nodetype(N) is int
+    assert nodedefault( N ) is 0
+
 

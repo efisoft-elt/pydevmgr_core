@@ -1,5 +1,6 @@
 import math
 from pydevmgr_core import  BaseNode
+from pydevmgr_core.base.interface import BaseInterface
 from pydevmgr_core.nodes import AllTrue, AnyTrue, AnyFalse, AllFalse
 
 from pydevmgr_core import nodes
@@ -149,6 +150,5 @@ def test_degree2ra():
     assert abs( a.get() - math.pi/2.0) < 1e-20
     a.set( math.pi)
     assert abs(a_deg.get() - 180) < 1e-20 
-
 
 

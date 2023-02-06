@@ -41,6 +41,22 @@ class Manager(BaseManager):
         class Config:
             extra = "allow"
 
+@register_factory("Device/TestYo2")
+class Motor2(BaseDevice):
+    class Config(BaseDevice.Config):
+        prefix = "default"
+        x=9.99  
+        
+        @classmethod
+        def __get_validators__(cls):
+            
+            yield cls.validate
+            yield cls.validate_scalar
+        @classmethod
+        def validate_scalar(cls, value):
+            return cls.validate( {'prefix':value}) 
+    pass
+
 
 
 
@@ -75,7 +91,9 @@ motor: !factory:Device/Test
     unknown_field: 10 
 """
 
-
+text7 = """---
+motor: !factory:Device/TestYo2 "MAIN.M1"
+"""
 
 
 
@@ -114,3 +132,8 @@ def test_device_factory_in_tag():
 def test_extra_config_value_must_be_catched_at_init():
     with pytest.raises(ValueError):
         d = yaml.load( text6, PydevmgrLoader)
+
+def test_factory_with_custom_validation():
+    d = yaml.load( text7, PydevmgrLoader)
+    assert d['motor'].prefix == "MAIN.M1"
+

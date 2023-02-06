@@ -46,7 +46,7 @@ class Data(BaseModel):
 
 def test_create_model():
     mgr = Manager()
-    Data = create_data_model("Data", mgr.find(BaseObject)) 
+    Data = create_data_model("Data", list(mgr.find(BaseObject)))
     data = Data() 
     
     assert data.device1.node == 0.0

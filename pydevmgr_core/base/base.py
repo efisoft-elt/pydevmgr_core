@@ -118,6 +118,12 @@ class BaseObject(BaseSystem):
     def engine(self)-> Engine:
         """  engine  """
         return self._engine
+    
+    def __repr__(self):
+        type_ = type(self)
+        # module = type_.__module__ 
+        qualname = type_.__qualname__ 
+        return f"<{qualname} key={self.key!r} ({hex(id(self))})>"
 
 class ObjectDict(SystemDict):
     """ Dictionary of pydevmgr objects """

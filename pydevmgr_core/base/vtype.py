@@ -2,7 +2,8 @@ from numpy.lib.function_base import insert
 from pydantic import BaseModel 
 from systemy import BaseSystem
 import inspect
-from typing import Union, Optional, Type, Tuple, Any
+from typing import Dict, Iterable, Union, Optional, Type, Tuple, Any
+
 VType = Optional[Union[Type, Tuple[Type,Any]]] 
 
 
@@ -31,7 +32,10 @@ def _vtype_default(vtype, default_default=None):
         return default_default
     return vtype()
 
-def find_vtype( obj: Union[BaseSystem, Type[BaseSystem], BaseSystem.Config, Type[BaseSystem.Config]]) -> Type:
+
+NodeObjVar = Union[BaseSystem, Type[BaseSystem], BaseSystem.Config, Type[BaseSystem.Config]]
+
+def find_vtype( obj: NodeObjVar) -> Type:
     if isinstance( obj, type):
         if issubclass( obj, BaseSystem):
             obj = obj.Config 
@@ -42,17 +46,23 @@ def find_vtype( obj: Union[BaseSystem, Type[BaseSystem], BaseSystem.Config, Type
         return vtype_field.get_default()
     return obj.vtype
 
-def nodetype( obj: Union[BaseSystem, Type[BaseSystem], BaseSystem.Config, Type[BaseSystem.Config]]) -> Type:
+def nodetype( obj: NodeObjVar) -> Type:
     return _vtype_type( find_vtype(obj) )
 
+def nodestype( l: Iterable[NodeObjVar] ) -> Dict[BaseSystem,Type]: 
+    return {n:nodetype(n) for n in l}
 
 def nodedefault( 
-        obj: Union[BaseSystem, Type[BaseSystem], BaseSystem.Config, Type[BaseSystem.Config]], 
+        obj: NodeObjVar, 
         default: Optional[Any] = None
     ) -> Any:
-    
     return _vtype_default( find_vtype(obj), default )
 
+def nodesdefault(
+        l: Iterable[NodeObjVar], 
+        default: Optional[Any] = None
+    )->Dict[BaseSystem, Any]:
+    return { n:nodedefault(n, default) for n in l} 
 
 
 def guess_vtype_from_signature(func):

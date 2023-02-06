@@ -13,6 +13,7 @@ from .vtype import VType
 
 
 
+
 class BaseNodeConfig(BaseObject.Config):
     """ Config for a Node """
     parser: Optional[ParserFactory] = None #NoneParserFactory()
@@ -20,7 +21,7 @@ class BaseNodeConfig(BaseObject.Config):
     description: str = ""
     unit: str = ""
     vtype: VType = None 
-        
+
 class BaseReadCollector:
     """ Object used to collect nodes values from the same server in one roundtrip 
     
@@ -172,7 +173,7 @@ class BaseNode(BaseObject):
         if not self.parser:
             return value
         return self.parser.parse(value)
-   
+
     def parse_output(self, value):
         if self._has_output_parser:
             return self.output_parser.parse(value)
