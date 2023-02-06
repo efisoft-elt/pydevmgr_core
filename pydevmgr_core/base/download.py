@@ -474,7 +474,7 @@ class DownloaderConnection(_BaseDownloader):
         
         self.inputs = downloader.inputs 
         self.info = DownloadInfo()
-
+        self._rebuild()
        
     def _check_connection(self):
         if not self.is_connected():
