@@ -1,58 +1,23 @@
 import re
-import ast
-import operator as op
 from typing import Any, Generic, Tuple, TypeVar, Union
 
 from pydantic.error_wrappers import ValidationError
 from pydantic.fields import ModelField
 
 
-
-_path_glv = {'open':None, '__name__':None, '__file__':None, 'globals':None, 'locals':None, 'eval':None, 'exec':None,
-        'compile':None}
-
+_path_glv = {
+        'open':None,
+        '__name__':None,
+        '__file__':None,
+        'globals':None,
+        'locals':None,
+        'eval':None,
+        'exec':None,
+        'compile':None
+    }
 
 _forbiden = re.compile( '.*[()].*' )
-
 PathType = TypeVar('PathType')
-
-class PathVar(Generic[PathType]):
-    def __new__(cls, path: Union[str,"BasePath"]):
-        return objpath( path )
-
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-    @classmethod
-    def __modify_schema__(cls, field_schema):
-        pass 
-    
-    @classmethod
-    def validate(cls, v, field: ModelField):
-        
-        
-
-        if field.sub_fields:
-            if len(field.sub_fields)>1:
-                raise ValidationError(['to many field PathVar accep only one'], cls)
-
-            val_f = field.sub_fields[0]
-            errors = []
-        
-            valid_value, error = val_f.validate(v, {}, loc='value')
-            if error:
-                errors.append(error)
-            if errors:
-                raise ValidationError(errors, cls)
-        else:
-            valid_value = v 
-        if not valid_value:
-            return DummyPath()
-        return objpath(valid_value)
-    
-    def __repr__(self):
-        return f'{self.__class__.__name__}({super().__repr__()})'
-
 
 
 class BasePath:
@@ -66,20 +31,54 @@ class BasePath:
         raise NotImplementedError("set_value")
     
     def add(self, path):
-        path = objpath(path)
+        path = PyPath(path)
         return GroupPath(self, path)
 
 
-def objpath( path) -> BasePath:
-    if isinstance( path, BasePath):
-        return path
-    if isinstance( path, str):
-        if not path or path == ".":
+class PyPath(Generic[PathType]):
+    def __new__(cls, path: Union[str,BasePath]):
+        if isinstance( path, BasePath):
+            return path
+        if isinstance( path, str):
+            if not path or path == ".":
+                return DummyPath()
+            return ObjPath(path)
+        if hasattr( path, "__iter__"):
+            return TuplePath(path)
+        raise ValueError("invalid path argument")
+
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+    @classmethod
+    def __modify_schema__(cls, field_schema):
+        pass 
+    
+    @classmethod
+    def validate(cls, v, field: ModelField):
+
+        if field.sub_fields:
+            if len(field.sub_fields)>1:
+                raise ValidationError(['to many field PyPath accep only one'], cls)
+
+            val_f = field.sub_fields[0]
+            errors = []
+        
+            valid_value, error = val_f.validate(v, {}, loc='value')
+            if error:
+                errors.append(error)
+            if errors:
+                raise ValidationError(errors, cls)
+        else:
+            valid_value = v 
+        if not valid_value:
             return DummyPath()
-        return ObjPath(path)
-    if hasattr( path, "__iter__"):
-        return TuplePath(path)
-    raise ValueError("invalid path argument")
+        return cls(valid_value)
+    
+    def __repr__(self):
+        return f'{self.__class__.__name__}({super().__repr__()})'
+
 
 
 class DummyPath(BasePath):
@@ -92,8 +91,9 @@ class DummyPath(BasePath):
 
 
 class GroupPath(BasePath):
+    """ Group several :class:`BasePath` to be resolved at ones """
     def __init__(self, *group):
-        self._group = tuple(objpath(p) for p in group)
+        self._group = tuple(PyPath(p) for p in group)
     
     def resolve(self, parent):
         for p in self._group:
@@ -115,10 +115,9 @@ class GroupPath(BasePath):
         if not isinstance(left, DummyPath):
             g = g.add(left)
         return g, right 
-
     
     def add(self, path):
-        path = objpath(path)
+        path = PyPath(path)
         if isinstance( path, GroupPath):
             return GroupPath( *self._group, *path._group)
         else:
@@ -153,7 +152,7 @@ class ObjPath(BasePath):
             return DummyPath(), ObjPath( splitted[0] )  
     
     def add(self, path):
-        path = objpath(path)
+        path = PyPath(path)
         if isinstance( path, ObjPath):
             return ObjPath( self._path+"."+path._path )
         else:
@@ -202,7 +201,7 @@ class TuplePath(BasePath):
             return DummyPath(), AttrPath(self._path[0])
      
     def add(self, path):
-        path = objpath(path)
+        path = PyPath(path)
         if isinstance( path, TuplePath):
             return TuplePath( self._path+path._path )
         else:

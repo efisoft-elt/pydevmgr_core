@@ -1,7 +1,7 @@
 from .engine import  DataNodeEngine
 from pydevmgr_core.base.register import register 
 from pydevmgr_core.base.node import BaseNode 
-from pydevmgr_core.base.object_path import PathVar
+from pydevmgr_core.base.object_path import PyPath
 from typing import Any, Optional
 
 class __Undefined__:
@@ -15,7 +15,7 @@ class DataNode(BaseNode):
     Engine = DataNodeEngine 
     
     class Config:
-        data_suffix: PathVar 
+        data_suffix: PyPath 
         default: Any = __Undefined__ 
     
     def fget(self):

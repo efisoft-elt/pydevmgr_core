@@ -2,14 +2,15 @@ from typing import Any
 from systemy import BaseFactory
 
 from .register import register 
-from .object_path import BasePath, PathVar
+from .object_path import BasePath, PyPath
 
 @register
 class Alias(BaseFactory):
     """ Alias """
-    target: PathVar
+    target: PyPath
     def __init__(self, target):
         super().__init__(target=target) 
+
     @classmethod
     def parse_obj(cls, obj: Any) -> 'Alias':
         if isinstance( obj, dict):

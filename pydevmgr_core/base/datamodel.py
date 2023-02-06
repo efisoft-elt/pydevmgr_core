@@ -10,7 +10,7 @@ from .upload import upload
 from .node import BaseNode
 from .model_var import NodeVar, NodeVar_R, NodeVar_W, NodeVar_RW, StaticVar
 from .base import BaseData, BaseFactory, BaseObject
-from .object_path import AttrPath, ObjPath, BasePath, TuplePath, objpath
+from .object_path import AttrPath, ObjPath, BasePath, TuplePath, PyPath
 from typing import  Any, Iterable, Dict, List, Optional, Set,  Tuple, Type, Union
 from warnings import warn
 import inspect
@@ -87,7 +87,7 @@ class NodeField:
                 node = AttrPath(name)
         
         if isinstance( node, (BasePath, str, tuple, list)):
-            node = objpath(node)
+            node = PyPath(node)
         elif not isinstance(node, BaseNode):
             if not isinstance(node, BaseFactory):
                 raise ValueError( f"Invalid node argument expecting a BaseNode, a Factory or string got {node}")
@@ -130,7 +130,7 @@ class StaticField:
     @classmethod
     def from_field(cls, name, field):
         if C.PATH in field.field_info.extra:
-            path = objpath(field.field_info.extra[C.PATH] )
+            path = PyPath(field.field_info.extra[C.PATH] )
         elif C.ATTR in field.field_info.extra:
             warn( f"{C.ATTR} var in field is deprecated, use {C.PATH!r}" , DeprecationWarning)
             path = ObjPath(field.field_info.extra[C.ATTR] )
@@ -163,7 +163,7 @@ class ObjField:
     @classmethod
     def from_field(cls, name, field):
         if C.PATH in field.field_info.extra:
-            path = objpath(field.field_info.extra[C.PATH] )
+            path = PyPath(field.field_info.extra[C.PATH] )
         elif C.ATTR in field.field_info.extra:
             warn( f"{C.ATTR} var in field is deprecated, use {C.PATH!r}" , DeprecationWarning)
             path = ObjPath(field.field_info.extra[C.ATTR] )

@@ -1,6 +1,6 @@
 from pydevmgr_core.base.engine import BaseEngine
 from dataclasses import dataclass 
-from pydevmgr_core.base.object_path import objpath, PathVar 
+from pydevmgr_core.base.object_path import  PyPath 
 from typing import Any, Optional
 
 @dataclass
@@ -12,7 +12,7 @@ class DataEngine(BaseEngine):
             self.data = self.data
     
     class Config(BaseEngine.Config):
-        data_prefix: Optional[PathVar] = None
+        data_prefix: Optional[PyPath] = None
 
     @classmethod
     def new(cls, com, config):
@@ -23,7 +23,7 @@ class DataEngine(BaseEngine):
         
         data_prefix = getattr(config, "data_prefix", None)
         if data_prefix:
-            data = objpath(config.data_prefix).resolve(data)    
+            data = PyPath(config.data_prefix).resolve(data)    
             
         engine = super().new(com, config)
         engine.data = data 

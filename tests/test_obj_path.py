@@ -1,6 +1,6 @@
 from pydantic.main import BaseModel
 import pytest 
-from pydevmgr_core.base.object_path import AttrPath, ItemPath, ObjPath, PathVar, TuplePath, GroupPath
+from pydevmgr_core.base.object_path import AttrPath, ItemPath, ObjPath, PyPath, TuplePath, GroupPath
 
 from pydevmgr_core import BaseManager,  BaseDevice
 from systemy import FactoryList, FactoryDict
@@ -40,10 +40,10 @@ def test_path_var_in_model():
         a = A() 
 
     class M(BaseModel):
-        path1: PathVar 
-        path2: PathVar 
-        path3: PathVar 
-        path4: PathVar  
+        path1: PyPath 
+        path2: PyPath 
+        path3: PyPath 
+        path4: PyPath  
     m = M(path1 = "", path2="a.b", path3="a", path4=("a","b"))
     data = Data()
     assert m.path1.resolve(data) is data 
@@ -127,7 +127,7 @@ def test_set_value():
 
 def test_path_var_instance():
     x = 2
-    assert PathVar(".").resolve(x) == 2
+    assert PyPath(".").resolve(x) == 2
 
 
 def test_group_path():
@@ -172,4 +172,13 @@ def test_group_path():
     assert left.resolve(root) is root.a 
 
 
+def test_path_var_parsing():
+    class A:
+        class B:
+            class C:
+                d = 0
+            c = C()
+        b = B() 
+    a = A() 
 
+    assert PyPath("b.c.d").resolve(a) is a.b.c.d

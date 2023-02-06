@@ -9,7 +9,7 @@ from py_expression_eval import Parser
 from dataclasses import dataclass
 import math
 
-from pydevmgr_core.base.object_path import PathVar 
+from pydevmgr_core.base.object_path import PyPath 
 
 _eval_parser = Parser()
 
@@ -96,14 +96,6 @@ class Static(BaseNode):
     """
     class Config(BaseNode.Config):    
         value: Any
-        def __init__(self, value=None, **kwargs):
-            super().__init__(value=value, **kwargs)
-        @classmethod
-        def validate(cls, value):
-            try:
-                return super().validate(value)
-            except (ValueError, TypeError, KeyError):
-                return super().validate( {'value':value})
 
     def fget(self):        
         return self.config.value    
@@ -117,14 +109,6 @@ class Value(BaseNode):
     """
     class Config(BaseNode.Config):    
         value: Any
-        def __init__(self, value=None, **kwargs):
-            super().__init__(value=value, **kwargs)
-        @classmethod
-        def validate(cls, value):
-            try:
-                return super().validate(value)
-            except (ValueError, TypeError, KeyError):
-                return super().validate( {'value':value})
             
 
     def __init__(self, *args, **kwargs):

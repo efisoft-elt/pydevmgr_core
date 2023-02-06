@@ -61,7 +61,7 @@ from .monitor import (
 
 from . import decorators
  
-from .object_path import BasePath, ObjPath, AttrPath, ItemPath, objpath, PathVar, DummyPath
+from .object_path import BasePath, ObjPath, AttrPath, ItemPath, PyPath, DummyPath
 from .vtype import VType, nodedefault, nodetype , nodestype, nodesdefault
 from systemy import storedproperty, find_factories , FactoryList, FactoryDict
 from .alias import Alias 
