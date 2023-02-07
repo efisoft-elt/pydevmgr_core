@@ -43,7 +43,7 @@ class PyPath(Generic[PathType]):
             if not path or path == ".":
                 return DummyPath()
             return ObjPath(path)
-        if hasattr( path, "__iter__"):
+        if isinstance( path, (tuple,list)):
             return TuplePath(path)
         raise ValueError("invalid path argument")
 
