@@ -1,4 +1,3 @@
-from numpy.lib.function_base import insert
 from pydantic import BaseModel 
 from systemy import BaseSystem
 import inspect
