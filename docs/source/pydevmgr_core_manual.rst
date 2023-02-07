@@ -61,7 +61,7 @@ configuraiton parameter is also accessible from `my_device` and is readonly :
 
     assert my_device.model == "PT100"
 
-One can however change any configuration parameters thanks to the :met:`BaseObject.reconfigure` 
+One can however change any configuration parameters thanks to the :meth:`BaseObject.reconfigure` 
 
 .. code-block:: python 
 

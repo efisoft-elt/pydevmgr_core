@@ -2,11 +2,9 @@ from warnings import warn
 
 from .base import (BaseObject, BaseData)
 from .engine import BaseNodeEngine 
-from inspect import signature , _empty
 
-from pydantic import create_model,  validator, BaseModel
+from pydantic import Field 
 from typing import Dict, Any, Optional,  Callable,  Dict,  Type, Union
-from systemy import BaseSystem
 from valueparser import ParserFactory
 from .vtype import VType 
 
@@ -16,11 +14,11 @@ from .vtype import VType
 
 class BaseNodeConfig(BaseObject.Config):
     """ Config for a Node """
-    parser: Optional[ParserFactory] = None #NoneParserFactory()
-    output_parser: Optional[ParserFactory] = None 
-    description: str = ""
+    parser: Optional[ParserFactory] = Field(None, description="A Parser for when a value is sent to set()")  #NoneParserFactory()
+    output_parser: Optional[ParserFactory] = Field(None, description="A Parser used before value is outputed by get()") 
+    description: str = Field("", description="Node description")
     unit: str = ""
-    vtype: VType = None 
+    vtype: VType = Field(None, description="expecting output Type of the node (if any)")  
 
 class BaseReadCollector:
     """ Object used to collect nodes values from the same server in one roundtrip 
@@ -108,15 +106,27 @@ class BaseNode(BaseObject):
     """ This a base class defining the base methods for a node 
     
     The requirement for a Node is to have: 
-        - a .key (str) attribute
-        - a .sid (any hashable) attribute (iddenify an id to group nodes together for efficient reading and writting 
-            in one server call). If sid is None the node is threated of an "alias Node".
-            The only requirement for sid is that it should be hashable.
+        
         - a .get(data=None) method 
+            
+        - a :attr:`BaseNode.sid` attribute : 
+            any hashable which iddenify the server (if any) targeted by the node. 
+            This is used by e.g. :class:`downloader` to group nodes by server.
+            If sid is None the node is threated of an "alias Node" and a :meth:`BaseNode.nodes` shall 
+            returns a node iterator.
+        - a .get(data=None) method 
+            
         - a .set(value, data=None) method 
-        - read_collector() : a constructor for a node collector for reading 
-        - write_collector() : a constructor for a node collector for writting
-    
+            
+        Optionally
+        
+        - read_collector() : 
+            a constructor for a node collector for reading 
+        - write_collector() : 
+            a constructor for a node collector for writting
+        - nodes():
+            If the nodes is a node alias and depend to other nodes 
+        
     To implement from BaseNode one need to implement the .fget and .fset method (they are called by .get and .set)
     """
     Config = BaseNodeConfig
@@ -137,13 +147,7 @@ class BaseNode(BaseObject):
         super().__init__(key, config=config, com=com, **kwargs)
         self._has_output_parser = self.output_parser is not None 
 
-        # if self.__config__.parser is not None:
-        #     # !!! the parser builder can return None
-        #     self._parser = self.__config__.parser.build(self)
-            
-        # if self.__config__.output_parser is not None:
-        #     # !!! the output_parser builder can return None
-        #     self._output_parser = self.__config__.output_parser.build(self) 
+
 
     @property
     def sid(self):
@@ -152,10 +156,6 @@ class BaseNode(BaseObject):
         The sid property shall be adujsted according to read_collector and write_collector methods 
         """
         return 0
-    
-    # @property
-    # def parser(self):
-    #     return self._parser
     
     
     def parse(self, value):
@@ -226,14 +226,10 @@ class BaseNode(BaseObject):
         value = self.parse(value)
         self.fset(value)
 
-        # if data is None:
-        #     self.fset(value)
-        # else:
-        #     data[self] = value
     
     ### ############################################
     #
-    # To be implemented by the inerated class  
+    # To be implemented by the inereted class  
     #
      
     def fget(self):
