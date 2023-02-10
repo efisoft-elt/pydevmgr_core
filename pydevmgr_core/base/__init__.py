@@ -63,6 +63,7 @@ from . import decorators
  
 from .object_path import BasePath, ObjPath, AttrPath, ItemPath, PyPath, DummyPath
 from .vtype import VType, nodedefault, nodetype , nodestype, nodesdefault
-from systemy import storedproperty, find_factories , FactoryList, FactoryDict, autodoc
+from systemy import (storedproperty, find_factories , FactoryList, FactoryDict, autodoc)
+from systemy.model_instance import InstanceOf # to be modified afte systemy update
 from .alias import Alias 
 # from .decorators import getter, setter, finaliser, nodealias, nodealias_maker, node_maker

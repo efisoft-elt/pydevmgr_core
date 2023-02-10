@@ -1,4 +1,3 @@
-from numpy.core.arrayprint import _TimelikeFormat
 from pydevmgr_core.base.node import BaseNode
 from typing import Callable
 from datetime import datetime

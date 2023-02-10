@@ -1,10 +1,11 @@
 from enum import Enum
-from typing import Any, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type
 import weakref
 
 from pydantic import BaseModel, Extra, validator
 
 from pydevmgr_core.base.io import load_config
+from pydevmgr_core.base.object_path import PyPath
 
 from .engine import BaseEngine 
 from .model_var import StaticVar, NodeVar
@@ -45,6 +46,7 @@ class BaseData(BaseModel):
 
 class BaseConfig(BaseSystem.Config):
     """ Configuration for pydevmgr objects """
+   
     class Config:
         validate_assignment = True
 
