@@ -1,3 +1,4 @@
+from enum import EnumMeta
 from pydantic import BaseModel 
 from systemy import BaseSystem
 import inspect
@@ -26,6 +27,8 @@ def _vtype_default(vtype, default_default=None):
         _, default = vtype 
         return default
     if vtype is None:
+        return default_default
+    if isinstance(vtype, EnumMeta):
         return default_default
     if not hasattr( vtype, "__call__"):
         return default_default
