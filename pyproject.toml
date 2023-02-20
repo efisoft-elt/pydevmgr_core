@@ -10,7 +10,7 @@ packages = [{include = "pydevmgr_core"}]
 [tool.poetry.dependencies]
 python = "^3.7"
 pydantic = "^1.9"
-systemy = ">=0.2.a7"
+systemy = ">=0.2.a8"
 valueparser = ">=0.2.a1"
 py-expression-eval = "^0.3.14"
 get-annotations = "^0.1.2"
