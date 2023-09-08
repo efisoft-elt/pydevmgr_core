@@ -1,7 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from pydantic.main import BaseModel
+try:
+    from pydantic.v1.main import BaseModel
+except ModuleNotFoundError:
+    from pydantic.main import BaseModel
 
 
 @dataclass

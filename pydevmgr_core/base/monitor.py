@@ -1,7 +1,10 @@
 import time
 from typing import Callable, Iterable, Optional,Any, Union
 from dataclasses import dataclass, field
-from pydantic.main import BaseModel
+try:
+    from pydantic.v1.main import BaseModel
+except ModuleNotFoundError:
+    from pydantic.main import BaseModel
 from pydevmgr_core.base.datamodel import DataLink
 
 from pydevmgr_core.base.download import Downloader

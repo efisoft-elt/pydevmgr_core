@@ -4,7 +4,6 @@ from .object_path import ObjPath
 from .decorators import getter 
 
 from typing import Union, List, Optional, Any, Dict, Callable
-from pydantic import create_model
 from inspect import signature , _empty, _ParameterKind, getattr_static
 
 

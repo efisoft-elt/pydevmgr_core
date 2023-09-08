@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from pydantic import BaseModel, ValidationError, Field
-from pydantic.fields import ModelField
-from pydantic.main import create_model
+try:
+    from pydantic.v1 import BaseModel,  Field
+except ModuleNotFoundError:
+    from pydantic import BaseModel,  Field
 
 from .vtype import VType, find_vtype, nodedefault, nodetype, _vtype_type, _vtype_default
 from .download import download, BaseDataLink, reset

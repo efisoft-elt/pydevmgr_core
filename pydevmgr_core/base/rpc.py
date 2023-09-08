@@ -1,10 +1,13 @@
 from warnings import warn
-from pydantic.class_validators import root_validator 
+try:
+    from pydantic.v1.class_validators import root_validator 
+except ModuleNotFoundError:
+    from pydantic.class_validators import root_validator 
 from valueparser import  ParserFactory
 
 from .base import BaseObject
 
-from typing import Dict, List, Callable,  Optional, Type, Any
+from typing import Dict, List,   Optional
 from systemy import BaseSystem, FactoryDict, FactoryList
 
 

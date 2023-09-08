@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Iterable, List, Optional, Tuple, Type, Union
-from pydantic.fields import Field
-from pydantic.main import BaseModel, create_model
+try:
+    from pydantic.v1 import Field, BaseModel, create_model
+except ModuleNotFoundError:
+    from pydantic import Field, BaseModel, create_model
 
 from systemy.system import BaseFactory
 from pydevmgr_core.base.base import BaseData, BaseObject, find_factories

@@ -1,5 +1,8 @@
 from enum import EnumMeta
-from pydantic import BaseModel 
+try:
+    from pydantic.v1 import BaseModel 
+except ModuleNotFoundError:
+    from pydantic import BaseModel 
 from systemy import BaseSystem
 import inspect
 from typing import Dict, Iterable, Union, Optional, Type, Tuple, Any

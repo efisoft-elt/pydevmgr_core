@@ -8,7 +8,6 @@ from .misc.math_parser import ExpEval
 from enum import Enum
 import math
 from typing import Any, Optional , Type
-from pydantic import validator
 from py_expression_eval import Parser as _ExpressionParser 
 _math_parser = _ExpressionParser()
 del _ExpressionParser

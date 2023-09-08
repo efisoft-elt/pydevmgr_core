@@ -1,7 +1,15 @@
 
 
-from pydantic import BaseModel, ValidationError
-from pydantic.fields import ModelField
+try:
+    from pydantic.v1 import BaseModel, ValidationError
+except ModuleNotFoundError:
+    from pydantic import BaseModel, ValidationError
+
+try:
+    from pydantic.v1.fields import ModelField
+except ModuleNotFoundError:
+    from pydantic.fields import ModelField
+
 from typing import Optional, TypeVar, Generic
 
 from systemy.system import BaseFactory 
@@ -117,7 +125,10 @@ class Defaults2(Defaults):
 
 
 if __name__ == "__main__":
-    from pydantic import BaseModel
+    try:
+        from pydantic.v1 import BaseModel
+    except ModuleNotFoundError:
+        from pydantic import BaseModel
     from pydevmgr_core import BaseDevice, register
     from typing import Dict 
     

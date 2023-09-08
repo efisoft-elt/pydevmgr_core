@@ -3,7 +3,10 @@ from warnings import warn
 from .base import (BaseObject, BaseData)
 from .engine import BaseNodeEngine 
 
-from pydantic import Field 
+try:
+    from pydantic.v1 import Field 
+except ModuleNotFoundError:
+    from pydantic import Field 
 from typing import Dict, Any, Optional,  Callable,  Dict,  Type, Union
 from valueparser import ParserFactory
 from .vtype import VType 

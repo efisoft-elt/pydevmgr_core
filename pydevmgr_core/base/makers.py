@@ -3,7 +3,10 @@ from pydevmgr_core.base.node_alias import BaseNodeAlias, NodeAlias
 from pydevmgr_core.base.rpc import BaseRpc
 from .decorators import getter, caller
 
-from pydantic.main import create_model
+try:
+    from pydantic.v1 import create_model
+except ModuleNotFoundError:
+    from pydantic import create_model
 from typing import  Optional, Union, Type
 
 

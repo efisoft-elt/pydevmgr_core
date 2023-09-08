@@ -1,7 +1,10 @@
 import yaml
 import os
 import re
-from pydantic import BaseModel
+try:
+    from pydantic.v1 import BaseModel
+except ModuleNotFoundError:
+    from pydantic import BaseModel
 from typing import Tuple, Optional, List, Dict, Optional, Callable, Any
 from enum import Enum
 from systemy import SystemLoader, SystemIo

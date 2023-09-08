@@ -2,7 +2,10 @@ from enum import Enum
 from typing import Optional 
 from pydevmgr_core.base.register import KINDS, record_factory
 from systemy import BaseFactory , get_factory_class
-from pydantic import Extra, validator
+try:
+    from pydantic.v1 import Extra, validator
+except ModuleNotFoundError:
+    from pydantic import Extra, validator
 from pydevmgr_core.base.base import BaseObject
 # used to force kind to be a device
 __all__ = ["ObjectFactory", "ManagerFactory", "DeviceFactory", 

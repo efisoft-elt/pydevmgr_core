@@ -1,16 +1,17 @@
-from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Optional, Tuple
 import weakref
 
-from pydantic import BaseModel, Extra, validator
+try:
+    from pydantic.v1 import BaseModel
+except ModuleNotFoundError:
+    from pydantic import BaseModel
 
 from pydevmgr_core.base.io import load_config
-from pydevmgr_core.base.object_path import PyPath
 
 from .engine import BaseEngine 
-from .model_var import StaticVar, NodeVar
-from systemy import BaseSystem, BaseFactory, SystemDict, SystemList
-from systemy import get_factory_class, find_factories
+from .model_var import StaticVar
+from systemy import BaseSystem,  SystemDict, SystemList, BaseFactory 
+from systemy import find_factories, get_factory_class
 
   
 
