@@ -28,7 +28,10 @@ Three type of interfaces :
 """
 
 from collections import OrderedDict
-from pydantic import BaseModel
+try:
+    from pydantic.v1 import BaseModel
+except ModuleNotFoundError:
+    from pydantic import BaseModel
 from typing import Callable
 
 

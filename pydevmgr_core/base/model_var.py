@@ -1,5 +1,11 @@
-from pydantic import BaseModel, ValidationError, Field
-from pydantic.fields import ModelField
+try:
+    from pydantic.v1 import BaseModel, ValidationError, Field
+except ModuleNotFoundError:
+    from pydantic import BaseModel, ValidationError, Field
+try:
+    from pydantic.v1.fields import ModelField
+except ModuleNotFoundError:
+    from pydantic.fields import ModelField
 from typing import TypeVar, Generic, Any, Iterable, Dict, List, Type
 
 ValType = TypeVar('ValType')

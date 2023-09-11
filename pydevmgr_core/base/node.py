@@ -8,7 +8,10 @@ from . import io
 import weakref
 from inspect import signature , _empty
 
-from pydantic import create_model,  validator
+try:
+    from pydantic.v1 import create_model,  validator
+except ModuleNotFoundError:
+    from pydantic import create_model,  validator
 from typing import Dict, Any, Optional, Union, Callable,  List, Dict
 from enum import Enum 
 

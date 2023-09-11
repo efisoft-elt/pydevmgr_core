@@ -1,7 +1,10 @@
 from PyQt5 import  uic
 from PyQt5.QtWidgets import QFrame, QHBoxLayout, QComboBox, QWidget
 from .base import get_widget_types, BaseUiLinker, get_widget_factory, DEFAULT, LayoutLinker
-from pydantic import BaseModel
+try:
+    from pydantic.v1 import BaseModel
+except ModuleNotFoundError:
+    from pydantic import BaseModel
 from typing import Optional, List
 from pydevmgr_core import BaseDevice
 from .io import find_ui

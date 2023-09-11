@@ -5,7 +5,10 @@ from .misc.math_parser import ExpEval
 from enum import Enum, auto
 import math
 from typing import Any, Optional , Type
-from pydantic import validator
+try:
+    from pydantic.v1 import validator
+except ModuleNotFoundError:
+    from pydantic import validator
 
 __all__ = [
 "BadValue", 

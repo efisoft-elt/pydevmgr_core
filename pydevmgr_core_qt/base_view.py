@@ -1,5 +1,8 @@
 from .base import BaseUiLinker, WidgetControl, WidgetFactory, get_widget_factory
-from pydantic import BaseModel, validator
+try:
+    from pydantic.v1 import BaseModel, validator
+except ModuleNotFoundError:
+    from pydantic import BaseModel, validator
 from typing import Iterable, Union, Optional, List, Dict
 from .io import find_ui
 from pydevmgr_core import _BaseObject, BaseData, BaseDevice

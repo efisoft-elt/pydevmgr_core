@@ -1,6 +1,12 @@
 from pydevmgr_core.base.class_recorder import get_class, KINDS
-from pydantic import BaseModel, ValidationError
-from pydantic.fields import ModelField
+try:
+    from pydantic.v1 import BaseModel, ValidationError
+except ModuleNotFoundError:
+    from pydantic import BaseModel, ValidationError
+try:
+    from pydantic.v1.fields import ModelField
+except ModuleNotFoundError:
+    from pydantic.fields import ModelField
 from typing import Optional, TypeVar, Generic 
 
 from .io import load_config
@@ -276,7 +282,10 @@ class GenConf(Generic[GenConfVar]):
 
 
 if __name__ == "__main__":
-    from pydantic import BaseModel
+    try:
+        from pydantic.v1 import BaseModel
+    except ModuleNotFoundError:
+        from pydantic import BaseModel
     from pydevmgr_core import BaseDevice, record_class
     from typing import Dict 
     

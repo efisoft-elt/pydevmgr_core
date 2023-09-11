@@ -1,8 +1,9 @@
 from os import path
 from typing import Any, Tuple, Optional, List,  Union, Type, TypeVar, Iterator
-from pydantic import BaseModel, Extra,  create_model, root_validator
-from pydantic.class_validators import root_validator
-
+try:
+    from pydantic.v1 import BaseModel, Extra,  create_model, root_validator
+except ModuleNotFoundError:
+    from pydantic import BaseModel, Extra,  create_model, root_validator
 from .class_recorder import get_class, KINDS
 from .model_var import StaticVar, NodeVar
 

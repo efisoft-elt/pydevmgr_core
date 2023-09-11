@@ -1,8 +1,11 @@
 from pydevmgr_core_qt import * 
 from pydevmgr_core import  BaseDevice, Downloader, NodeVar, parser
-from pydevmgr_core.np_nodes import Noise, Mean, Max
+from pydevmgr_core.np_nodes import Noise, MeanFilter, MaxFilter
 from pydevmgr_core.nodes import UtcTime, Local 
-from pydantic import Field
+try:
+    from pydantic.v1 import Field
+except ModuleNotFoundError:
+    from pydantic import Field
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton
 from PyQt5 import  QtCore
@@ -52,11 +55,11 @@ class TestUiLinker(BaseUiLinker):
         
     class Data(BaseDevice.Data):
         noise: NodeVar[float] = 0.0
-        maxnoise: NodeVar[float] = Field(0.0, node=Max.prop(node="noise"))
+        maxnoise: NodeVar[float] = Field(0.0, node=MaxFilter.prop(node="noise"))
         
         utc: NodeVar[str] = ""
         counter: NodeVar[int] = 0
-        meancounter: NodeVar[float] = Field(0.0, node=Mean.prop(node="counter"))
+        meancounter: NodeVar[float] = Field(0.0, node=MeanFilter.prop(node="counter"))
         
     def init_vars(self):
         self.outputs.noise = self.outputs.Float(self.widget.label0)

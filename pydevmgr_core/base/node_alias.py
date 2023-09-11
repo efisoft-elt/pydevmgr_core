@@ -1,7 +1,10 @@
 from .node import BaseNode, NodesReader, NodesWriter
 from .base import kjoin, _BaseObject, new_key, path 
 from typing import Union, List, Optional, Any, Dict, Callable
-from pydantic import create_model, validator
+try:
+    from pydantic.v1 import create_model
+except ModuleNotFoundError:
+    from pydantic import create_model
 from inspect import signature , _empty
 
 

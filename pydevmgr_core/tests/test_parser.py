@@ -1,7 +1,10 @@
 from pydevmgr_core import parsers, conparser
 import pytest 
 from enum import Enum 
-from pydantic import BaseModel
+try:
+    from pydantic.v1 import BaseModel
+except ModuleNotFoundError:
+    from pydantic import BaseModel
 
 
 def test_conpraser():

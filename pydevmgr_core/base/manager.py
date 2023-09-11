@@ -8,7 +8,6 @@ from .interface import BaseInterface
 from .class_recorder import KINDS, get_class, record_class
 
 from enum import Enum 
-from pydantic import create_model 
 
 # used to force kind to be a manager
 class MANAGERKIND(str, Enum):

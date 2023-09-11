@@ -1,7 +1,13 @@
 from typing import Any, Optional, Type, Callable, Union, Iterable, List, Generic, TypeVar
-from pydantic import BaseModel , create_model, Extra, validator, ValidationError
+try:
+    from pydantic.v1 import BaseModel , create_model, Extra, validator, ValidationError
+except ModuleNotFoundError:
+    from pydantic import BaseModel , create_model, Extra, validator, ValidationError
 
-from pydantic.fields import ModelField
+try:
+    from pydantic.v1.fields import ModelField
+except ModuleNotFoundError:
+    from pydantic.fields import ModelField
 from inspect import signature , _ParameterKind, _empty, isbuiltin
 from .class_recorder import get_class, KINDS, record_class
 from .base import reconfig

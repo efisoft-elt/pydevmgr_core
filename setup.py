@@ -9,10 +9,11 @@ if sys.version_info < (3, 6, 0, 'final', 0):
 
 setup(
     name= 'pydevmgr_core',
-    version= '0.5.1', # https://www.python.org/dev/peps/pep-0440/
+    version= '0.5.2', # https://www.python.org/dev/peps/pep-0440/
     author='Sylvain Guieu',
     author_email='sylvain.guieu@univ-grenoble-alpes.fr',
-    packages=find_packages(), 
+    # packages=find_packages(), 
+    packages=["pydevmgr_core", "pydevmgr_core_qt"], 
     #scripts=scripts,
     #data_files=data_files,
     license='Creative Commons Attribution-Noncommercial-Share Alike license',

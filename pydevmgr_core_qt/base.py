@@ -4,7 +4,10 @@ from pydevmgr_core import Downloader, _BaseObject, DataLink, BaseData, RpcError
 from typing import Union, Optional, Callable, Iterable
 from PyQt5.QtWidgets import QLayout,  QBoxLayout,  QGridLayout , QWidget, QAction, QComboBox, QVBoxLayout, QBoxLayout, QGridLayout
 from PyQt5 import uic, QtCore
-from pydantic import BaseModel
+try:
+    from pydantic.v1 import BaseModel
+except ModuleNotFoundError:
+    from pydantic import BaseModel
 #QCheckBox, QAction, QPushButton, QComboBox, QLayout,  QWidget, QFrame
 
 class Action:

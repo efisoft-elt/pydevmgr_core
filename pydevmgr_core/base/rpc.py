@@ -5,7 +5,10 @@ from .base import (_BaseObject, _BaseProperty)
                            
 
 from typing import Dict, List, Callable, Union , Optional, Type, Any
-from pydantic import create_model
+try:
+    from pydantic.v1 import create_model
+except ModuleNotFoundError:
+    from pydantic import create_model
 from .parser_engine import parser, AnyParserConfig
 from inspect import signature , _empty
 from enum import Enum 
